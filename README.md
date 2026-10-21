@@ -1,74 +1,135 @@
 # ♠ BTP Poker League
 
-Website buat ngetracking match poker bareng teman. Mobile-first, real-time.
+**🔗 https://btp-poker-league.vercel.app**
 
-- **Player**: daftar pakai nama, email, password → lihat statistik (match dimainkan, menang, win rate), riwayat match, join match.
-- **Dealer**: buat match (maks 8 player), mulai match, tandai player yang kalah, tetapkan pemenang.
-- **Leaderboard**: tab Bulanan & All Time — top 3 di podium, sisanya di list.
-- Halaman match update otomatis (Supabase Realtime) untuk semua yang sedang membukanya.
+BTP Poker League adalah website untuk mencatat hasil permainan poker antar teman. Setiap match yang dimainkan tercatat otomatis: siapa yang ikut, siapa yang kalah, dan siapa yang menang. Hasilnya langsung masuk ke statistik tiap pemain dan ke leaderboard bulanan maupun all time.
 
-**Stack:** React + Vite + Tailwind · Supabase (Auth, Postgres, Realtime) · Vercel. Semua gratis.
+Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semua orang yang membuka match yang sama melihat perubahan yang sama tanpa perlu refresh.
 
 ---
 
-## Setup (sekali saja, ±15 menit)
+## Fitur
 
-### 1. Supabase (database + login)
+### 👤 Akun
+- Daftar cukup dengan **nama, email, dan password**, lalu langsung bisa login.
+- Ada dua jenis akun: **Player** dan **Dealer**.
 
-1. Buat akun di <https://supabase.com> → **New project** (region: Singapore). Simpan database password-nya.
-2. Buka **SQL Editor** → New query → paste isi [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
-3. **Authentication → Sign In / Providers → Email**: matikan **Confirm email**.
-   (Email bawaan Supabase gratis cuma bisa kirim beberapa email per jam, jadi tanpa ini teman-teman bakal gagal daftar.)
-4. **Project Settings → API**: catat **Project URL** dan **anon / publishable key**.
+### 🏠 Beranda Player
+- **Win rate**, jumlah **match dimainkan**, dan jumlah **match menang**.
+- Daftar **match aktif** yang sedang kamu ikuti.
+- **Riwayat match** dengan label WIN / OUT dan nama pemenangnya.
 
-### 2. Vercel (hosting)
+### 🎩 Beranda Dealer
+- Jumlah **match yang sudah di-host**.
+- Tombol **Buat Match Baru**.
+- Daftar match aktif dan riwayat hosting beserta pemenangnya.
 
-1. Login ke <https://vercel.com> pakai GitHub → **Add New → Project** → import repo ini.
-2. Framework otomatis terdeteksi **Vite**. Tambahkan **Environment Variables**:
-   - `VITE_SUPABASE_URL` = Project URL
-   - `VITE_SUPABASE_KEY` = anon / publishable key
-3. **Deploy**. Bagikan link `*.vercel.app` ke teman-teman.
+### 🃏 Match
+- Daftar **match yang sedang aktif** dan **match yang baru selesai**, bisa dilihat semua user.
+- Satu match berisi **maksimal 8 pemain**. Dealer bisa mengatur batasnya antara 2 sampai 8.
+- **Halaman match real-time**:
+  - Player bisa join dan keluar dari match.
+  - Dealer bisa memulai match, menandai pemain yang kalah, dan menetapkan pemenang.
+  - Urutan pemain mengikuti posisi akhir (pemenang di atas, yang kalah paling awal di bawah).
 
-### 3. Jadikan akun sebagai dealer
+### 🏆 Leaderboard
+- Dua tab: **Bulanan** dan **All Time**.
+- Di tab Bulanan bisa geser ke bulan-bulan sebelumnya.
+- **Juara 1, 2, 3 tampil di podium**, sisanya di daftar di bawahnya.
+- Diurutkan berdasarkan jumlah kemenangan. Pemain dengan jumlah menang yang sama mendapat peringkat yang sama.
 
-Daftar dulu lewat website, lalu di Supabase **SQL Editor** jalankan:
+---
 
-```sql
-update public.profiles set role = 'dealer'
- where id = (select id from auth.users where email = 'email-dealer@contoh.com');
+## Cara Kerja
+
+### Alur sebuah match
+
+```
+Dealer buat match  →  Player join  →  Dealer mulai match  →  Dealer tandai yang kalah  →  Dealer tetapkan pemenang  →  Tercatat ✅
 ```
 
-Logout & login lagi — badge **DEALER** muncul dan tombol **Buat Match** tersedia.
+1. **Dealer membuat match** dari menu khusus dealer. Status match: *Menunggu player*.
+2. **Player membuka menu Match**, memilih match, lalu menekan **Join Match**. Selama match belum dimulai, player masih boleh keluar dan dealer masih bisa mengeluarkan player.
+3. **Dealer menekan Mulai Match** (minimal 2 pemain). Setelah itu tidak ada yang bisa join atau keluar.
+4. Selama permainan, **dealer menekan Kalah** untuk pemain yang tersingkir. Kalau salah tekan, bisa di-**Undo**.
+5. **Dealer menekan Menang** pada pemenang dan mengonfirmasi. Match selesai, semua pemain lain tercatat kalah.
+6. Hasilnya langsung muncul di **riwayat**, **statistik**, dan **leaderboard** setiap pemain.
+
+Match yang **dibatalkan** dealer tidak dihitung di statistik maupun leaderboard.
+
+### Bagaimana statistik dihitung
+
+Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwayat match setiap kali halaman dibuka, jadi angkanya selalu sesuai dengan match yang benar-benar terjadi.
+
+| Statistik       | Dihitung dari                                                |
+| --------------- | ------------------------------------------------------------ |
+| Match dimainkan | Jumlah match **selesai** yang diikuti pemain                 |
+| Match menang    | Jumlah match selesai di mana pemain menjadi **pemenang**     |
+| Win rate        | Match menang ÷ match dimainkan × 100%                        |
+| Leaderboard     | Jumlah kemenangan per pemain, untuk bulan terpilih / all time |
+| Match di-host   | Jumlah match **selesai** yang dibuat dealer                  |
+
+### Peran Player vs Dealer
+
+|                                         | Player | Dealer |
+| --------------------------------------- | :----: | :----: |
+| Lihat statistik, match & leaderboard    |   ✅   |   ✅   |
+| Join / keluar dari match                |   ✅   |   –    |
+| Buat, mulai, dan batalkan match         |   –    |   ✅   |
+| Tandai pemain kalah & tetapkan pemenang |   –    |   ✅   |
+
+Semua akun baru otomatis menjadi **Player**. Akun dijadikan **Dealer** oleh admin melalui Supabase (Table Editor → tabel `profiles` → ubah kolom `role` menjadi `dealer`).
+
+### Keamanan
+
+- Data hanya bisa dilihat oleh user yang sudah login.
+- Semua aksi (join, mulai match, tetapkan pemenang, dll.) dijalankan lewat fungsi di database yang **mengecek peran dan kepemilikan match**. Pemain tidak bisa mengubah hasil match atau menjadikan dirinya dealer, dan dealer hanya bisa mengatur match miliknya sendiri.
 
 ---
 
-## Alur match
+## Teknologi
 
-1. Dealer buat match → status **Menunggu player**.
-2. Player buka menu **Match** → pilih match → **Join Match** (maks sesuai setting, ≤ 8).
-3. Dealer tekan **Mulai Match** (min. 2 player). Setelah mulai, player tidak bisa join/keluar.
-4. Selama main, dealer tekan **Kalah** untuk player yang tersingkir (bisa **Undo**).
-5. Dealer tekan **Menang** pada pemenang → match selesai, tercatat di riwayat & leaderboard.
+| Bagian   | Yang dipakai                                         |
+| -------- | ---------------------------------------------------- |
+| Frontend | React, TypeScript, Vite, Tailwind CSS                |
+| Backend  | Supabase (Auth, PostgreSQL, Realtime, Row Level Security) |
+| Hosting  | Vercel (auto-deploy setiap push ke `main`)           |
 
-Match yang **Dibatalkan** tidak dihitung di statistik.
+Semua layanan memakai paket gratis, cukup untuk 40–50 pengguna. Project Supabase gratis akan di-pause kalau tidak dipakai selama 7 hari. Klik **Restore** di dashboard Supabase untuk mengaktifkannya lagi.
 
-## Development lokal
+---
 
+## Untuk Pengembang
+
+<details>
+<summary>Setup dari nol & development lokal</summary>
+
+**Supabase**
+1. Buat project di <https://supabase.com>.
+2. SQL Editor → jalankan isi [`supabase/schema.sql`](supabase/schema.sql).
+3. Authentication → Sign In / Providers → Email → matikan **Confirm email**.
+4. Project Settings → API → catat Project URL dan publishable key.
+
+**Vercel**
+1. Import repo ini di <https://vercel.com>.
+2. Tambahkan environment variable `VITE_SUPABASE_URL` dan `VITE_SUPABASE_KEY`.
+3. Deploy.
+
+**Lokal**
 ```bash
-cp .env.example .env   # isi dengan URL & key Supabase
+cp .env.example .env   # isi URL & key Supabase
 npm install
 npm run dev
 ```
 
-## Batas free tier (cukup untuk 40–50 orang)
+**Struktur**
+```
+src/
+  pages/        Beranda, Leaderboard, Match, Match Room, Buat Match, Login/Daftar
+  components/   Layout (header + bottom nav) dan komponen UI
+  lib/          Supabase client, auth context, helper format
+supabase/
+  schema.sql    Tabel, RLS, fungsi database, realtime
+```
 
-| Layanan  | Limit gratis                                   |
-| -------- | ---------------------------------------------- |
-| Supabase | 500 MB database, 50k user aktif/bulan, 200 koneksi realtime |
-| Vercel   | 100 GB bandwidth/bulan                         |
-
-Catatan: project Supabase gratis akan **di-pause kalau tidak ada aktivitas 7 hari**. Tinggal klik **Restore** di dashboard Supabase kalau itu terjadi.
-
-## Keamanan
-
-Semua tabel memakai Row Level Security: user yang login hanya bisa **membaca**. Semua perubahan (buat match, join, tentukan pemenang, dll.) lewat fungsi database yang mengecek role & kepemilikan match, jadi player tidak bisa mengubah hasil match atau menjadikan dirinya dealer.
+</details>
