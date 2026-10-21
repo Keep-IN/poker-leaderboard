@@ -17,7 +17,7 @@ export default function Layout() {
         <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <span className="text-xl text-gold-400">♠</span>
-            <span className="font-bold tracking-tight">Poker Night</span>
+            <span className="font-bold tracking-tight">BTP Poker League</span>
             {profile?.role === 'dealer' && (
               <span className="rounded-md bg-gold-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gold-300">
                 Dealer

@@ -51,7 +51,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           <span className="text-gold-400">♣</span>
           <span className="text-chip-red">♦</span>
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Poker Night</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight">BTP Poker League</h1>
         <p className="mt-1 text-sm text-slate-400">{isRegister ? 'Buat akun untuk mulai main' : 'Masuk ke akun kamu'}</p>
       </div>
 

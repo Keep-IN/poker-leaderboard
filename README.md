@@ -1,4 +1,4 @@
-# ♠ Poker Night — Leaderboard
+# ♠ BTP Poker League
 
 Website buat ngetracking match poker bareng teman. Mobile-first, real-time.
 
