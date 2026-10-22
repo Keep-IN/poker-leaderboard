@@ -13,6 +13,8 @@ export default function Home() {
 
 interface PlayerMatchRow {
   status: PlayerStatus
+  placement: number | null
+  points: number
   match: {
     id: string
     title: string
@@ -39,7 +41,7 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
   useEffect(() => {
     supabase
       .from('match_players')
-      .select('status, match:matches!inner(id, title, status, created_at, finished_at, winner:profiles!matches_winner_id_fkey(name))')
+      .select('status, placement, points, match:matches!inner(id, title, status, created_at, finished_at, winner:profiles!matches_winner_id_fkey(name))')
       .eq('player_id', playerId)
       .then(({ data }) => setRows((data as unknown as PlayerMatchRow[]) ?? []))
   }, [playerId])
@@ -53,6 +55,11 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
   const played = finished.length
   const wins = finished.filter((r) => r.status === 'winner').length
   const rate = winRate(wins, played)
+  const totalPoints = finished.reduce((sum, r) => sum + r.points, 0)
+  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+  const monthPoints = finished
+    .filter((r) => (r.match.finished_at ?? '') >= monthStart)
+    .reduce((sum, r) => sum + r.points, 0)
 
   return (
     <>
@@ -62,8 +69,12 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
           <WinRateRing value={rate} />
           <div className="grid flex-1 grid-cols-2 gap-3">
             <Stat label="Match dimainkan" value={played} />
-            <Stat label="Match menang" value={wins} accent />
+            <Stat label="Match menang" value={wins} />
           </div>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <Stat label="Poin bulan ini" value={monthPoints} accent />
+          <Stat label="Total poin" value={totalPoints} accent />
         </div>
       </Card>
 
@@ -97,6 +108,7 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
           <Card className="divide-y divide-white/5 p-0">
             {finished.map((r) => {
               const won = r.status === 'winner'
+              const podium = r.placement === 2 || r.placement === 3
               return (
                 <Link
                   key={r.match.id}
@@ -106,10 +118,10 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
                   <span
                     className={cx(
                       'flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
-                      won ? 'bg-gold-400 text-felt-950' : 'bg-white/8 text-slate-400',
+                      won ? 'bg-gold-400 text-felt-950' : podium ? 'bg-slate-300/20 text-slate-200' : 'bg-white/8 text-slate-400',
                     )}
                   >
-                    {won ? 'WIN' : 'OUT'}
+                    {won ? 'WIN' : podium ? `#${r.placement}` : 'OUT'}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{r.match.title}</p>
@@ -118,6 +130,7 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
                       {!won && r.match.winner && ` · Pemenang: ${r.match.winner.name}`}
                     </p>
                   </div>
+                  {r.points > 0 && <span className="shrink-0 text-sm font-bold text-gold-400">+{r.points}</span>}
                   <Chevron />
                 </Link>
               )

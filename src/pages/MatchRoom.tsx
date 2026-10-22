@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
-import { errorMessage, supabase, type Match, type MatchPlayer } from '../lib/supabase'
+import { POINTS_BY_PLACEMENT, errorMessage, supabase, type Match, type MatchPlayer } from '../lib/supabase'
 
 type MatchWithDealer = Match & { dealer: { name: string } | null }
 
@@ -72,6 +72,8 @@ export default function MatchRoom() {
   const me = players.find((p) => p.player_id === profile.id)
   const full = players.length >= match.max_players
   const stillPlaying = players.filter((p) => p.status === 'playing')
+  // Placements come from elimination order, so a winner can only be picked once it is heads-up.
+  const canPickWinner = stillPlaying.length <= 2
   const winner = players.find((p) => p.status === 'winner')
   const sorted = [...players].sort(byStanding)
   const nameOf = (p: MatchPlayer) => p.profile?.name ?? 'Player'
@@ -160,27 +162,40 @@ export default function MatchRoom() {
         </Button>
       )}
 
+      {isDealer && match.status === 'ongoing' && !canPickWinner && (
+        <p className="rounded-xl bg-white/5 px-3 py-2 text-xs text-slate-400">
+          Tekan <span className="font-semibold text-red-300">Kalah</span> sesuai urutan pemain tersingkir. Tombol Menang muncul saat
+          tersisa 2 pemain.
+        </p>
+      )}
+
       {/* Player list */}
       <section>
-        <SectionTitle>Player</SectionTitle>
+        <SectionTitle>{match.status === 'finished' ? 'Hasil akhir' : 'Player'}</SectionTitle>
         {players.length === 0 ? (
           <Card>
             <EmptyState icon="🪑" title="Belum ada yang join" text="Player bisa join dari halaman ini." />
           </Card>
         ) : (
           <Card className="divide-y divide-white/5 p-0">
-            {sorted.map((p, i) => (
+            {sorted.map((p, i) => {
+              const out = p.status === 'eliminated' && !(match.status === 'finished' && p.points > 0)
+              return (
               <div key={p.player_id} className={cx('px-4 py-3', p.player_id === profile.id && 'bg-gold-400/8')}>
-              <div className={cx('flex items-center gap-3', p.status === 'eliminated' && 'opacity-60')}>
+              <div className={cx('flex items-center gap-3', out && 'opacity-60')}>
                 <span className="w-5 text-center text-xs font-bold text-slate-500">{i + 1}</span>
                 <Avatar name={nameOf(p)} id={p.player_id} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className={cx('truncate font-medium', p.status === 'eliminated' && 'line-through decoration-slate-500')}>
-                    {nameOf(p)}
-                    {p.player_id === profile.id && <span className="ml-1.5 text-xs text-gold-300 no-underline">(kamu)</span>}
+                  <p className="flex items-baseline gap-1.5 font-medium">
+                    <span className={cx('truncate', out && 'line-through decoration-slate-500')}>{nameOf(p)}</span>
+                    {p.player_id === profile.id && <span className="shrink-0 text-xs text-gold-300">(kamu)</span>}
                   </p>
-                  <PlayerStatusLabel status={p.status} matchOpen={match.status === 'open'} />
+                  <PlayerStatusLabel player={p} matchStatus={match.status} />
                 </div>
+
+                {match.status === 'finished' && p.points > 0 && (
+                  <span className="shrink-0 rounded-lg bg-gold-400/15 px-2 py-1 text-xs font-bold text-gold-300">+{p.points} poin</span>
+                )}
 
                 {isDealer && match.status === 'open' && (
                   <SmallButton
@@ -204,7 +219,7 @@ export default function MatchRoom() {
               </div>
 
               {isDealer && match.status === 'ongoing' && p.status === 'playing' && (
-                <div className="mt-2.5 grid grid-cols-2 gap-2 pl-8">
+                <div className={cx('mt-2.5 grid gap-2 pl-8', canPickWinner ? 'grid-cols-2' : 'grid-cols-1')}>
                   <SmallButton
                     tone="danger"
                     loading={busy === `out-${p.player_id}`}
@@ -212,13 +227,16 @@ export default function MatchRoom() {
                   >
                     ✕ Kalah
                   </SmallButton>
-                  <SmallButton tone="gold" onClick={() => askWinner(p)}>
-                    🏆 Menang
-                  </SmallButton>
+                  {canPickWinner && (
+                    <SmallButton tone="gold" onClick={() => askWinner(p)}>
+                      🏆 Menang
+                    </SmallButton>
+                  )}
                 </div>
               )}
               </div>
-            ))}
+              )
+            })}
           </Card>
         )}
       </section>
@@ -250,9 +268,14 @@ export default function MatchRoom() {
   )
 
   function askWinner(p: MatchPlayer) {
+    const runnerUp = stillPlaying.find((x) => x.player_id !== p.player_id)
+    const [first, second] = POINTS_BY_PLACEMENT
     setConfirm({
       title: `${nameOf(p)} menang?`,
-      text: 'Match akan berakhir dan semua player lain dicatat kalah. Aksi ini tidak bisa dibatalkan.',
+      text:
+        `${nameOf(p)} juara (+${first} poin)` +
+        (runnerUp ? ` dan ${nameOf(runnerUp)} runner-up 1 (+${second} poin)` : '') +
+        '. Peringkat lainnya mengikuti urutan kalah. Aksi ini tidak bisa dibatalkan.',
       action: '🏆 Ya, tetapkan pemenang',
       run: () => call('confirm', 'declare_winner', { p_match: id, p_player: p.player_id }),
     })
@@ -272,6 +295,7 @@ export default function MatchRoom() {
 const standingOrder = { winner: 0, playing: 1, eliminated: 2 }
 
 function byStanding(a: MatchPlayer, b: MatchPlayer) {
+  if (a.placement && b.placement) return a.placement - b.placement
   const diff = standingOrder[a.status] - standingOrder[b.status]
   if (diff !== 0) return diff
   // Eliminated later = better finish
@@ -288,9 +312,12 @@ function Meta({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PlayerStatusLabel({ status, matchOpen }: { status: MatchPlayer['status']; matchOpen: boolean }) {
-  if (matchOpen) return <p className="text-xs text-sky-300">Sudah join</p>
-  if (status === 'winner') return <p className="text-xs font-semibold text-gold-400">🏆 Pemenang</p>
+function PlayerStatusLabel({ player, matchStatus }: { player: MatchPlayer; matchStatus: Match['status'] }) {
+  const { status, placement } = player
+  if (matchStatus === 'open') return <p className="text-xs text-sky-300">Sudah join</p>
+  if (status === 'winner') return <p className="text-xs font-semibold text-gold-400">🏆 Juara</p>
+  if (matchStatus === 'finished' && (placement === 2 || placement === 3))
+    return <p className="text-xs font-semibold text-slate-200">{placement === 2 ? '🥈 Runner-up 1' : '🥉 Runner-up 2'}</p>
   if (status === 'eliminated') return <p className="text-xs text-red-300">Kalah</p>
   return <p className="text-xs text-emerald-300">Masih main</p>
 }

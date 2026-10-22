@@ -11,22 +11,41 @@ interface PlayerStatRow {
   name: string
   played: number
   wins: number
+  points: number
+  month_points: number
   joined_at: string
 }
 
-type SortKey = 'wins' | 'rate' | 'played' | 'name'
+type SortKey = 'points' | 'month' | 'wins' | 'rate' | 'played' | 'name'
 
-const sortLabels: Record<SortKey, string> = { wins: 'Menang', rate: 'Win rate', played: 'Main', name: 'Nama' }
+const sortLabels: Record<SortKey, string> = {
+  points: 'Total poin',
+  month: 'Poin bulan ini',
+  wins: 'Menang',
+  rate: 'Win rate',
+  played: 'Main',
+  name: 'Nama',
+}
 
 export default function Players() {
   const { profile } = useAuth()
   const [rows, setRows] = useState<PlayerStatRow[] | null>(null)
   const [query, setQuery] = useState('')
-  const [sort, setSort] = useState<SortKey>('wins')
+  const [sort, setSort] = useState<SortKey>('points')
 
   useEffect(() => {
-    supabase.rpc('get_player_stats').then(({ data }) =>
-      setRows(((data as PlayerStatRow[]) ?? []).map((r) => ({ ...r, played: Number(r.played), wins: Number(r.wins) }))),
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    supabase.rpc('get_player_stats', { p_month_start: monthStart }).then(({ data }) =>
+      setRows(
+        ((data as PlayerStatRow[]) ?? []).map((r) => ({
+          ...r,
+          played: Number(r.played),
+          wins: Number(r.wins),
+          points: Number(r.points),
+          month_points: Number(r.month_points),
+        })),
+      ),
     )
   }, [])
 
@@ -35,6 +54,8 @@ export default function Players() {
     const list = (rows ?? []).filter((r) => r.name.toLowerCase().includes(q))
     const byName = (a: PlayerStatRow, b: PlayerStatRow) => a.name.localeCompare(b.name, 'id')
     const compare: Record<SortKey, (a: PlayerStatRow, b: PlayerStatRow) => number> = {
+      points: (a, b) => b.points - a.points || b.wins - a.wins || byName(a, b),
+      month: (a, b) => b.month_points - a.month_points || b.points - a.points || byName(a, b),
       wins: (a, b) => b.wins - a.wins || b.played - a.played || byName(a, b),
       rate: (a, b) => winRate(b.wins, b.played) - winRate(a.wins, a.played) || b.played - a.played || byName(a, b),
       played: (a, b) => b.played - a.played || b.wins - a.wins || byName(a, b),
@@ -97,12 +118,12 @@ export default function Players() {
                   {r.player_id === profile?.id && <span className="shrink-0 text-xs text-gold-300">(kamu)</span>}
                 </p>
                 <p className="text-xs text-slate-400">
-                  {r.played} main · {winRate(r.wins, r.played)}% win rate
+                  {r.played} main · {r.wins} menang · {winRate(r.wins, r.played)}%
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-lg leading-none font-extrabold text-gold-400">{r.wins}</p>
-                <p className="text-[10px] uppercase tracking-wider text-slate-400">menang</p>
+                <p className="text-lg leading-none font-extrabold text-gold-400">{sort === 'month' ? r.month_points : r.points}</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-400">{sort === 'month' ? 'bln ini' : 'poin'}</p>
               </div>
               <Chevron />
             </Link>

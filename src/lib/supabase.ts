@@ -35,12 +35,16 @@ export interface MatchPlayer {
   status: PlayerStatus
   joined_at: string
   eliminated_at: string | null
+  /** Final rank (1 = winner), set when the match finishes. */
+  placement: number | null
+  points: number
   profile: { name: string } | null
 }
 
 export interface LeaderboardRow {
   player_id: string
   name: string
+  points: number
   wins: number
   played: number
 }
@@ -56,3 +60,6 @@ export function errorMessage(err: unknown): string {
   if (/failed to fetch/i.test(msg)) return 'Gagal terhubung ke server'
   return msg
 }
+
+/** Mirrors the generated `match_players.points` column. */
+export const POINTS_BY_PLACEMENT = [10, 5, 1] as const

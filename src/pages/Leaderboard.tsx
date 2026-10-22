@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Avatar, Card, EmptyState, PageLoader, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatMonth } from '../lib/format'
-import { supabase, type LeaderboardRow } from '../lib/supabase'
+import { POINTS_BY_PLACEMENT, supabase, type LeaderboardRow } from '../lib/supabase'
 
 type Tab = 'monthly' | 'all'
 
@@ -29,7 +29,7 @@ export default function Leaderboard() {
           }
         : {}
     supabase.rpc('get_leaderboard', params).then(({ data }) => {
-      if (!cancelled) setRows(((data as LeaderboardRow[]) ?? []).map((r) => ({ ...r, wins: Number(r.wins), played: Number(r.played) })))
+      if (!cancelled) setRows(((data as LeaderboardRow[]) ?? []).map((r) => ({ ...r, points: Number(r.points), wins: Number(r.wins), played: Number(r.played) })))
     })
     return () => {
       cancelled = true
@@ -71,7 +71,7 @@ export default function Leaderboard() {
         <PageLoader />
       ) : ranked.length === 0 ? (
         <Card>
-          <EmptyState icon="🏆" title="Belum ada pemenang" text={tab === 'monthly' ? 'Belum ada match selesai di bulan ini.' : 'Belum ada match selesai.'} />
+          <EmptyState icon="🏆" title="Belum ada poin" text={tab === 'monthly' ? 'Belum ada match selesai di bulan ini.' : 'Belum ada match selesai.'} />
         </Card>
       ) : (
         <>
@@ -91,8 +91,11 @@ export default function Leaderboard() {
                     {r.player_id === profile?.id && <span className="ml-1.5 text-xs text-gold-300">(kamu)</span>}
                   </span>
                   <span className="text-right">
-                    <span className="font-bold text-gold-400">{r.wins}</span>
-                    <span className="ml-1 text-xs text-slate-400">win</span>
+                    <span className="block leading-tight">
+                      <span className="font-bold text-gold-400">{r.points}</span>
+                      <span className="ml-1 text-xs text-slate-400">poin</span>
+                    </span>
+                    <span className="block text-[11px] text-slate-500">{r.wins} menang</span>
                   </span>
                 </Link>
               ))}
@@ -100,17 +103,21 @@ export default function Leaderboard() {
           )}
         </>
       )}
+
+      <p className="text-center text-xs text-slate-500">
+        Poin per match: Juara {POINTS_BY_PLACEMENT[0]} · Runner-up 1 {POINTS_BY_PLACEMENT[1]} · Runner-up 2 {POINTS_BY_PLACEMENT[2]}
+      </p>
     </div>
   )
 }
 
 type Ranked = LeaderboardRow & { rank: number }
 
-/** Standard competition ranking (1, 1, 3...) on wins. */
+/** Standard competition ranking (1, 1, 3...) on points. */
 function rank(rows: LeaderboardRow[]): Ranked[] {
   return rows.map((r, i) => ({
     ...r,
-    rank: i > 0 && rows[i - 1].wins === r.wins ? rows.findIndex((x) => x.wins === r.wins) + 1 : i + 1,
+    rank: i > 0 && rows[i - 1].points === r.points ? rows.findIndex((x) => x.points === r.points) + 1 : i + 1,
   }))
 }
 
@@ -139,7 +146,7 @@ function Podium({ entries, meId }: { entries: Ranked[]; meId?: string }) {
               {e.name}
             </p>
             <p className="text-xs text-slate-400">
-              <span className="text-base font-extrabold text-gold-400">{e.wins}</span> win
+              <span className="text-base font-extrabold text-gold-400">{e.points}</span> poin
             </p>
             <div
               className={cx(

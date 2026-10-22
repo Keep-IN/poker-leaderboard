@@ -44,6 +44,12 @@ create index if not exists match_players_player_idx on public.match_players (pla
 -- Realtime DELETE events carry the full old row (needed to know which match changed).
 alter table public.match_players replica identity full;
 
+-- Peringkat akhir (1 = pemenang, 2 = runner-up 1, ...) diisi saat match selesai.
+-- Poin dihitung otomatis dari peringkat: juara 10, runner-up 1 dapat 5, runner-up 2 dapat 1, sisanya 0.
+alter table public.match_players add column if not exists placement int check (placement >= 1);
+alter table public.match_players add column if not exists points int
+  generated always as (case placement when 1 then 10 when 2 then 5 when 3 then 1 else 0 end) stored;
+
 -- ---------- Auto-create profile on sign-up -----------------------------
 
 create or replace function public.handle_new_user()
@@ -214,6 +220,24 @@ begin
 end;
 $$;
 
+-- Pemenang peringkat 1, lalu yang kalah paling akhir peringkat 2, dst.
+create or replace function public.set_placements(p_match uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.match_players mp
+     set placement = r.rn
+    from (
+      select player_id,
+             row_number() over (order by (status = 'winner') desc, eliminated_at desc nulls last, joined_at) as rn
+        from public.match_players
+       where match_id = p_match
+    ) r
+   where mp.match_id = p_match and mp.player_id = r.player_id;
+$$;
+
 create or replace function public.declare_winner(p_match uuid, p_player uuid)
 returns void
 language plpgsql
@@ -226,16 +250,21 @@ begin
   if m.status <> 'ongoing' then
     raise exception 'Match belum/tidak sedang berlangsung';
   end if;
-  if not exists (select 1 from public.match_players where match_id = p_match and player_id = p_player) then
-    raise exception 'Player bukan peserta match ini';
+  if not exists (select 1 from public.match_players where match_id = p_match and player_id = p_player and status = 'playing') then
+    raise exception 'Pemenang harus pemain yang masih main';
+  end if;
+  -- Peringkat ditentukan dari urutan kalah, jadi pemenang baru bisa ditetapkan saat tersisa 2 pemain.
+  if (select count(*) from public.match_players where match_id = p_match and status = 'playing' and player_id <> p_player) > 1 then
+    raise exception 'Tandai dulu pemain yang kalah sampai tersisa 2 pemain';
   end if;
 
   update public.match_players
-     set status = 'eliminated', eliminated_at = coalesce(eliminated_at, now())
-   where match_id = p_match and player_id <> p_player;
+     set status = 'eliminated', eliminated_at = now()
+   where match_id = p_match and player_id <> p_player and status = 'playing';
   update public.match_players
      set status = 'winner', eliminated_at = null
    where match_id = p_match and player_id = p_player;
+  perform public.set_placements(p_match);
   update public.matches
      set status = 'finished', winner_id = p_player, finished_at = now()
    where id = p_match;
@@ -308,14 +337,16 @@ $$;
 -- ---------- Leaderboard ------------------------------------------------
 -- p_from / p_to null = all time.
 
-create or replace function public.get_leaderboard(p_from timestamptz default null, p_to timestamptz default null)
-returns table (player_id uuid, name text, wins bigint, played bigint)
+drop function if exists public.get_leaderboard(timestamptz, timestamptz);
+create function public.get_leaderboard(p_from timestamptz default null, p_to timestamptz default null)
+returns table (player_id uuid, name text, points bigint, wins bigint, played bigint)
 language sql
 stable
 security definer
 set search_path = public
 as $$
   select p.id, p.name,
+         coalesce(sum(mp.points), 0) as points,
          count(*) filter (where mp.status = 'winner') as wins,
          count(*) as played
     from public.match_players mp
@@ -326,13 +357,16 @@ as $$
      and (p_to   is null or m.finished_at <  p_to)
      and auth.uid() is not null
    group by p.id, p.name
-  having count(*) filter (where mp.status = 'winner') > 0
-   order by wins desc, played asc, p.name asc;
+  having coalesce(sum(mp.points), 0) > 0
+   order by points desc, wins desc, played asc, p.name asc;
 $$;
 
 -- Semua akun player (termasuk yang belum pernah main) beserta statistiknya.
-create or replace function public.get_player_stats()
-returns table (player_id uuid, name text, played bigint, wins bigint, joined_at timestamptz)
+-- p_month_start = awal bulan berjalan (dari jam lokal browser) untuk menghitung poin bulan ini.
+drop function if exists public.get_player_stats();
+drop function if exists public.get_player_stats(timestamptz);
+create function public.get_player_stats(p_month_start timestamptz default null)
+returns table (player_id uuid, name text, played bigint, wins bigint, points bigint, month_points bigint, joined_at timestamptz)
 language sql
 stable
 security definer
@@ -341,6 +375,8 @@ as $$
   select p.id, p.name,
          count(m.id) as played,
          count(m.id) filter (where mp.status = 'winner') as wins,
+         coalesce(sum(mp.points) filter (where m.id is not null), 0) as points,
+         coalesce(sum(mp.points) filter (where m.id is not null and m.finished_at >= p_month_start), 0) as month_points,
          p.created_at
     from public.profiles p
     left join public.match_players mp on mp.player_id = p.id
@@ -348,12 +384,27 @@ as $$
    where p.role = 'player'
      and auth.uid() is not null
    group by p.id, p.name, p.created_at
-   order by wins desc, played desc, p.name asc;
+   order by points desc, wins desc, played desc, p.name asc;
+$$;
+
+-- Isi peringkat untuk match yang selesai sebelum sistem poin ada (aman dijalankan ulang).
+do $$
+declare
+  mid uuid;
+begin
+  for mid in
+    select distinct m.id from public.matches m join public.match_players mp on mp.match_id = m.id
+     where m.status = 'finished' and mp.placement is null
+  loop
+    perform public.set_placements(mid);
+  end loop;
+end;
 $$;
 
 -- ---------- Grants -----------------------------------------------------
 
 revoke all on function public.lock_own_match(uuid) from public, anon, authenticated;
+revoke all on function public.set_placements(uuid) from public, anon, authenticated;
 
 do $$
 declare
@@ -370,7 +421,7 @@ begin
     'public.join_match(uuid)',
     'public.leave_match(uuid)',
     'public.get_leaderboard(timestamptz, timestamptz)',
-    'public.get_player_stats()',
+    'public.get_player_stats(timestamptz)',
     'public.current_role_name()'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);

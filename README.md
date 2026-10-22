@@ -16,8 +16,14 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
 
 ### 🏠 Beranda Player
 - **Win rate**, jumlah **match dimainkan**, dan jumlah **match menang**.
+- **Poin bulan ini** dan **total poin** yang sudah dikumpulkan.
 - Daftar **match aktif** yang sedang kamu ikuti.
-- **Riwayat match** dengan label WIN / OUT dan nama pemenangnya.
+- **Riwayat match** dengan label WIN / #2 / #3 / OUT, poin yang didapat, dan nama pemenangnya.
+
+### 👥 Pemain
+- Daftar **semua player yang sudah daftar** beserta total poin, jumlah main, jumlah menang, dan win rate.
+- Bisa dicari berdasarkan nama dan diurutkan berdasarkan total poin, poin bulan ini, menang, win rate, jumlah main, atau nama.
+- Klik nama untuk membuka **profil pemain**: statistik lengkap, match yang sedang diikuti, dan riwayat match.
 
 ### 🎩 Beranda Dealer
 - Jumlah **match yang sudah di-host**.
@@ -31,12 +37,14 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
   - Player bisa join dan keluar dari match.
   - Dealer bisa memulai match, menandai pemain yang kalah, dan menetapkan pemenang.
   - Urutan pemain mengikuti posisi akhir (pemenang di atas, yang kalah paling awal di bawah).
+  - Setelah match selesai, tampil **hasil akhir**: Juara, Runner-up 1, Runner-up 2, beserta poinnya.
 
 ### 🏆 Leaderboard
 - Dua tab: **Bulanan** dan **All Time**.
 - Di tab Bulanan bisa geser ke bulan-bulan sebelumnya.
 - **Juara 1, 2, 3 tampil di podium**, sisanya di daftar di bawahnya.
-- Diurutkan berdasarkan jumlah kemenangan. Pemain dengan jumlah menang yang sama mendapat peringkat yang sama.
+- Diurutkan berdasarkan **jumlah poin**. Pemain dengan poin yang sama mendapat peringkat yang sama.
+- Nama di leaderboard bisa diklik untuk membuka profil pemain.
 
 ---
 
@@ -51,11 +59,24 @@ Dealer buat match  →  Player join  →  Dealer mulai match  →  Dealer tandai
 1. **Dealer membuat match** dari menu khusus dealer. Status match: *Menunggu player*.
 2. **Player membuka menu Match**, memilih match, lalu menekan **Join Match**. Selama match belum dimulai, player masih boleh keluar dan dealer masih bisa mengeluarkan player.
 3. **Dealer menekan Mulai Match** (minimal 2 pemain). Setelah itu tidak ada yang bisa join atau keluar.
-4. Selama permainan, **dealer menekan Kalah** untuk pemain yang tersingkir. Kalau salah tekan, bisa di-**Undo**.
-5. **Dealer menekan Menang** pada pemenang dan mengonfirmasi. Match selesai, semua pemain lain tercatat kalah.
+4. Selama permainan, **dealer menekan Kalah** sesuai urutan pemain tersingkir. Kalau salah tekan, bisa di-**Undo**.
+5. Saat tersisa **2 pemain**, tombol **Menang** muncul. Dealer menekan Menang pada pemenang dan mengonfirmasi. Pemain satunya otomatis menjadi Runner-up 1, dan match selesai.
 6. Hasilnya langsung muncul di **riwayat**, **statistik**, dan **leaderboard** setiap pemain.
 
 Match yang **dibatalkan** dealer tidak dihitung di statistik maupun leaderboard.
+
+### Sistem poin
+
+Setiap match selesai, pemain mendapat poin sesuai peringkat akhirnya:
+
+| Peringkat | Poin |
+| --- | :---: |
+| 🏆 Juara | **10** |
+| 🥈 Runner-up 1 (kalah paling akhir) | **5** |
+| 🥉 Runner-up 2 (kalah kedua dari akhir) | **1** |
+| Pemain lain | 0 |
+
+Peringkat ditentukan dari **urutan dealer menekan Kalah**, jadi pastikan tombol Kalah ditekan sesuai urutan pemain tersingkir. Itulah sebabnya pemenang baru bisa ditetapkan saat tersisa 2 pemain.
 
 ### Bagaimana statistik dihitung
 
@@ -66,7 +87,9 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Match dimainkan | Jumlah match **selesai** yang diikuti pemain                 |
 | Match menang    | Jumlah match selesai di mana pemain menjadi **pemenang**     |
 | Win rate        | Match menang ÷ match dimainkan × 100%                        |
-| Leaderboard     | Jumlah kemenangan per pemain, untuk bulan terpilih / all time |
+| Poin bulan ini  | Total poin dari match yang selesai di bulan berjalan         |
+| Total poin      | Total poin dari semua match yang pernah diikuti              |
+| Leaderboard     | Total poin per pemain, untuk bulan terpilih / all time       |
 | Match di-host   | Jumlah match **selesai** yang dibuat dealer                  |
 
 ### Peran Player vs Dealer
@@ -125,7 +148,7 @@ npm run dev
 **Struktur**
 ```
 src/
-  pages/        Beranda, Leaderboard, Match, Match Room, Buat Match, Login/Daftar
+  pages/        Beranda, Leaderboard, Match, Match Room, Pemain, Buat Match, Login/Daftar, Reset password
   components/   Layout (header + bottom nav) dan komponen UI
   lib/          Supabase client, auth context, helper format
 supabase/
