@@ -10,6 +10,7 @@ import Home from './pages/Home'
 import Leaderboard from './pages/Leaderboard'
 import MatchRoom from './pages/MatchRoom'
 import Matches from './pages/Matches'
+import { ForgotPassword, ResetPassword } from './pages/PasswordPages'
 
 export default function App() {
   if (!isConfigured) return <SetupNotice />
@@ -19,6 +20,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<GuestOnly><AuthPage mode="login" /></GuestOnly>} />
           <Route path="/register" element={<GuestOnly><AuthPage mode="register" /></GuestOnly>} />
+          <Route path="/forgot-password" element={<GuestOnly><ForgotPassword /></GuestOnly>} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route element={<RequireAuth><Layout /></RequireAuth>}>
             <Route index element={<Home />} />
             <Route path="leaderboard" element={<Leaderboard />} />
