@@ -5,6 +5,7 @@ import { cx } from './ui'
 const tabs = [
   { to: '/', label: 'Beranda', icon: HomeIcon },
   { to: '/matches', label: 'Match', icon: CardsIcon },
+  { to: '/players', label: 'Pemain', icon: PeopleIcon },
   { to: '/leaderboard', label: 'Leaderboard', icon: TrophyIcon },
 ]
 
@@ -35,7 +36,7 @@ export default function Layout() {
       </main>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 border-t border-white/5 bg-felt-950/90 backdrop-blur">
-        <div className="mx-auto grid max-w-lg grid-cols-3">
+        <div className="mx-auto grid max-w-lg grid-cols-4">
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -80,6 +81,15 @@ function TrophyIcon() {
   return (
     <svg className="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9 17h6v4H9z" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function PeopleIcon() {
+  return (
+    <svg className="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8" strokeLinecap="round" />
     </svg>
   )
 }

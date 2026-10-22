@@ -10,6 +10,7 @@ import Home from './pages/Home'
 import Leaderboard from './pages/Leaderboard'
 import MatchRoom from './pages/MatchRoom'
 import Matches from './pages/Matches'
+import Players, { PlayerProfile } from './pages/Players'
 import { ForgotPassword, ResetPassword } from './pages/PasswordPages'
 
 export default function App() {
@@ -27,6 +28,8 @@ export default function App() {
             <Route path="leaderboard" element={<Leaderboard />} />
             <Route path="matches" element={<Matches />} />
             <Route path="matches/:id" element={<MatchRoom />} />
+            <Route path="players" element={<Players />} />
+            <Route path="players/:id" element={<PlayerProfile />} />
             <Route path="dealer/new" element={<DealerOnly><CreateMatch /></DealerOnly>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

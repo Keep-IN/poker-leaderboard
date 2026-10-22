@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Avatar, Card, EmptyState, PageLoader, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatMonth } from '../lib/format'
@@ -78,9 +79,10 @@ export default function Leaderboard() {
           {rest.length > 0 && (
             <Card className="divide-y divide-white/5 p-0">
               {rest.map((r) => (
-                <div
+                <Link
                   key={r.player_id}
-                  className={cx('flex items-center gap-3 px-4 py-3', r.player_id === profile?.id && 'bg-gold-400/8')}
+                  to={`/players/${r.player_id}`}
+                  className={cx('flex items-center gap-3 px-4 py-3 transition hover:bg-white/5', r.player_id === profile?.id && 'bg-gold-400/8')}
                 >
                   <span className="w-6 text-center text-sm font-bold text-slate-400">{r.rank}</span>
                   <Avatar name={r.name} id={r.player_id} size="sm" />
@@ -92,7 +94,7 @@ export default function Leaderboard() {
                     <span className="font-bold text-gold-400">{r.wins}</span>
                     <span className="ml-1 text-xs text-slate-400">win</span>
                   </span>
-                </div>
+                </Link>
               ))}
             </Card>
           )}
@@ -128,7 +130,7 @@ function Podium({ entries, meId }: { entries: Ranked[]; meId?: string }) {
         const style = podiumStyles[idx]
         if (!e) return <div key={idx} />
         return (
-          <div key={e.player_id} className="flex min-w-0 flex-col items-center">
+          <Link key={e.player_id} to={`/players/${e.player_id}`} className="flex min-w-0 flex-col items-center">
             {idx === 0 && <span className="mb-1 text-2xl">👑</span>}
             <div className={cx('rounded-full ring-4', style.ring)}>
               <Avatar name={e.name} id={e.player_id} size={idx === 0 ? 'xl' : 'lg'} />
@@ -148,7 +150,7 @@ function Podium({ entries, meId }: { entries: Ranked[]; meId?: string }) {
             >
               {style.medal}
             </div>
-          </div>
+          </Link>
         )
       })}
     </div>

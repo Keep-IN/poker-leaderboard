@@ -24,15 +24,25 @@ interface PlayerMatchRow {
 }
 
 function PlayerHome({ profile }: { profile: Profile }) {
+  return (
+    <div className="space-y-5">
+      <Greeting profile={profile} subtitle="Statistik kamu" />
+      <PlayerStats playerId={profile.id} isMe />
+    </div>
+  )
+}
+
+/** Stat card, active matches and match history for one player. Used on Beranda and on a player's profile. */
+export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boolean }) {
   const [rows, setRows] = useState<PlayerMatchRow[] | null>(null)
 
   useEffect(() => {
     supabase
       .from('match_players')
       .select('status, match:matches!inner(id, title, status, created_at, finished_at, winner:profiles!matches_winner_id_fkey(name))')
-      .eq('player_id', profile.id)
+      .eq('player_id', playerId)
       .then(({ data }) => setRows((data as unknown as PlayerMatchRow[]) ?? []))
-  }, [profile.id])
+  }, [playerId])
 
   if (!rows) return <PageLoader />
 
@@ -45,9 +55,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
   const rate = winRate(wins, played)
 
   return (
-    <div className="space-y-5">
-      <Greeting profile={profile} subtitle="Statistik kamu" />
-
+    <>
       <Card className="relative overflow-hidden">
         <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-white/[0.03]">♠</div>
         <div className="flex items-center gap-5">
@@ -61,7 +69,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
 
       {active.length > 0 && (
         <section>
-          <SectionTitle>Match aktif kamu</SectionTitle>
+          <SectionTitle>{isMe ? 'Match aktif kamu' : 'Sedang main'}</SectionTitle>
           <div className="space-y-2">
             {active.map((r) => (
               <Link key={r.match.id} to={`/matches/${r.match.id}`} className="block">
@@ -79,7 +87,11 @@ function PlayerHome({ profile }: { profile: Profile }) {
         <SectionTitle>Riwayat match</SectionTitle>
         {finished.length === 0 ? (
           <Card>
-            <EmptyState icon="🃏" title="Belum ada riwayat" text="Join match dari menu Match untuk mulai mencatat kemenangan." />
+            <EmptyState
+              icon="🃏"
+              title="Belum ada riwayat"
+              text={isMe ? 'Join match dari menu Match untuk mulai mencatat kemenangan.' : 'Pemain ini belum menyelesaikan match.'}
+            />
           </Card>
         ) : (
           <Card className="divide-y divide-white/5 p-0">
@@ -113,7 +125,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
           </Card>
         )}
       </section>
-    </div>
+    </>
   )
 }
 

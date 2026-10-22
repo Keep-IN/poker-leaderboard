@@ -330,6 +330,27 @@ as $$
    order by wins desc, played asc, p.name asc;
 $$;
 
+-- Semua akun player (termasuk yang belum pernah main) beserta statistiknya.
+create or replace function public.get_player_stats()
+returns table (player_id uuid, name text, played bigint, wins bigint, joined_at timestamptz)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p.id, p.name,
+         count(m.id) as played,
+         count(m.id) filter (where mp.status = 'winner') as wins,
+         p.created_at
+    from public.profiles p
+    left join public.match_players mp on mp.player_id = p.id
+    left join public.matches m on m.id = mp.match_id and m.status = 'finished'
+   where p.role = 'player'
+     and auth.uid() is not null
+   group by p.id, p.name, p.created_at
+   order by wins desc, played desc, p.name asc;
+$$;
+
 -- ---------- Grants -----------------------------------------------------
 
 revoke all on function public.lock_own_match(uuid) from public, anon, authenticated;
@@ -349,6 +370,7 @@ begin
     'public.join_match(uuid)',
     'public.leave_match(uuid)',
     'public.get_leaderboard(timestamptz, timestamptz)',
+    'public.get_player_stats()',
     'public.current_role_name()'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
