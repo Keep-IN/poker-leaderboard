@@ -82,7 +82,11 @@ Setiap match selesai, pemain mendapat poin sesuai peringkat akhirnya:
 | 🥉 Runner-up 2 (kalah kedua dari akhir) | **1** |
 | Pemain lain | 0 |
 
-Membuat match sebagai player memakai **1 poin**, yang mengurangi total poin dan poin bulan itu. Kalau match dibatalkan, poinnya dikembalikan.
+Membuat match sebagai player memakai **1 poin**:
+
+- Kalau poin bulan ini **minimal 1**, potongan mengurangi **total poin dan poin bulan ini**.
+- Kalau poin bulan ini masih **0** (mis. awal bulan), potongan hanya mengurangi **total poin**, jadi poin bulanan tidak pernah minus.
+- Kalau match dibatalkan, poinnya dikembalikan.
 
 Peringkat ditentukan dari **urutan dealer menekan Kalah**, jadi pastikan tombol Kalah ditekan sesuai urutan pemain tersingkir. Itulah sebabnya pemenang baru bisa ditetapkan saat tersisa 2 pemain.
 

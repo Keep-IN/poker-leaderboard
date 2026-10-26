@@ -67,6 +67,7 @@ export default function CreateMatch() {
           <ul className="space-y-1.5 text-sm text-slate-300">
             <li>• Kamu jadi <span className="font-semibold">host</span>: mulai match, tandai pemain kalah, dan tetapkan pemenang.</li>
             <li>• Kamu <span className="font-semibold">tidak bisa ikut main</span> di match buatanmu sendiri.</li>
+            <li>• Kalau poin bulan ini masih 0, biaya hanya diambil dari <span className="font-semibold">total poin</span>.</li>
             <li>• Kalau match dibatalkan, <span className="font-semibold">poin kamu dikembalikan</span>.</li>
           </ul>
         </Card>

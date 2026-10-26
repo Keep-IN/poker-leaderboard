@@ -75,7 +75,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
 /** Stat card, active matches and match history for one player. Used on Beranda and on a player's profile. */
 export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boolean }) {
   const [rows, setRows] = useState<PlayerMatchRow[] | null>(null)
-  const [adjustments, setAdjustments] = useState<{ amount: number; created_at: string }[]>([])
+  const [adjustments, setAdjustments] = useState<{ amount: number; created_at: string; counts_monthly: boolean }[]>([])
 
   useEffect(() => {
     supabase
@@ -85,7 +85,7 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
       .then(({ data }) => setRows((data as unknown as PlayerMatchRow[]) ?? []))
     supabase
       .from('point_adjustments')
-      .select('amount, created_at')
+      .select('amount, created_at, counts_monthly')
       .eq('player_id', playerId)
       .then(({ data }) => setAdjustments(data ?? []))
   }, [playerId])
@@ -104,7 +104,7 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
   const totalPoints = finished.reduce((sum, r) => sum + r.points, 0) - spent
   const monthPoints =
     finished.filter((r) => (r.match.finished_at ?? '') >= monthStart).reduce((sum, r) => sum + r.points, 0) +
-    adjustments.filter((a) => a.created_at >= monthStart).reduce((sum, a) => sum + a.amount, 0)
+    adjustments.filter((a) => a.counts_monthly && a.created_at >= monthStart).reduce((sum, a) => sum + a.amount, 0)
 
   return (
     <>

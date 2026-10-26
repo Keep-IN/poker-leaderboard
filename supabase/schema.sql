@@ -62,6 +62,9 @@ create table if not exists public.point_adjustments (
 
 create index if not exists point_adjustments_player_idx on public.point_adjustments (player_id);
 
+-- false = hanya mengurangi total poin (dipakai saat poin bulan itu masih 0), jadi poin bulanan tidak pernah minus.
+alter table public.point_adjustments add column if not exists counts_monthly boolean not null default true;
+
 -- ---------- Auto-create profile on sign-up -----------------------------
 
 create or replace function public.handle_new_user()
@@ -151,6 +154,26 @@ as $$
        + coalesce((select sum(amount) from public.point_adjustments where player_id = p_player), 0);
 $$;
 
+-- Poin seorang player di bulan berjalan (WIB), dengan aturan yang sama seperti leaderboard bulanan.
+create or replace function public.month_points_balance(p_player uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with bounds as (
+    select date_trunc('month', now() at time zone 'Asia/Jakarta') at time zone 'Asia/Jakarta' as month_start
+  )
+  select coalesce((select sum(mp.points)
+                     from public.match_players mp
+                     join public.matches m on m.id = mp.match_id, bounds
+                    where mp.player_id = p_player and m.status = 'finished' and m.finished_at >= bounds.month_start), 0)
+       + coalesce((select sum(a.amount)
+                     from public.point_adjustments a, bounds
+                    where a.player_id = p_player and a.counts_monthly and a.created_at >= bounds.month_start), 0);
+$$;
+
 create or replace function public.get_my_points()
 returns bigint
 language sql
@@ -196,8 +219,10 @@ begin
   returning id into new_id;
 
   if my_role = 'player' then
-    insert into public.point_adjustments (player_id, amount, reason, match_id)
-    values (auth.uid(), -public.match_creation_cost(), 'create_match', new_id);
+    -- Kalau poin bulan ini belum cukup (mis. awal bulan), biaya hanya diambil dari total poin.
+    insert into public.point_adjustments (player_id, amount, reason, match_id, counts_monthly)
+    values (auth.uid(), -public.match_creation_cost(), 'create_match', new_id,
+            public.month_points_balance(auth.uid()) >= public.match_creation_cost());
   end if;
   return new_id;
 end;
@@ -409,12 +434,12 @@ set search_path = public
 as $$
   -- Poin dari hasil match + penyesuaian (biaya membuat match), dihitung pada tanggal kejadiannya.
   with events as (
-    select mp.player_id, mp.points, (mp.status = 'winner')::int as win, 1 as play, m.finished_at as at
+    select mp.player_id, mp.points, (mp.status = 'winner')::int as win, 1 as play, m.finished_at as at, true as counts_monthly
       from public.match_players mp
       join public.matches m on m.id = mp.match_id
      where m.status = 'finished'
     union all
-    select a.player_id, a.amount, 0, 0, a.created_at
+    select a.player_id, a.amount, 0, 0, a.created_at, a.counts_monthly
       from public.point_adjustments a
   )
   select p.id, p.name,
@@ -425,6 +450,7 @@ as $$
     join public.profiles p on p.id = e.player_id
    where (p_from is null or e.at >= p_from)
      and (p_to   is null or e.at <  p_to)
+     and (e.counts_monthly or (p_from is null and p_to is null))
      and auth.uid() is not null
    group by p.id, p.name
   having coalesce(sum(e.points), 0) > 0
@@ -443,19 +469,19 @@ security definer
 set search_path = public
 as $$
   with events as (
-    select mp.player_id, mp.points, (mp.status = 'winner')::int as win, 1 as play, m.finished_at as at
+    select mp.player_id, mp.points, (mp.status = 'winner')::int as win, 1 as play, m.finished_at as at, true as counts_monthly
       from public.match_players mp
       join public.matches m on m.id = mp.match_id
      where m.status = 'finished'
     union all
-    select a.player_id, a.amount, 0, 0, a.created_at
+    select a.player_id, a.amount, 0, 0, a.created_at, a.counts_monthly
       from public.point_adjustments a
   )
   select p.id, p.name,
          coalesce(sum(e.play), 0) as played,
          coalesce(sum(e.win), 0) as wins,
          coalesce(sum(e.points), 0) as points,
-         coalesce(sum(e.points) filter (where e.at >= p_month_start), 0) as month_points,
+         coalesce(sum(e.points) filter (where e.at >= p_month_start and e.counts_monthly), 0) as month_points,
          p.created_at
     from public.profiles p
     left join events e on e.player_id = p.id
@@ -484,6 +510,7 @@ $$;
 revoke all on function public.lock_own_match(uuid) from public, anon, authenticated;
 revoke all on function public.set_placements(uuid) from public, anon, authenticated;
 revoke all on function public.points_balance(uuid) from public, anon, authenticated;
+revoke all on function public.month_points_balance(uuid) from public, anon, authenticated;
 
 do $$
 declare
