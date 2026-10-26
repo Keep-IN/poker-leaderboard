@@ -12,13 +12,13 @@ interface MatchListRow {
   max_players: number
   created_at: string
   finished_at: string | null
-  dealer: { name: string } | null
+  dealer: { name: string; role: string } | null
   winner: { name: string } | null
   players: { count: number }[]
 }
 
 const SELECT =
-  'id, title, status, max_players, created_at, finished_at, dealer:profiles!matches_dealer_id_fkey(name), winner:profiles!matches_winner_id_fkey(name), players:match_players(count)'
+  'id, title, status, max_players, created_at, finished_at, dealer:profiles!matches_dealer_id_fkey(name, role), winner:profiles!matches_winner_id_fkey(name), players:match_players(count)'
 
 export default function Matches() {
   const { profile } = useAuth()
@@ -50,9 +50,9 @@ export default function Matches() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Match</h1>
-        {profile?.role === 'dealer' && (
+        {profile && (
           <Link
-            to="/dealer/new"
+            to="/matches/new"
             className="inline-flex min-h-10 items-center gap-1 rounded-xl bg-gold-400 px-3 text-sm font-bold text-felt-950"
           >
             ＋ Buat
@@ -69,7 +69,7 @@ export default function Matches() {
             <EmptyState
               icon="♣"
               title="Belum ada match aktif"
-              text={profile?.role === 'dealer' ? 'Buat match baru supaya player bisa join.' : 'Tunggu dealer membuat match ya.'}
+              text={profile?.role === 'dealer' ? 'Buat match baru supaya player bisa join.' : 'Tunggu dealer membuat match, atau buat sendiri pakai 1 poin.'}
             />
           </Card>
         ) : (
@@ -111,7 +111,7 @@ function MatchCard({ m }: { m: MatchListRow }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">{m.title}</p>
-            <p className="text-xs text-slate-400">Dealer: {m.dealer?.name ?? '-'}</p>
+            <p className="text-xs text-slate-400">{m.dealer?.role === 'player' ? 'Host' : 'Dealer'}: {m.dealer?.name ?? '-'}</p>
           </div>
           <StatusBadge status={m.status} />
         </div>

@@ -3,9 +3,9 @@ import { Link, useParams } from 'react-router-dom'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
-import { POINTS_BY_PLACEMENT, errorMessage, supabase, type Match, type MatchPlayer } from '../lib/supabase'
+import { MATCH_CREATION_COST, POINTS_BY_PLACEMENT, errorMessage, supabase, type Match, type MatchPlayer, type Role } from '../lib/supabase'
 
-type MatchWithDealer = Match & { dealer: { name: string } | null }
+type MatchWithDealer = Match & { dealer: { name: string; role: Role } | null }
 
 interface Confirmation {
   title: string
@@ -26,7 +26,7 @@ export default function MatchRoom() {
 
   const load = useCallback(async () => {
     const [m, p] = await Promise.all([
-      supabase.from('matches').select('*, dealer:profiles!matches_dealer_id_fkey(name)').eq('id', id).maybeSingle(),
+      supabase.from('matches').select('*, dealer:profiles!matches_dealer_id_fkey(name, role)').eq('id', id).maybeSingle(),
       supabase.from('match_players').select('*, profile:profiles(name)').eq('match_id', id).order('joined_at'),
     ])
     setMatch((m.data as MatchWithDealer | null) ?? null)
@@ -69,6 +69,7 @@ export default function MatchRoom() {
     )
 
   const isDealer = match.dealer_id === profile.id
+  const hostedByPlayer = match.dealer?.role === 'player'
   const me = players.find((p) => p.player_id === profile.id)
   const full = players.length >= match.max_players
   const stillPlaying = players.filter((p) => p.status === 'playing')
@@ -90,7 +91,7 @@ export default function MatchRoom() {
         <StatusBadge status={match.status} />
         <h1 className="mt-2 text-2xl font-extrabold">{match.title}</h1>
         <p className="mt-1 text-sm text-slate-300">
-          Dealer: <span className="font-semibold">{match.dealer?.name ?? '-'}</span>
+          {hostedByPlayer ? 'Host' : 'Dealer'}: <span className="font-semibold">{match.dealer?.name ?? '-'}</span>
         </p>
         <div className="mt-4 flex gap-4 text-sm">
           <Meta label="Player" value={`${players.length}/${match.max_players}`} />
@@ -112,13 +113,19 @@ export default function MatchRoom() {
 
       <ErrorText>{error}</ErrorText>
 
+      {isDealer && hostedByPlayer && match.status !== 'finished' && match.status !== 'cancelled' && (
+        <p className="rounded-xl bg-gold-400/10 px-3 py-2 text-xs text-gold-300">
+          Kamu host match ini, jadi kamu yang mengatur jalannya match dan tidak ikut main.
+        </p>
+      )}
+
       {/* Player actions */}
-      {profile.role === 'player' && match.status === 'open' && (
+      {profile.role === 'player' && !isDealer && match.status === 'open' && (
         me ? (
           <Card className="flex items-center justify-between gap-3">
             <p className="text-sm">
               <span className="font-semibold text-emerald-300">Kamu sudah join.</span>
-              <span className="block text-slate-400">Tunggu dealer memulai match.</span>
+              <span className="block text-slate-400">Tunggu {hostedByPlayer ? 'host' : 'dealer'} memulai match.</span>
             </p>
             <Button variant="danger" loading={busy === 'leave'} onClick={() => call('leave', 'leave_match', { p_match: id })}>
               Keluar
@@ -284,7 +291,9 @@ export default function MatchRoom() {
   function askCancel() {
     setConfirm({
       title: 'Batalkan match?',
-      text: 'Match tidak akan dihitung di statistik maupun leaderboard.',
+      text:
+        'Match tidak akan dihitung di statistik maupun leaderboard.' +
+        (hostedByPlayer ? ` ${MATCH_CREATION_COST} poin yang dipakai untuk membuat match ini akan dikembalikan.` : ''),
       action: 'Ya, batalkan',
       danger: true,
       run: () => call('confirm', 'cancel_match', { p_match: id }),

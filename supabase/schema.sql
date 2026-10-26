@@ -50,6 +50,18 @@ alter table public.match_players add column if not exists placement int check (p
 alter table public.match_players add column if not exists points int
   generated always as (case placement when 1 then 10 when 2 then 5 when 3 then 1 else 0 end) stored;
 
+-- Poin di luar hasil match, mis. biaya player membuat match (-1). Total poin = poin match + penyesuaian ini.
+create table if not exists public.point_adjustments (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  amount      int  not null,
+  reason      text not null check (reason in ('create_match')),
+  match_id    uuid references public.matches (id) on delete cascade,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists point_adjustments_player_idx on public.point_adjustments (player_id);
+
 -- ---------- Auto-create profile on sign-up -----------------------------
 
 create or replace function public.handle_new_user()
@@ -79,14 +91,17 @@ create trigger on_auth_user_created
 alter table public.profiles      enable row level security;
 alter table public.matches       enable row level security;
 alter table public.match_players enable row level security;
+alter table public.point_adjustments enable row level security;
 
 drop policy if exists "profiles readable"      on public.profiles;
 drop policy if exists "matches readable"       on public.matches;
 drop policy if exists "match_players readable" on public.match_players;
+drop policy if exists "point_adjustments readable" on public.point_adjustments;
 
 create policy "profiles readable"      on public.profiles      for select to authenticated using (true);
 create policy "matches readable"       on public.matches       for select to authenticated using (true);
 create policy "match_players readable" on public.match_players for select to authenticated using (true);
+create policy "point_adjustments readable" on public.point_adjustments for select to authenticated using (true);
 
 -- ---------- Helpers ----------------------------------------------------
 
@@ -115,13 +130,44 @@ begin
     raise exception 'Match tidak ditemukan';
   end if;
   if m.dealer_id <> auth.uid() then
-    raise exception 'Hanya dealer match ini yang bisa melakukan aksi ini';
+    raise exception 'Hanya host match ini yang bisa melakukan aksi ini';
   end if;
   return m;
 end;
 $$;
 
--- ---------- Dealer RPCs ------------------------------------------------
+-- Total poin seorang player: poin dari match selesai + penyesuaian (biaya membuat match, dll).
+create or replace function public.points_balance(p_player uuid)
+returns bigint
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select sum(mp.points)
+                     from public.match_players mp
+                     join public.matches m on m.id = mp.match_id
+                    where mp.player_id = p_player and m.status = 'finished'), 0)
+       + coalesce((select sum(amount) from public.point_adjustments where player_id = p_player), 0);
+$$;
+
+create or replace function public.get_my_points()
+returns bigint
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.points_balance(auth.uid()) where auth.uid() is not null;
+$$;
+
+-- ---------- Host RPCs (dealer, atau player dengan biaya poin) -----------
+
+create or replace function public.match_creation_cost()
+returns int
+language sql
+immutable
+as $$ select 1 $$;
 
 create or replace function public.create_match(p_title text, p_max_players int default 8)
 returns uuid
@@ -131,17 +177,28 @@ set search_path = public
 as $$
 declare
   new_id uuid;
+  my_role text;
 begin
-  if public.current_role_name() is distinct from 'dealer' then
-    raise exception 'Hanya akun dealer yang bisa membuat match';
+  -- Kunci baris profil supaya dua request bersamaan tidak sama-sama lolos cek saldo.
+  select role into my_role from public.profiles where id = auth.uid() for update;
+  if my_role is null then
+    raise exception 'Akun tidak ditemukan';
   end if;
   if p_max_players < 2 or p_max_players > 8 then
     raise exception 'Jumlah player harus 2 sampai 8';
+  end if;
+  if my_role = 'player' and public.points_balance(auth.uid()) < public.match_creation_cost() then
+    raise exception 'Poin kamu belum cukup untuk membuat match (butuh % poin)', public.match_creation_cost();
   end if;
 
   insert into public.matches (title, dealer_id, max_players)
   values (trim(p_title), auth.uid(), p_max_players)
   returning id into new_id;
+
+  if my_role = 'player' then
+    insert into public.point_adjustments (player_id, amount, reason, match_id)
+    values (auth.uid(), -public.match_creation_cost(), 'create_match', new_id);
+  end if;
   return new_id;
 end;
 $$;
@@ -284,6 +341,8 @@ begin
     raise exception 'Match ini sudah selesai';
   end if;
   update public.matches set status = 'cancelled', finished_at = now() where id = p_match;
+  -- Kembalikan poin yang dipakai player untuk membuat match ini.
+  delete from public.point_adjustments where match_id = p_match and reason = 'create_match';
 end;
 $$;
 
@@ -308,6 +367,9 @@ begin
   end if;
   if m.status <> 'open' then
     raise exception 'Match sudah dimulai atau selesai';
+  end if;
+  if m.dealer_id = auth.uid() then
+    raise exception 'Kamu tidak bisa join match yang kamu buat sendiri';
   end if;
   if exists (select 1 from public.match_players where match_id = p_match and player_id = auth.uid()) then
     return;
@@ -345,19 +407,27 @@ stable
 security definer
 set search_path = public
 as $$
+  -- Poin dari hasil match + penyesuaian (biaya membuat match), dihitung pada tanggal kejadiannya.
+  with events as (
+    select mp.player_id, mp.points, (mp.status = 'winner')::int as win, 1 as play, m.finished_at as at
+      from public.match_players mp
+      join public.matches m on m.id = mp.match_id
+     where m.status = 'finished'
+    union all
+    select a.player_id, a.amount, 0, 0, a.created_at
+      from public.point_adjustments a
+  )
   select p.id, p.name,
-         coalesce(sum(mp.points), 0) as points,
-         count(*) filter (where mp.status = 'winner') as wins,
-         count(*) as played
-    from public.match_players mp
-    join public.matches  m on m.id = mp.match_id
-    join public.profiles p on p.id = mp.player_id
-   where m.status = 'finished'
-     and (p_from is null or m.finished_at >= p_from)
-     and (p_to   is null or m.finished_at <  p_to)
+         coalesce(sum(e.points), 0) as points,
+         coalesce(sum(e.win), 0) as wins,
+         coalesce(sum(e.play), 0) as played
+    from events e
+    join public.profiles p on p.id = e.player_id
+   where (p_from is null or e.at >= p_from)
+     and (p_to   is null or e.at <  p_to)
      and auth.uid() is not null
    group by p.id, p.name
-  having coalesce(sum(mp.points), 0) > 0
+  having coalesce(sum(e.points), 0) > 0
    order by points desc, wins desc, played asc, p.name asc;
 $$;
 
@@ -372,15 +442,23 @@ stable
 security definer
 set search_path = public
 as $$
+  with events as (
+    select mp.player_id, mp.points, (mp.status = 'winner')::int as win, 1 as play, m.finished_at as at
+      from public.match_players mp
+      join public.matches m on m.id = mp.match_id
+     where m.status = 'finished'
+    union all
+    select a.player_id, a.amount, 0, 0, a.created_at
+      from public.point_adjustments a
+  )
   select p.id, p.name,
-         count(m.id) as played,
-         count(m.id) filter (where mp.status = 'winner') as wins,
-         coalesce(sum(mp.points) filter (where m.id is not null), 0) as points,
-         coalesce(sum(mp.points) filter (where m.id is not null and m.finished_at >= p_month_start), 0) as month_points,
+         coalesce(sum(e.play), 0) as played,
+         coalesce(sum(e.win), 0) as wins,
+         coalesce(sum(e.points), 0) as points,
+         coalesce(sum(e.points) filter (where e.at >= p_month_start), 0) as month_points,
          p.created_at
     from public.profiles p
-    left join public.match_players mp on mp.player_id = p.id
-    left join public.matches m on m.id = mp.match_id and m.status = 'finished'
+    left join events e on e.player_id = p.id
    where p.role = 'player'
      and auth.uid() is not null
    group by p.id, p.name, p.created_at
@@ -405,6 +483,7 @@ $$;
 
 revoke all on function public.lock_own_match(uuid) from public, anon, authenticated;
 revoke all on function public.set_placements(uuid) from public, anon, authenticated;
+revoke all on function public.points_balance(uuid) from public, anon, authenticated;
 
 do $$
 declare
@@ -422,6 +501,8 @@ begin
     'public.leave_match(uuid)',
     'public.get_leaderboard(timestamptz, timestamptz)',
     'public.get_player_stats(timestamptz)',
+    'public.get_my_points()',
+    'public.match_creation_cost()',
     'public.current_role_name()'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);

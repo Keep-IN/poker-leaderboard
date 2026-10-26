@@ -14,6 +14,12 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
 - Daftar cukup dengan **nama, email, dan password**, lalu langsung bisa login.
 - Ada dua jenis akun: **Player** dan **Dealer**.
 
+### 🎟️ Player bisa jadi host
+- Player bisa **membuat match sendiri dengan biaya 1 poin**. Sebelum match dibuat, ada **halaman konfirmasi** yang menampilkan biaya dan sisa poin.
+- Player yang membuat match menjadi **host**: memulai match, menandai pemain kalah, dan menetapkan pemenang. Host **tidak bisa ikut main** di match buatannya sendiri.
+- Kalau match dibatalkan, **1 poin dikembalikan** ke host.
+- Butuh minimal 1 poin untuk membuat match. Dealer tetap bisa membuat match gratis.
+
 ### 🏠 Beranda Player
 - **Win rate**, jumlah **match dimainkan**, dan jumlah **match menang**.
 - **Poin bulan ini** dan **total poin** yang sudah dikumpulkan.
@@ -76,6 +82,8 @@ Setiap match selesai, pemain mendapat poin sesuai peringkat akhirnya:
 | 🥉 Runner-up 2 (kalah kedua dari akhir) | **1** |
 | Pemain lain | 0 |
 
+Membuat match sebagai player memakai **1 poin**, yang mengurangi total poin dan poin bulan itu. Kalau match dibatalkan, poinnya dikembalikan.
+
 Peringkat ditentukan dari **urutan dealer menekan Kalah**, jadi pastikan tombol Kalah ditekan sesuai urutan pemain tersingkir. Itulah sebabnya pemenang baru bisa ditetapkan saat tersisa 2 pemain.
 
 ### Bagaimana statistik dihitung
@@ -98,8 +106,9 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | --------------------------------------- | :----: | :----: |
 | Lihat statistik, match & leaderboard    |   ✅   |   ✅   |
 | Join / keluar dari match                |   ✅   |   –    |
-| Buat, mulai, dan batalkan match         |   –    |   ✅   |
-| Tandai pemain kalah & tetapkan pemenang |   –    |   ✅   |
+| Buat match                              | ✅ (1 poin) | ✅ (gratis) |
+| Mulai & batalkan match yang dibuat sendiri |   ✅   |   ✅   |
+| Tandai pemain kalah & tetapkan pemenang (di match sendiri) |   ✅   |   ✅   |
 
 Semua akun baru otomatis menjadi **Player**. Akun dijadikan **Dealer** oleh admin melalui Supabase (Table Editor → tabel `profiles` → ubah kolom `role` menjadi `dealer`).
 

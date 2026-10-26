@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Avatar, Card, EmptyState, PageLoader, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatMonth } from '../lib/format'
-import { POINTS_BY_PLACEMENT, supabase, type LeaderboardRow } from '../lib/supabase'
+import { MATCH_CREATION_COST, POINTS_BY_PLACEMENT, supabase, type LeaderboardRow } from '../lib/supabase'
 
 type Tab = 'monthly' | 'all'
 
@@ -106,6 +106,8 @@ export default function Leaderboard() {
 
       <p className="text-center text-xs text-slate-500">
         Poin per match: Juara {POINTS_BY_PLACEMENT[0]} · Runner-up 1 {POINTS_BY_PLACEMENT[1]} · Runner-up 2 {POINTS_BY_PLACEMENT[2]}
+        <br />
+        Membuat match sebagai player: −{MATCH_CREATION_COST} poin
       </p>
     </div>
   )

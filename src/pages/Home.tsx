@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Avatar, Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDate, winRate } from '../lib/format'
-import { supabase, type MatchStatus, type PlayerStatus, type Profile } from '../lib/supabase'
+import { MATCH_CREATION_COST, supabase, type MatchStatus, type PlayerStatus, type Profile } from '../lib/supabase'
 
 export default function Home() {
   const { profile } = useAuth()
@@ -26,10 +26,48 @@ interface PlayerMatchRow {
 }
 
 function PlayerHome({ profile }: { profile: Profile }) {
+  const [hosted, setHosted] = useState<DealerMatchRow[]>([])
+
+  useEffect(() => {
+    supabase
+      .from('matches')
+      .select('id, title, status, created_at, finished_at, winner:profiles!matches_winner_id_fkey(name), players:match_players(count)')
+      .eq('dealer_id', profile.id)
+      .in('status', ['open', 'ongoing'])
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setHosted((data as unknown as DealerMatchRow[]) ?? []))
+  }, [profile.id])
+
   return (
     <div className="space-y-5">
       <Greeting profile={profile} subtitle="Statistik kamu" />
       <PlayerStats playerId={profile.id} isMe />
+
+      {hosted.length > 0 && (
+        <section>
+          <SectionTitle>Match yang kamu host</SectionTitle>
+          <div className="space-y-2">
+            {hosted.map((m) => (
+              <Link key={m.id} to={`/matches/${m.id}`} className="block">
+                <Card className="flex items-center justify-between gap-3 border-gold-400/30 transition hover:bg-felt-700/80">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{m.title}</p>
+                    <p className="text-xs text-slate-400">{m.players[0]?.count ?? 0} player</p>
+                  </div>
+                  <StatusBadge status={m.status} />
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <Link
+        to="/matches/new"
+        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-gold-400/50 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10 active:scale-[0.98]"
+      >
+        <span className="text-lg">＋</span> Buat Match ({MATCH_CREATION_COST} poin)
+      </Link>
     </div>
   )
 }
@@ -37,6 +75,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
 /** Stat card, active matches and match history for one player. Used on Beranda and on a player's profile. */
 export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boolean }) {
   const [rows, setRows] = useState<PlayerMatchRow[] | null>(null)
+  const [adjustments, setAdjustments] = useState<{ amount: number; created_at: string }[]>([])
 
   useEffect(() => {
     supabase
@@ -44,6 +83,11 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
       .select('status, placement, points, match:matches!inner(id, title, status, created_at, finished_at, winner:profiles!matches_winner_id_fkey(name))')
       .eq('player_id', playerId)
       .then(({ data }) => setRows((data as unknown as PlayerMatchRow[]) ?? []))
+    supabase
+      .from('point_adjustments')
+      .select('amount, created_at')
+      .eq('player_id', playerId)
+      .then(({ data }) => setAdjustments(data ?? []))
   }, [playerId])
 
   if (!rows) return <PageLoader />
@@ -55,11 +99,12 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
   const played = finished.length
   const wins = finished.filter((r) => r.status === 'winner').length
   const rate = winRate(wins, played)
-  const totalPoints = finished.reduce((sum, r) => sum + r.points, 0)
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-  const monthPoints = finished
-    .filter((r) => (r.match.finished_at ?? '') >= monthStart)
-    .reduce((sum, r) => sum + r.points, 0)
+  const spent = -adjustments.reduce((sum, a) => sum + a.amount, 0)
+  const totalPoints = finished.reduce((sum, r) => sum + r.points, 0) - spent
+  const monthPoints =
+    finished.filter((r) => (r.match.finished_at ?? '') >= monthStart).reduce((sum, r) => sum + r.points, 0) +
+    adjustments.filter((a) => a.created_at >= monthStart).reduce((sum, a) => sum + a.amount, 0)
 
   return (
     <>
@@ -76,6 +121,9 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
           <Stat label="Poin bulan ini" value={monthPoints} accent />
           <Stat label="Total poin" value={totalPoints} accent />
         </div>
+        {spent > 0 && (
+          <p className="mt-2 text-center text-[11px] text-slate-500">Sudah dikurangi {spent} poin untuk membuat match</p>
+        )}
       </Card>
 
       {active.length > 0 && (

@@ -30,7 +30,8 @@ export default function App() {
             <Route path="matches/:id" element={<MatchRoom />} />
             <Route path="players" element={<Players />} />
             <Route path="players/:id" element={<PlayerProfile />} />
-            <Route path="dealer/new" element={<DealerOnly><CreateMatch /></DealerOnly>} />
+            <Route path="matches/new" element={<CreateMatch />} />
+            <Route path="dealer/new" element={<Navigate to="/matches/new" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -50,13 +51,6 @@ function GuestOnly({ children }: { children: ReactNode }) {
   const { session, loading } = useAuth()
   if (loading) return <PageLoader />
   if (session) return <Navigate to="/" replace />
-  return children
-}
-
-function DealerOnly({ children }: { children: ReactNode }) {
-  const { profile } = useAuth()
-  if (!profile) return <PageLoader />
-  if (profile.role !== 'dealer') return <Navigate to="/" replace />
   return children
 }
 
