@@ -66,3 +66,6 @@ export const POINTS_BY_PLACEMENT = [10, 5, 1] as const
 
 /** Points a player pays to host a match (refunded if it is cancelled). Mirrors `match_creation_cost()` in the database. */
 export const MATCH_CREATION_COST = 1
+
+/** Matches need at least this many players to start (prevents 1-vs-1 point farming). Mirrors start_match(). */
+export const MIN_MATCH_PLAYERS = 3

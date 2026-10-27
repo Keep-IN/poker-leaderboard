@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button, Card, ErrorText, PageLoader } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDate } from '../lib/format'
-import { MATCH_CREATION_COST, errorMessage, supabase } from '../lib/supabase'
+import { MATCH_CREATION_COST, MIN_MATCH_PLAYERS, errorMessage, supabase } from '../lib/supabase'
 
 export default function CreateMatch() {
   const navigate = useNavigate()
@@ -118,9 +118,15 @@ export default function CreateMatch() {
           </label>
 
           <div>
-            <span className="mb-1.5 block text-sm font-medium text-slate-300">Maksimal player</span>
+            <span className="mb-1.5 block text-sm font-medium text-slate-300">
+              Maksimal player <span className="font-normal text-slate-500">(min. {MIN_MATCH_PLAYERS} untuk mulai)</span>
+            </span>
             <div className="flex items-center justify-between rounded-xl bg-felt-950/60 p-2">
-              <StepButton label="−" onClick={() => setMaxPlayers((n) => Math.max(2, n - 1))} disabled={maxPlayers <= 2} />
+              <StepButton
+                label="−"
+                onClick={() => setMaxPlayers((n) => Math.max(MIN_MATCH_PLAYERS, n - 1))}
+                disabled={maxPlayers <= MIN_MATCH_PLAYERS}
+              />
               <div className="text-center">
                 <span className="text-3xl font-extrabold text-gold-400">{maxPlayers}</span>
                 <span className="ml-1 text-sm text-slate-400">player</span>

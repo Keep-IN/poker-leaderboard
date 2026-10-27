@@ -38,7 +38,7 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
 
 ### 🃏 Match
 - Daftar **match yang sedang aktif** dan **match yang baru selesai**, bisa dilihat semua user.
-- Satu match berisi **maksimal 8 pemain**. Dealer bisa mengatur batasnya antara 2 sampai 8.
+- Satu match berisi **maksimal 8 pemain**. Dealer bisa mengatur batasnya antara 3 sampai 8. Match butuh **minimal 3 pemain** untuk dimulai.
 - **Halaman match real-time**:
   - Player bisa join dan keluar dari match.
   - Dealer bisa memulai match, menandai pemain yang kalah, dan menetapkan pemenang.
@@ -64,7 +64,7 @@ Dealer buat match  →  Player join  →  Dealer mulai match  →  Dealer tandai
 
 1. **Dealer membuat match** dari menu khusus dealer. Status match: *Menunggu player*.
 2. **Player membuka menu Match**, memilih match, lalu menekan **Join Match**. Selama match belum dimulai, player masih boleh keluar dan dealer masih bisa mengeluarkan player.
-3. **Dealer menekan Mulai Match** (minimal 2 pemain). Setelah itu tidak ada yang bisa join atau keluar.
+3. **Dealer menekan Mulai Match** (minimal 3 pemain, supaya poin tidak bisa didapat dari match 1 lawan 1). Setelah itu tidak ada yang bisa join atau keluar.
 4. Selama permainan, **dealer menekan Kalah** sesuai urutan pemain tersingkir. Kalau salah tekan, bisa di-**Undo**.
 5. Saat tersisa **2 pemain**, tombol **Menang** muncul. Dealer menekan Menang pada pemenang dan mengonfirmasi. Pemain satunya otomatis menjadi Runner-up 1, dan match selesai.
 6. Hasilnya langsung muncul di **riwayat**, **statistik**, dan **leaderboard** setiap pemain.

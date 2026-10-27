@@ -18,12 +18,17 @@ create table if not exists public.matches (
   dealer_id    uuid not null references public.profiles (id) on delete cascade,
   status       text not null default 'open'
                check (status in ('open', 'ongoing', 'finished', 'cancelled')),
-  max_players  int  not null default 8 check (max_players between 2 and 8),
+  max_players  int  not null default 8 check (max_players between 3 and 8),
   winner_id    uuid references public.profiles (id) on delete set null,
   created_at   timestamptz not null default now(),
   started_at   timestamptz,
   finished_at  timestamptz
 );
+
+-- Minimal 3 pemain per match supaya poin tidak bisa dieksploitasi lewat match 1 lawan 1.
+-- (Untuk database lama: ganti batas bawah constraint dari 2 ke 3.)
+alter table public.matches drop constraint if exists matches_max_players_check;
+alter table public.matches add constraint matches_max_players_check check (max_players between 3 and 8);
 
 create index if not exists matches_status_idx      on public.matches (status);
 create index if not exists matches_finished_at_idx on public.matches (finished_at);
@@ -207,8 +212,8 @@ begin
   if my_role is null then
     raise exception 'Akun tidak ditemukan';
   end if;
-  if p_max_players < 2 or p_max_players > 8 then
-    raise exception 'Jumlah player harus 2 sampai 8';
+  if p_max_players < 3 or p_max_players > 8 then
+    raise exception 'Jumlah player harus 3 sampai 8';
   end if;
   if my_role = 'player' and public.points_balance(auth.uid()) < public.match_creation_cost() then
     raise exception 'Poin kamu belum cukup untuk membuat match (butuh % poin)', public.match_creation_cost();
@@ -240,8 +245,8 @@ begin
   if m.status <> 'open' then
     raise exception 'Match ini tidak bisa dimulai';
   end if;
-  if (select count(*) from public.match_players where match_id = p_match) < 2 then
-    raise exception 'Butuh minimal 2 player untuk memulai';
+  if (select count(*) from public.match_players where match_id = p_match) < 3 then
+    raise exception 'Butuh minimal 3 player untuk memulai';
   end if;
   update public.matches set status = 'ongoing', started_at = now() where id = p_match;
 end;
@@ -334,6 +339,9 @@ begin
   end if;
   if not exists (select 1 from public.match_players where match_id = p_match and player_id = p_player and status = 'playing') then
     raise exception 'Pemenang harus pemain yang masih main';
+  end if;
+  if (select count(*) from public.match_players where match_id = p_match) < 3 then
+    raise exception 'Match dengan kurang dari 3 player tidak bisa dihitung';
   end if;
   -- Peringkat ditentukan dari urutan kalah, jadi pemenang baru bisa ditetapkan saat tersisa 2 pemain.
   if (select count(*) from public.match_players where match_id = p_match and status = 'playing' and player_id <> p_player) > 1 then

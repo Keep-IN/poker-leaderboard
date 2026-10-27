@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
-import { MATCH_CREATION_COST, POINTS_BY_PLACEMENT, errorMessage, supabase, type Match, type MatchPlayer, type Role } from '../lib/supabase'
+import { MATCH_CREATION_COST, MIN_MATCH_PLAYERS, POINTS_BY_PLACEMENT, errorMessage, supabase, type Match, type MatchPlayer, type Role } from '../lib/supabase'
 
 type MatchWithDealer = Match & { dealer: { name: string; role: Role } | null }
 
@@ -148,11 +148,11 @@ export default function MatchRoom() {
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <Button
             className="min-h-13 text-base"
-            disabled={players.length < 2}
+            disabled={players.length < MIN_MATCH_PLAYERS}
             loading={busy === 'start'}
             onClick={() => call('start', 'start_match', { p_match: id })}
           >
-            {players.length < 2 ? 'Butuh min. 2 player' : 'Mulai Match'}
+            {players.length < MIN_MATCH_PLAYERS ? `Butuh min. ${MIN_MATCH_PLAYERS} player` : 'Mulai Match'}
           </Button>
           <Button variant="ghost" className="min-h-13" onClick={() => askCancel()}>
             Batalkan
