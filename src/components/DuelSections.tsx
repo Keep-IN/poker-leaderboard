@@ -103,7 +103,7 @@ export function PlayerDuelSections({ me }: { me: string }) {
                       onClick={() =>
                         ask({
                           title: `Terima duel dari ${a}?`,
-                          text: `${d.stake} poin kamu langsung ditahan. Kalau menang +${d.stake}, kalau kalah −${d.stake}. Setelah diterima, duel menunggu persetujuan dealer. Duel hanya memengaruhi total poin, tidak poin bulan ini.`,
+                          text: `${d.stake} poin kamu langsung ditahan. Kalau menang +${d.stake}, kalau kalah −${d.stake}. Setelah diterima, duel menunggu persetujuan dealer. Taruhan diambil dari poin bulan ini dan total poin; kalau poin bulan ini kurang, sisanya dari total poin saja.`,
                           action: `⚔️ Terima (taruhan ${d.stake} poin)`,
                           run: () => call('confirm', 'respond_duel', { p_duel: d.id, p_accept: true }),
                         })

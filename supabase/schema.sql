@@ -96,7 +96,8 @@ create index if not exists duels_opponent_idx   on public.duels (opponent_id);
 create index if not exists duels_status_idx     on public.duels (status);
 
 -- Taruhan duel ditahan sebagai penyesuaian negatif; pemenang menerima pot (2× taruhan).
--- Duel hanya memengaruhi total poin, tidak poin bulanan (counts_monthly = false).
+-- Bagian taruhan yang tertutup poin bulan ini dicatat counts_monthly = true, sisanya hanya total poin,
+-- jadi poin bulanan tidak pernah minus.
 alter table public.point_adjustments add column if not exists duel_id uuid references public.duels (id) on delete cascade;
 alter table public.point_adjustments drop constraint if exists point_adjustments_reason_check;
 alter table public.point_adjustments add constraint point_adjustments_reason_check
@@ -500,6 +501,27 @@ begin
 end;
 $$;
 
+-- Tahan taruhan: diambil dari poin bulan ini sebanyak yang ada, sisanya hanya dari total poin.
+create or replace function public.hold_duel_stake(p_duel uuid, p_player uuid, p_stake int)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  monthly int := least(p_stake, greatest(public.month_points_balance(p_player), 0));
+begin
+  if monthly > 0 then
+    insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
+    values (p_player, -monthly, 'duel_stake', p_duel, true);
+  end if;
+  if p_stake - monthly > 0 then
+    insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
+    values (p_player, -(p_stake - monthly), 'duel_stake', p_duel, false);
+  end if;
+end;
+$$;
+
 -- Kembalikan semua taruhan yang ditahan untuk duel ini.
 create or replace function public.refund_duel(p_duel uuid)
 returns void
@@ -549,8 +571,7 @@ begin
   values (auth.uid(), p_opponent, p_stake)
   returning id into new_id;
 
-  insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
-  values (auth.uid(), -p_stake, 'duel_stake', new_id, false);
+  perform public.hold_duel_stake(new_id, auth.uid(), p_stake);
   return new_id;
 end;
 $$;
@@ -581,8 +602,7 @@ begin
   if public.points_balance(auth.uid()) < d.stake then
     raise exception 'Poin kamu tidak cukup untuk taruhan % poin', d.stake;
   end if;
-  insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
-  values (auth.uid(), -d.stake, 'duel_stake', p_duel, false);
+  perform public.hold_duel_stake(p_duel, auth.uid(), d.stake);
   update public.duels set status = 'accepted', responded_at = now() where id = p_duel;
 end;
 $$;
@@ -642,6 +662,7 @@ set search_path = public
 as $$
 declare
   d public.duels := public.lock_duel(p_duel);
+  monthly_pot int;
 begin
   if d.dealer_id is distinct from auth.uid() then
     raise exception 'Hanya dealer host duel ini yang bisa menetapkan pemenang';
@@ -653,8 +674,19 @@ begin
     raise exception 'Pemenang harus salah satu pemain duel';
   end if;
 
-  insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
-  values (p_winner, 2 * d.stake, 'duel_payout', p_duel, false);
+  -- Pot total 2× taruhan. Poin bulanan pemenang bertambah sebesar bagian bulanan yang ditahan dari
+  -- kedua pemain, jadi poin bulanan juga hanya berpindah (yang kalah −X bulanan, pemenang +X bulanan).
+  select coalesce(-sum(amount), 0) into monthly_pot
+    from public.point_adjustments
+   where duel_id = p_duel and reason = 'duel_stake' and counts_monthly;
+  if monthly_pot > 0 then
+    insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
+    values (p_winner, monthly_pot, 'duel_payout', p_duel, true);
+  end if;
+  if 2 * d.stake - monthly_pot > 0 then
+    insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
+    values (p_winner, 2 * d.stake - monthly_pot, 'duel_payout', p_duel, false);
+  end if;
   update public.duels set status = 'finished', winner_id = p_winner, finished_at = now() where id = p_duel;
 end;
 $$;
@@ -737,6 +769,7 @@ revoke all on function public.points_balance(uuid) from public, anon, authentica
 revoke all on function public.month_points_balance(uuid) from public, anon, authenticated;
 revoke all on function public.lock_duel(uuid) from public, anon, authenticated;
 revoke all on function public.refund_duel(uuid) from public, anon, authenticated;
+revoke all on function public.hold_duel_stake(uuid, uuid, int) from public, anon, authenticated;
 
 do $$
 declare

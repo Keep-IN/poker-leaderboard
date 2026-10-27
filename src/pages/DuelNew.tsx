@@ -100,7 +100,10 @@ export default function DuelNew() {
           <ul className="space-y-1.5 text-sm text-slate-300">
             <li>• Taruhan kamu langsung ditahan. {opponent.name} juga harus menerima, lalu dealer menyetujui dan menjadi host.</li>
             <li>• Kalau ajakan ditolak, dibatalkan, atau tidak disetujui dealer, <span className="font-semibold">poin dikembalikan</span>.</li>
-            <li>• Duel hanya memengaruhi <span className="font-semibold">total poin</span>, tidak poin bulan ini.</li>
+            <li>
+              • Taruhan diambil dari <span className="font-semibold">poin bulan ini dan total poin</span>. Kalau poin bulan ini
+              kurang, sisanya hanya dari total poin, jadi poin bulan ini tidak pernah minus.
+            </li>
           </ul>
         </Card>
 

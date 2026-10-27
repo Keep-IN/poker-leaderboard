@@ -127,7 +127,10 @@ Player A ajak duel  →  Player B terima  →  Dealer setujui & host  →  Deale
 - **Pemenang mendapat taruhan lawan** (+taruhan), yang kalah kehilangan taruhannya (−taruhan). Total poin di liga tidak bertambah, hanya berpindah, jadi duel tidak bisa dipakai untuk mencetak poin.
 - Taruhan **dikembalikan** kalau ajakan ditolak, dibatalkan sebelum disetujui dealer, ditolak dealer, atau dibatalkan dealer host.
 - Taruhan maksimal adalah total poin yang lebih kecil di antara kedua pemain. Hanya boleh ada satu duel aktif antara dua pemain yang sama.
-- Duel **hanya memengaruhi total poin** dan leaderboard All Time. **Poin bulan ini dan leaderboard bulanan tidak berubah**, jadi persaingan bulanan tetap murni dari hasil match.
+- Duel memengaruhi **poin bulan ini dan total poin**, sama seperti biaya membuat match:
+  - Kalau poin bulan ini cukup, taruhan diambil dari poin bulan ini dan total poin. Contoh: poin bulan ini 20, total 20, kalah taruhan 10 → **10 dan 10**.
+  - Kalau poin bulan ini kurang atau 0, poin bulan ini berkurang sebanyak yang ada (sampai 0) dan sisanya hanya dari total poin, jadi **poin bulan ini tidak pernah minus**.
+  - Pemenang mendapat **+taruhan** di total poin, dan di poin bulan ini sebanyak poin bulanan yang benar-benar hilang dari lawannya. Jadi poin bulanan juga hanya berpindah, tidak tercipta dari duel.
 - Duel tidak dihitung ke statistik match (match dimainkan, menang, win rate). Duel punya statistiknya sendiri di tab Duel.
 
 ### Bagaimana statistik dihitung
@@ -139,7 +142,7 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Match dimainkan | Jumlah match **selesai** yang diikuti pemain                 |
 | Match menang    | Jumlah match selesai di mana pemain menjadi **pemenang**     |
 | Win rate        | Match menang ÷ match dimainkan × 100%                        |
-| Poin bulan ini  | Total poin dari match yang selesai di bulan berjalan         |
+| Poin bulan ini  | Poin dari match bulan berjalan + hasil duel − biaya membuat match di bulan itu |
 | Total poin      | Poin dari semua match + hasil duel − biaya membuat match     |
 | Leaderboard     | Total poin per pemain, untuk bulan terpilih / all time       |
 | Match di-host   | Jumlah match **selesai** yang dibuat dealer                  |
