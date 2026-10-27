@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
-import { MATCH_CREATION_COST, MIN_MATCH_PLAYERS, POINTS_BY_PLACEMENT, errorMessage, supabase, type Match, type MatchPlayer, type Role } from '../lib/supabase'
+import { MATCH_CREATION_COST, MIN_MATCH_PLAYERS, errorMessage, pointsFor, supabase, type Match, type MatchPlayer, type Role } from '../lib/supabase'
 
 type MatchWithDealer = Match & { dealer: { name: string; role: Role } | null }
 
@@ -98,6 +98,12 @@ export default function MatchRoom() {
           {match.status === 'ongoing' && <Meta label="Masih main" value={String(stillPlaying.length)} />}
           {match.finished_at && <Meta label="Selesai" value={formatDateTime(match.finished_at)} />}
         </div>
+        {(match.status === 'open' || match.status === 'ongoing') && players.length >= MIN_MATCH_PLAYERS && (
+          <p className="mt-3 text-xs text-slate-300">
+            Poin dengan {players.length} pemain: 🏆 {pointsFor(1, players.length)} · 🥈 {pointsFor(2, players.length)}
+            {pointsFor(3, players.length) > 0 && ` · 🥉 ${pointsFor(3, players.length)}`}
+          </p>
+        )}
       </div>
 
       {/* Winner banner */}
@@ -276,7 +282,7 @@ export default function MatchRoom() {
 
   function askWinner(p: MatchPlayer) {
     const runnerUp = stillPlaying.find((x) => x.player_id !== p.player_id)
-    const [first, second] = POINTS_BY_PLACEMENT
+    const [first, second] = [pointsFor(1, players.length), pointsFor(2, players.length)]
     setConfirm({
       title: `${nameOf(p)} menang?`,
       text:

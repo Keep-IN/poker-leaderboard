@@ -73,14 +73,34 @@ Match yang **dibatalkan** dealer tidak dihitung di statistik maupun leaderboard.
 
 ### Sistem poin
 
-Setiap match selesai, pemain mendapat poin sesuai peringkat akhirnya:
+Setiap match selesai, pemain mendapat poin sesuai **peringkat akhir** dan **jumlah pemain di match itu** (N). Makin banyak lawan yang dikalahkan, makin besar poinnya.
 
 | Peringkat | Poin |
 | --- | :---: |
-| 🏆 Juara | **10** |
-| 🥈 Runner-up 1 (kalah paling akhir) | **5** |
-| 🥉 Runner-up 2 (kalah kedua dari akhir) | **1** |
+| 🏆 Juara | **2 × N** |
+| 🥈 Runner-up 1 (kalah paling akhir) | **N** |
+| 🥉 Runner-up 2 (kalah kedua dari akhir) | **N ÷ 3**, dibulatkan (hanya kalau minimal 4 pemain) |
 | Pemain lain | 0 |
+
+| Jumlah pemain | 🏆 Juara | 🥈 Runner-up 1 | 🥉 Runner-up 2 |
+| :---: | :---: | :---: | :---: |
+| 3 | 6 | 3 | 0 |
+| 4 | 8 | 4 | 1 |
+| 5 | 10 | 5 | 2 |
+| 6 | 12 | 6 | 2 |
+| 7 | 14 | 7 | 2 |
+| 8 | 16 | 8 | 3 |
+
+Kenapa begini:
+
+- **Tidak ada lonjakan.** Setiap tambahan 1 pemain menambah 2 poin untuk juara, jadi tidak ada ukuran meja yang tiba-tiba jauh lebih menguntungkan.
+- **Rata-rata poin per pemain stabil** di sekitar 3 poin per match untuk semua ukuran meja, jadi main di meja kecil atau besar sama adilnya.
+- **Juru kunci tidak dapat poin.** Di meja 3 orang, runner-up 2 adalah pemain terakhir, jadi tidak diberi poin.
+- Match butuh **minimal 3 pemain**, jadi poin tidak bisa didapat dari match 1 lawan 1.
+
+Poin disimpan saat match selesai, jadi perubahan aturan tidak mengubah poin match lama. Match yang selesai sebelum 27 Oktober 2026 tetap memakai aturan lama (juara 10, runner-up 1 5, runner-up 2 1).
+
+Di halaman match yang belum selesai, tampil poin yang akan didapat sesuai jumlah pemain saat itu.
 
 Membuat match sebagai player memakai **1 poin**:
 

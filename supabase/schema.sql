@@ -49,11 +49,13 @@ create index if not exists match_players_player_idx on public.match_players (pla
 -- Realtime DELETE events carry the full old row (needed to know which match changed).
 alter table public.match_players replica identity full;
 
--- Peringkat akhir (1 = pemenang, 2 = runner-up 1, ...) diisi saat match selesai.
--- Poin dihitung otomatis dari peringkat: juara 10, runner-up 1 dapat 5, runner-up 2 dapat 1, sisanya 0.
+-- Peringkat akhir (1 = pemenang, 2 = runner-up 1, ...) dan poinnya diisi saat match selesai.
+-- Poin disimpan per match, jadi perubahan aturan poin hanya berlaku untuk match berikutnya.
 alter table public.match_players add column if not exists placement int check (placement >= 1);
-alter table public.match_players add column if not exists points int
-  generated always as (case placement when 1 then 10 when 2 then 5 when 3 then 1 else 0 end) stored;
+alter table public.match_players add column if not exists points int not null default 0;
+-- Database lama: dulu `points` adalah kolom generated (10/5/1). Jadikan kolom biasa, nilai lama tetap tersimpan.
+alter table public.match_players alter column points drop expression if exists;
+alter table public.match_players alter column points set default 0;
 
 -- Poin di luar hasil match, mis. biaya player membuat match (-1). Total poin = poin match + penyesuaian ini.
 create table if not exists public.point_adjustments (
@@ -308,6 +310,21 @@ end;
 $$;
 
 -- Pemenang peringkat 1, lalu yang kalah paling akhir peringkat 2, dst.
+-- Poin berdasarkan peringkat dan jumlah pemain (N): juara 2×N, runner-up 1 N,
+-- runner-up 2 N÷3 dibulatkan (hanya kalau N ≥ 4), sisanya 0. Sama dengan pointsFor() di frontend.
+create or replace function public.placement_points(p_placement int, p_players int)
+returns int
+language sql
+immutable
+as $$
+  select case
+           when p_placement = 1 then 2 * p_players
+           when p_placement = 2 then p_players
+           when p_placement = 3 and p_players >= 4 then round(p_players / 3.0)::int
+           else 0
+         end;
+$$;
+
 create or replace function public.set_placements(p_match uuid)
 returns void
 language sql
@@ -315,10 +332,12 @@ security definer
 set search_path = public
 as $$
   update public.match_players mp
-     set placement = r.rn
+     set placement = r.rn,
+         points = public.placement_points(r.rn::int, r.total::int)
     from (
       select player_id,
-             row_number() over (order by (status = 'winner') desc, eliminated_at desc nulls last, joined_at) as rn
+             row_number() over (order by (status = 'winner') desc, eliminated_at desc nulls last, joined_at) as rn,
+             count(*) over () as total
         from public.match_players
        where match_id = p_match
     ) r
@@ -499,20 +518,6 @@ as $$
    order by points desc, wins desc, played desc, p.name asc;
 $$;
 
--- Isi peringkat untuk match yang selesai sebelum sistem poin ada (aman dijalankan ulang).
-do $$
-declare
-  mid uuid;
-begin
-  for mid in
-    select distinct m.id from public.matches m join public.match_players mp on mp.match_id = m.id
-     where m.status = 'finished' and mp.placement is null
-  loop
-    perform public.set_placements(mid);
-  end loop;
-end;
-$$;
-
 -- ---------- Grants -----------------------------------------------------
 
 revoke all on function public.lock_own_match(uuid) from public, anon, authenticated;
@@ -538,6 +543,7 @@ begin
     'public.get_player_stats(timestamptz)',
     'public.get_my_points()',
     'public.match_creation_cost()',
+    'public.placement_points(int, int)',
     'public.current_role_name()'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);

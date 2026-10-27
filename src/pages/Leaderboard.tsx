@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Avatar, Card, EmptyState, PageLoader, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatMonth } from '../lib/format'
-import { MATCH_CREATION_COST, POINTS_BY_PLACEMENT, supabase, type LeaderboardRow } from '../lib/supabase'
+import { MATCH_CREATION_COST, supabase, type LeaderboardRow } from '../lib/supabase'
 
 type Tab = 'monthly' | 'all'
 
@@ -105,7 +105,7 @@ export default function Leaderboard() {
       )}
 
       <p className="text-center text-xs text-slate-500">
-        Poin per match: Juara {POINTS_BY_PLACEMENT[0]} · Runner-up 1 {POINTS_BY_PLACEMENT[1]} · Runner-up 2 {POINTS_BY_PLACEMENT[2]}
+        Poin per match (N = jumlah pemain): Juara 2×N · Runner-up 1 N · Runner-up 2 N÷3 (min. 4 pemain)
         <br />
         Membuat match sebagai player: −{MATCH_CREATION_COST} poin
       </p>

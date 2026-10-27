@@ -61,8 +61,16 @@ export function errorMessage(err: unknown): string {
   return msg
 }
 
-/** Mirrors the generated `match_players.points` column. */
-export const POINTS_BY_PLACEMENT = [10, 5, 1] as const
+/**
+ * Points for a final placement in a match with `players` players. Mirrors placement_points() in the database:
+ * winner 2×N, runner-up 1 N, runner-up 2 N÷3 rounded (only with 4+ players), everyone else 0.
+ */
+export function pointsFor(placement: number, players: number) {
+  if (placement === 1) return 2 * players
+  if (placement === 2) return players
+  if (placement === 3 && players >= 4) return Math.round(players / 3)
+  return 0
+}
 
 /** Points a player pays to host a match (refunded if it is cancelled). Mirrors `match_creation_cost()` in the database. */
 export const MATCH_CREATION_COST = 1
