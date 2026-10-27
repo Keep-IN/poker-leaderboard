@@ -105,7 +105,7 @@ Kenapa begini:
 - **Juru kunci tidak dapat poin.** Di meja 3 orang, runner-up 2 adalah pemain terakhir, jadi tidak diberi poin.
 - Match butuh **minimal 3 pemain**, jadi poin tidak bisa didapat dari match 1 lawan 1.
 
-Poin disimpan saat match selesai, jadi perubahan aturan tidak mengubah poin match lama. Match yang selesai sebelum 27 Oktober 2026 tetap memakai aturan lama (juara 10, runner-up 1 5, runner-up 2 1).
+Aturan ini berlaku untuk **semua match**, termasuk yang dimainkan sebelum aturan ini ada. Pada 27 Oktober 2026, poin semua match lama dihitung ulang dari aturan sebelumnya (juara 10, runner-up 1 5, runner-up 2 1) ke rumus ini. Poin disimpan saat match selesai, jadi kalau aturan diubah lagi nanti, poin match lama hanya berubah kalau sengaja dihitung ulang.
 
 Di halaman match yang belum selesai, tampil poin yang akan didapat sesuai jumlah pemain saat itu.
 
