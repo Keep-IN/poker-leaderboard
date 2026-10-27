@@ -103,13 +103,10 @@ export default function Players() {
       ) : (
         <Card className="divide-y divide-white/5 p-0">
           {visible.map((r) => (
+            <div key={r.player_id} className={cx('flex items-center', r.player_id === profile?.id && 'bg-gold-400/8')}>
             <Link
-              key={r.player_id}
               to={`/players/${r.player_id}`}
-              className={cx(
-                'flex items-center gap-3 px-4 py-3 transition hover:bg-white/5',
-                r.player_id === profile?.id && 'bg-gold-400/8',
-              )}
+              className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 transition hover:bg-white/5"
             >
               <Avatar name={r.name} id={r.player_id} />
               <div className="min-w-0 flex-1">
@@ -125,8 +122,21 @@ export default function Players() {
                 <p className="text-lg leading-none font-extrabold text-gold-400">{sort === 'month' ? r.month_points : r.points}</p>
                 <p className="text-[10px] uppercase tracking-wider text-slate-400">{sort === 'month' ? 'bln ini' : 'poin'}</p>
               </div>
-              <Chevron />
             </Link>
+            {profile?.role === 'player' && r.player_id !== profile.id ? (
+              <Link
+                to={`/duel/${r.player_id}`}
+                aria-label={`Ajak ${r.name} duel`}
+                className="mx-2 flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-lg transition hover:bg-gold-400/15"
+              >
+                ⚔️
+              </Link>
+            ) : (
+              <span className="mx-2 flex size-10 shrink-0 items-center justify-center">
+                <Chevron />
+              </span>
+            )}
+            </div>
           ))}
         </Card>
       )}
@@ -181,6 +191,14 @@ export function PlayerProfile() {
               </p>
             </div>
           </div>
+          {me?.role === 'player' && player.role === 'player' && player.id !== me.id && (
+            <Link
+              to={`/duel/${player.id}`}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-gold-400/50 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10 active:scale-[0.98]"
+            >
+              ⚔️ Ajak {player.name.split(' ')[0]} duel
+            </Link>
+          )}
           <PlayerStats playerId={player.id} isMe={player.id === me?.id} />
         </>
       )}

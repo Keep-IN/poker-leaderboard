@@ -62,7 +62,7 @@ create table if not exists public.point_adjustments (
   id          uuid primary key default gen_random_uuid(),
   player_id   uuid not null references public.profiles (id) on delete cascade,
   amount      int  not null,
-  reason      text not null check (reason in ('create_match')),
+  reason      text not null,
   match_id    uuid references public.matches (id) on delete cascade,
   created_at  timestamptz not null default now()
 );
@@ -71,6 +71,36 @@ create index if not exists point_adjustments_player_idx on public.point_adjustme
 
 -- false = hanya mengurangi total poin (dipakai saat poin bulan itu masih 0), jadi poin bulanan tidak pernah minus.
 alter table public.point_adjustments add column if not exists counts_monthly boolean not null default true;
+
+-- Duel 1 lawan 1 antar player dengan taruhan poin.
+-- pending → (lawan terima) accepted → (dealer setuju) approved → finished
+-- Bisa berhenti di declined (lawan tolak), cancelled (dibatalkan pemain/dealer), rejected (dealer tolak).
+create table if not exists public.duels (
+  id             uuid primary key default gen_random_uuid(),
+  challenger_id  uuid not null references public.profiles (id) on delete cascade,
+  opponent_id    uuid not null references public.profiles (id) on delete cascade,
+  stake          int  not null check (stake >= 1),
+  status         text not null default 'pending'
+                 check (status in ('pending', 'accepted', 'approved', 'finished', 'declined', 'cancelled', 'rejected')),
+  dealer_id      uuid references public.profiles (id) on delete set null,
+  winner_id      uuid references public.profiles (id) on delete set null,
+  created_at     timestamptz not null default now(),
+  responded_at   timestamptz,
+  approved_at    timestamptz,
+  finished_at    timestamptz,
+  check (challenger_id <> opponent_id)
+);
+
+create index if not exists duels_challenger_idx on public.duels (challenger_id);
+create index if not exists duels_opponent_idx   on public.duels (opponent_id);
+create index if not exists duels_status_idx     on public.duels (status);
+
+-- Taruhan duel ditahan sebagai penyesuaian negatif; pemenang menerima pot (2× taruhan).
+-- Duel hanya memengaruhi total poin, tidak poin bulanan (counts_monthly = false).
+alter table public.point_adjustments add column if not exists duel_id uuid references public.duels (id) on delete cascade;
+alter table public.point_adjustments drop constraint if exists point_adjustments_reason_check;
+alter table public.point_adjustments add constraint point_adjustments_reason_check
+  check (reason in ('create_match', 'duel_stake', 'duel_payout'));
 
 -- ---------- Auto-create profile on sign-up -----------------------------
 
@@ -102,16 +132,19 @@ alter table public.profiles      enable row level security;
 alter table public.matches       enable row level security;
 alter table public.match_players enable row level security;
 alter table public.point_adjustments enable row level security;
+alter table public.duels enable row level security;
 
 drop policy if exists "profiles readable"      on public.profiles;
 drop policy if exists "matches readable"       on public.matches;
 drop policy if exists "match_players readable" on public.match_players;
 drop policy if exists "point_adjustments readable" on public.point_adjustments;
+drop policy if exists "duels readable" on public.duels;
 
 create policy "profiles readable"      on public.profiles      for select to authenticated using (true);
 create policy "matches readable"       on public.matches       for select to authenticated using (true);
 create policy "match_players readable" on public.match_players for select to authenticated using (true);
 create policy "point_adjustments readable" on public.point_adjustments for select to authenticated using (true);
+create policy "duels readable" on public.duels for select to authenticated using (true);
 
 -- ---------- Helpers ----------------------------------------------------
 
@@ -448,6 +481,184 @@ begin
 end;
 $$;
 
+-- ---------- Duel RPCs -------------------------------------------------
+
+create or replace function public.lock_duel(p_duel uuid)
+returns public.duels
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  d public.duels;
+begin
+  select * into d from public.duels where id = p_duel for update;
+  if not found then
+    raise exception 'Duel tidak ditemukan';
+  end if;
+  return d;
+end;
+$$;
+
+-- Kembalikan semua taruhan yang ditahan untuk duel ini.
+create or replace function public.refund_duel(p_duel uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  delete from public.point_adjustments where duel_id = p_duel and reason = 'duel_stake';
+$$;
+
+create or replace function public.create_duel(p_opponent uuid, p_stake int)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_id uuid;
+begin
+  -- Kunci profil penantang supaya saldo tidak dipakai dua kali bersamaan.
+  perform 1 from public.profiles where id = auth.uid() and role = 'player' for update;
+  if not found then
+    raise exception 'Hanya akun player yang bisa mengajak duel';
+  end if;
+  if p_opponent = auth.uid() then
+    raise exception 'Kamu tidak bisa duel dengan diri sendiri';
+  end if;
+  if not exists (select 1 from public.profiles where id = p_opponent and role = 'player') then
+    raise exception 'Lawan duel harus akun player';
+  end if;
+  if p_stake is null or p_stake < 1 then
+    raise exception 'Taruhan minimal 1 poin';
+  end if;
+  if public.points_balance(auth.uid()) < p_stake then
+    raise exception 'Poin kamu tidak cukup untuk taruhan % poin', p_stake;
+  end if;
+  if exists (
+    select 1 from public.duels
+     where status in ('pending', 'accepted', 'approved')
+       and ((challenger_id = auth.uid() and opponent_id = p_opponent)
+         or (challenger_id = p_opponent and opponent_id = auth.uid()))
+  ) then
+    raise exception 'Masih ada duel yang belum selesai dengan pemain ini';
+  end if;
+
+  insert into public.duels (challenger_id, opponent_id, stake)
+  values (auth.uid(), p_opponent, p_stake)
+  returning id into new_id;
+
+  insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
+  values (auth.uid(), -p_stake, 'duel_stake', new_id, false);
+  return new_id;
+end;
+$$;
+
+create or replace function public.respond_duel(p_duel uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  d public.duels := public.lock_duel(p_duel);
+begin
+  if d.opponent_id <> auth.uid() then
+    raise exception 'Ajakan duel ini bukan untuk kamu';
+  end if;
+  if d.status <> 'pending' then
+    raise exception 'Ajakan duel ini sudah tidak aktif';
+  end if;
+
+  if not p_accept then
+    perform public.refund_duel(p_duel);
+    update public.duels set status = 'declined', responded_at = now() where id = p_duel;
+    return;
+  end if;
+
+  perform 1 from public.profiles where id = auth.uid() for update;
+  if public.points_balance(auth.uid()) < d.stake then
+    raise exception 'Poin kamu tidak cukup untuk taruhan % poin', d.stake;
+  end if;
+  insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
+  values (auth.uid(), -d.stake, 'duel_stake', p_duel, false);
+  update public.duels set status = 'accepted', responded_at = now() where id = p_duel;
+end;
+$$;
+
+-- Pemain bisa membatalkan selama dealer belum menyetujui; dealer host bisa membatalkan duel yang sedang di-host.
+create or replace function public.cancel_duel(p_duel uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  d public.duels := public.lock_duel(p_duel);
+begin
+  if not (
+       (d.status = 'pending'  and auth.uid() = d.challenger_id)
+    or (d.status = 'accepted' and auth.uid() in (d.challenger_id, d.opponent_id))
+    or (d.status = 'approved' and auth.uid() = d.dealer_id)
+  ) then
+    raise exception 'Duel ini tidak bisa dibatalkan';
+  end if;
+  perform public.refund_duel(p_duel);
+  update public.duels set status = 'cancelled', finished_at = now() where id = p_duel;
+end;
+$$;
+
+create or replace function public.review_duel(p_duel uuid, p_approve boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  d public.duels := public.lock_duel(p_duel);
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa menyetujui duel';
+  end if;
+  if d.status <> 'accepted' then
+    raise exception 'Duel ini sudah ditangani dealer lain atau sudah tidak aktif';
+  end if;
+
+  if p_approve then
+    update public.duels set status = 'approved', dealer_id = auth.uid(), approved_at = now() where id = p_duel;
+  else
+    perform public.refund_duel(p_duel);
+    update public.duels set status = 'rejected', dealer_id = auth.uid(), finished_at = now() where id = p_duel;
+  end if;
+end;
+$$;
+
+create or replace function public.finish_duel(p_duel uuid, p_winner uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  d public.duels := public.lock_duel(p_duel);
+begin
+  if d.dealer_id is distinct from auth.uid() then
+    raise exception 'Hanya dealer host duel ini yang bisa menetapkan pemenang';
+  end if;
+  if d.status <> 'approved' then
+    raise exception 'Duel ini belum disetujui atau sudah selesai';
+  end if;
+  if p_winner not in (d.challenger_id, d.opponent_id) then
+    raise exception 'Pemenang harus salah satu pemain duel';
+  end if;
+
+  insert into public.point_adjustments (player_id, amount, reason, duel_id, counts_monthly)
+  values (p_winner, 2 * d.stake, 'duel_payout', p_duel, false);
+  update public.duels set status = 'finished', winner_id = p_winner, finished_at = now() where id = p_duel;
+end;
+$$;
+
 -- ---------- Leaderboard ------------------------------------------------
 -- p_from / p_to null = all time.
 
@@ -524,6 +735,8 @@ revoke all on function public.lock_own_match(uuid) from public, anon, authentica
 revoke all on function public.set_placements(uuid) from public, anon, authenticated;
 revoke all on function public.points_balance(uuid) from public, anon, authenticated;
 revoke all on function public.month_points_balance(uuid) from public, anon, authenticated;
+revoke all on function public.lock_duel(uuid) from public, anon, authenticated;
+revoke all on function public.refund_duel(uuid) from public, anon, authenticated;
 
 do $$
 declare
@@ -544,6 +757,11 @@ begin
     'public.get_my_points()',
     'public.match_creation_cost()',
     'public.placement_points(int, int)',
+    'public.create_duel(uuid, int)',
+    'public.respond_duel(uuid, boolean)',
+    'public.cancel_duel(uuid)',
+    'public.review_duel(uuid, boolean)',
+    'public.finish_duel(uuid, uuid)',
     'public.current_role_name()'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
@@ -562,6 +780,10 @@ begin
   end;
   begin
     alter publication supabase_realtime add table public.match_players;
+  exception when duplicate_object then null;
+  end;
+  begin
+    alter publication supabase_realtime add table public.duels;
   exception when duplicate_object then null;
   end;
 end;

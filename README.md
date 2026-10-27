@@ -31,6 +31,13 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
 - Bisa dicari berdasarkan nama dan diurutkan berdasarkan total poin, poin bulan ini, menang, win rate, jumlah main, atau nama.
 - Klik nama untuk membuka **profil pemain**: statistik lengkap, match yang sedang diikuti, dan riwayat match.
 
+### ⚔️ Duel
+- Player bisa **mengajak player lain duel 1 lawan 1** dengan **taruhan poin**, lewat tombol ⚔️ di menu Pemain atau di profil pemain.
+- Penantang menentukan jumlah taruhan, lalu melihat **halaman konfirmasi** sebelum ajakan dikirim.
+- Ajakan muncul di **Beranda pemain yang diajak**, yang bisa menerima atau menolak.
+- Duel yang sudah diterima muncul di **Beranda semua dealer**. Dealer pertama yang menyetujui menjadi **host** dan menetapkan pemenangnya.
+- Di kartu statistik ada tab **Match / Duel**. Tab Duel hanya muncul kalau pemain itu pernah duel, dan berisi win rate duel serta riwayat duel.
+
 ### 🎩 Beranda Dealer
 - Jumlah **match yang sudah di-host**.
 - Tombol **Buat Match Baru**.
@@ -110,6 +117,19 @@ Membuat match sebagai player memakai **1 poin**:
 
 Peringkat ditentukan dari **urutan dealer menekan Kalah**, jadi pastikan tombol Kalah ditekan sesuai urutan pemain tersingkir. Itulah sebabnya pemenang baru bisa ditetapkan saat tersisa 2 pemain.
 
+### Aturan duel
+
+```
+Player A ajak duel  →  Player B terima  →  Dealer setujui & host  →  Dealer tetapkan pemenang  →  Poin berpindah ✅
+```
+
+- **Taruhan ditahan** sejak ajakan dikirim (penantang) dan sejak ajakan diterima (lawan).
+- **Pemenang mendapat taruhan lawan** (+taruhan), yang kalah kehilangan taruhannya (−taruhan). Total poin di liga tidak bertambah, hanya berpindah, jadi duel tidak bisa dipakai untuk mencetak poin.
+- Taruhan **dikembalikan** kalau ajakan ditolak, dibatalkan sebelum disetujui dealer, ditolak dealer, atau dibatalkan dealer host.
+- Taruhan maksimal adalah total poin yang lebih kecil di antara kedua pemain. Hanya boleh ada satu duel aktif antara dua pemain yang sama.
+- Duel **hanya memengaruhi total poin** dan leaderboard All Time. **Poin bulan ini dan leaderboard bulanan tidak berubah**, jadi persaingan bulanan tetap murni dari hasil match.
+- Duel tidak dihitung ke statistik match (match dimainkan, menang, win rate). Duel punya statistiknya sendiri di tab Duel.
+
 ### Bagaimana statistik dihitung
 
 Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwayat match setiap kali halaman dibuka, jadi angkanya selalu sesuai dengan match yang benar-benar terjadi.
@@ -120,7 +140,7 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Match menang    | Jumlah match selesai di mana pemain menjadi **pemenang**     |
 | Win rate        | Match menang ÷ match dimainkan × 100%                        |
 | Poin bulan ini  | Total poin dari match yang selesai di bulan berjalan         |
-| Total poin      | Total poin dari semua match yang pernah diikuti              |
+| Total poin      | Poin dari semua match + hasil duel − biaya membuat match     |
 | Leaderboard     | Total poin per pemain, untuk bulan terpilih / all time       |
 | Match di-host   | Jumlah match **selesai** yang dibuat dealer                  |
 
@@ -133,6 +153,8 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Buat match                              | ✅ (1 poin) | ✅ (gratis) |
 | Mulai & batalkan match yang dibuat sendiri |   ✅   |   ✅   |
 | Tandai pemain kalah & tetapkan pemenang (di match sendiri) |   ✅   |   ✅   |
+| Ajak duel & terima/tolak ajakan duel    |   ✅   |   –    |
+| Setujui, tolak & host duel              |   –    |   ✅   |
 
 Semua akun baru otomatis menjadi **Player**. Akun dijadikan **Dealer** oleh admin melalui Supabase (Table Editor → tabel `profiles` → ubah kolom `role` menjadi `dealer`).
 

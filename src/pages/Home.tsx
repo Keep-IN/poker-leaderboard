@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { DealerDuelSections, PlayerDuelSections } from '../components/DuelSections'
+import { ACTIVE_DUEL_STATUSES, DUEL_SELECT, type Duel, type DuelStatus } from '../lib/duels'
 import { Avatar, Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDate, winRate } from '../lib/format'
@@ -41,6 +43,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
   return (
     <div className="space-y-5">
       <Greeting profile={profile} subtitle="Statistik kamu" />
+      <PlayerDuelSections me={profile.id} />
       <PlayerStats playerId={profile.id} isMe />
 
       {hosted.length > 0 && (
@@ -75,7 +78,9 @@ function PlayerHome({ profile }: { profile: Profile }) {
 /** Stat card, active matches and match history for one player. Used on Beranda and on a player's profile. */
 export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boolean }) {
   const [rows, setRows] = useState<PlayerMatchRow[] | null>(null)
-  const [adjustments, setAdjustments] = useState<{ amount: number; created_at: string; counts_monthly: boolean }[]>([])
+  const [adjustments, setAdjustments] = useState<Adjustment[]>([])
+  const [duels, setDuels] = useState<Duel[]>([])
+  const [tab, setTab] = useState<'match' | 'duel'>('match')
 
   useEffect(() => {
     supabase
@@ -85,9 +90,16 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
       .then(({ data }) => setRows((data as unknown as PlayerMatchRow[]) ?? []))
     supabase
       .from('point_adjustments')
-      .select('amount, created_at, counts_monthly')
+      .select('amount, created_at, counts_monthly, reason, duel:duels(status)')
       .eq('player_id', playerId)
-      .then(({ data }) => setAdjustments(data ?? []))
+      .then(({ data }) => setAdjustments((data as unknown as Adjustment[]) ?? []))
+    supabase
+      .from('duels')
+      .select(DUEL_SELECT)
+      .eq('status', 'finished')
+      .or(`challenger_id.eq.${playerId},opponent_id.eq.${playerId}`)
+      .order('finished_at', { ascending: false })
+      .then(({ data }) => setDuels((data as unknown as Duel[]) ?? []))
   }, [playerId])
 
   if (!rows) return <PageLoader />
@@ -100,32 +112,95 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
   const wins = finished.filter((r) => r.status === 'winner').length
   const rate = winRate(wins, played)
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-  const spent = -adjustments.reduce((sum, a) => sum + a.amount, 0)
-  const totalPoints = finished.reduce((sum, r) => sum + r.points, 0) - spent
+  const totalPoints =
+    finished.reduce((sum, r) => sum + r.points, 0) + adjustments.reduce((sum, a) => sum + a.amount, 0)
+  const spent = -adjustments.filter((a) => a.reason === 'create_match').reduce((sum, a) => sum + a.amount, 0)
+  const held = -adjustments
+    .filter((a) => a.reason === 'duel_stake' && a.duel && ACTIVE_DUEL_STATUSES.includes(a.duel.status))
+    .reduce((sum, a) => sum + a.amount, 0)
+  const duelWins = duels.filter((d) => d.winner_id === playerId).length
+  const showDuels = tab === 'duel' && duels.length > 0
   const monthPoints =
     finished.filter((r) => (r.match.finished_at ?? '') >= monthStart).reduce((sum, r) => sum + r.points, 0) +
     adjustments.filter((a) => a.counts_monthly && a.created_at >= monthStart).reduce((sum, a) => sum + a.amount, 0)
 
   return (
     <>
+      {duels.length > 0 && (
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
+          {(['match', 'duel'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={cx(
+                'min-h-9 rounded-lg text-sm font-semibold transition',
+                tab === t ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+              )}
+            >
+              {t === 'match' ? '🃏 Match' : '⚔️ Duel'}
+            </button>
+          ))}
+        </div>
+      )}
+
       <Card className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-white/[0.03]">♠</div>
+        <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-white/[0.03]">
+          {showDuels ? '⚔' : '♠'}
+        </div>
         <div className="flex items-center gap-5">
-          <WinRateRing value={rate} />
+          <WinRateRing value={showDuels ? winRate(duelWins, duels.length) : rate} />
           <div className="grid flex-1 grid-cols-2 gap-3">
-            <Stat label="Match dimainkan" value={played} />
-            <Stat label="Match menang" value={wins} />
+            <Stat label={showDuels ? 'Duel dimainkan' : 'Match dimainkan'} value={showDuels ? duels.length : played} />
+            <Stat label={showDuels ? 'Duel menang' : 'Match menang'} value={showDuels ? duelWins : wins} />
           </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <Stat label="Poin bulan ini" value={monthPoints} accent />
           <Stat label="Total poin" value={totalPoints} accent />
         </div>
-        {spent > 0 && (
-          <p className="mt-2 text-center text-[11px] text-slate-500">Sudah dikurangi {spent} poin untuk membuat match</p>
+        {(spent > 0 || held > 0) && (
+          <p className="mt-2 text-center text-[11px] text-slate-500">
+            {[spent > 0 && `Sudah dikurangi ${spent} poin untuk membuat match`, held > 0 && `${held} poin ditahan untuk duel`]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
         )}
       </Card>
 
+      {showDuels ? (
+        <section>
+          <SectionTitle>Riwayat duel</SectionTitle>
+          <Card className="divide-y divide-white/5 p-0">
+            {duels.map((d) => {
+              const won = d.winner_id === playerId
+              const foe = d.challenger_id === playerId ? d.opponent : d.challenger
+              return (
+                <div key={d.id} className="flex items-center gap-3 px-4 py-3">
+                  <span
+                    className={cx(
+                      'flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
+                      won ? 'bg-gold-400 text-felt-950' : 'bg-white/8 text-slate-400',
+                    )}
+                  >
+                    {won ? 'WIN' : 'LOSE'}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">vs {foe?.name ?? 'Player'}</p>
+                    <p className="truncate text-xs text-slate-400">
+                      {d.finished_at && formatDate(d.finished_at)} · Dealer {d.dealer?.name ?? '-'}
+                    </p>
+                  </div>
+                  <span className={cx('shrink-0 text-sm font-bold', won ? 'text-gold-400' : 'text-red-300')}>
+                    {won ? '+' : '−'}
+                    {d.stake}
+                  </span>
+                </div>
+              )
+            })}
+          </Card>
+        </section>
+      ) : (
+      <>
       {active.length > 0 && (
         <section>
           <SectionTitle>{isMe ? 'Match aktif kamu' : 'Sedang main'}</SectionTitle>
@@ -186,8 +261,18 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
           </Card>
         )}
       </section>
+      </>
+      )}
     </>
   )
+}
+
+interface Adjustment {
+  amount: number
+  created_at: string
+  counts_monthly: boolean
+  reason: 'create_match' | 'duel_stake' | 'duel_payout'
+  duel: { status: DuelStatus } | null
 }
 
 interface DealerMatchRow {
@@ -234,6 +319,8 @@ function DealerHome({ profile }: { profile: Profile }) {
       >
         <span className="text-xl">＋</span> Buat Match Baru
       </Link>
+
+      <DealerDuelSections me={profile.id} />
 
       {active.length > 0 && (
         <section>

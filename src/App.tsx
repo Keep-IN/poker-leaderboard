@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import { isConfigured } from './lib/supabase'
 import AuthPage from './pages/AuthPage'
 import CreateMatch from './pages/CreateMatch'
+import DuelNew from './pages/DuelNew'
 import Home from './pages/Home'
 import Leaderboard from './pages/Leaderboard'
 import MatchRoom from './pages/MatchRoom'
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="matches/:id" element={<MatchRoom />} />
             <Route path="players" element={<Players />} />
             <Route path="players/:id" element={<PlayerProfile />} />
+            <Route path="duel/:opponentId" element={<DuelNew />} />
             <Route path="matches/new" element={<CreateMatch />} />
             <Route path="dealer/new" element={<Navigate to="/matches/new" replace />} />
           </Route>
