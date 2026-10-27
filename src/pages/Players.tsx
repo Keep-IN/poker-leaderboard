@@ -71,12 +71,13 @@ export default function Players() {
         {rows && <span className="text-sm text-slate-400">{rows.length} terdaftar</span>}
       </div>
 
+      <div className="space-y-4 md:flex md:items-center md:gap-4 md:space-y-0">
       <input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Cari nama pemain…"
-        className="h-11 w-full rounded-xl border border-white/10 bg-felt-950/60 px-4 text-base outline-none placeholder:text-slate-500 focus:border-gold-400/70 focus:ring-2 focus:ring-gold-400/20"
+        className="h-11 w-full rounded-xl border md:max-w-xs border-white/10 bg-felt-950/60 px-4 text-base outline-none placeholder:text-slate-500 focus:border-gold-400/70 focus:ring-2 focus:ring-gold-400/20"
       />
 
       <div className="flex gap-1.5 overflow-x-auto">
@@ -93,6 +94,7 @@ export default function Players() {
           </button>
         ))}
       </div>
+      </div>
 
       {!rows ? (
         <PageLoader />
@@ -101,9 +103,9 @@ export default function Players() {
           <EmptyState icon="🔍" title={rows.length === 0 ? 'Belum ada pemain' : 'Pemain tidak ditemukan'} />
         </Card>
       ) : (
-        <Card className="divide-y divide-white/5 p-0">
+        <Card className="divide-y divide-white/5 p-0 md:grid md:grid-cols-2 md:divide-y-0">
           {visible.map((r) => (
-            <div key={r.player_id} className={cx('flex items-center', r.player_id === profile?.id && 'bg-gold-400/8')}>
+            <div key={r.player_id} className={cx('flex items-center md:border-b md:border-white/5 md:odd:border-r', r.player_id === profile?.id && 'bg-gold-400/8')}>
             <Link
               to={`/players/${r.player_id}`}
               className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 transition hover:bg-white/5"
@@ -194,7 +196,7 @@ export function PlayerProfile() {
           {me?.role === 'player' && player.role === 'player' && player.id !== me.id && (
             <Link
               to={`/duel/${player.id}`}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-gold-400/50 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10 active:scale-[0.98]"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-gold-400/50 md:w-fit md:px-8 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10 active:scale-[0.98]"
             >
               ⚔️ Ajak {player.name.split(' ')[0]} duel
             </Link>

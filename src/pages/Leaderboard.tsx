@@ -44,6 +44,9 @@ export default function Leaderboard() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Leaderboard</h1>
 
+      <div className="space-y-4 md:grid md:grid-cols-2 md:items-start md:gap-6 md:space-y-0">
+      <div className="space-y-4">
+
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
         {(['monthly', 'all'] as const).map((t) => (
           <button
@@ -76,7 +79,11 @@ export default function Leaderboard() {
       ) : (
         <>
           <Podium entries={podium} meId={profile?.id} />
-          {rest.length > 0 && (
+        </>
+      )}
+      </div>
+
+      {rows && rest.length > 0 && (
             <Card className="divide-y divide-white/5 p-0">
               {rest.map((r) => (
                 <Link
@@ -100,9 +107,8 @@ export default function Leaderboard() {
                 </Link>
               ))}
             </Card>
-          )}
-        </>
       )}
+      </div>
 
       <p className="text-center text-xs text-slate-500">
         Poin per match (N = jumlah pemain): Juara 2×N · Runner-up 1 N · Runner-up 2 N÷3 (min. 4 pemain)

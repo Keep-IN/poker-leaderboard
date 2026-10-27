@@ -73,7 +73,7 @@ export default function Matches() {
             />
           </Card>
         ) : (
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {active.map((m) => (
               <MatchCard key={m.id} m={m} />
             ))}

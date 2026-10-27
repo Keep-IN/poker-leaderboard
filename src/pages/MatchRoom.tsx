@@ -73,7 +73,7 @@ export default function MatchRoom() {
   const nameOf = (p: MatchPlayer) => p.profile?.name ?? 'Player'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:mx-auto md:max-w-2xl">
       <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
         ‹ Semua match
       </Link>

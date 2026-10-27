@@ -79,7 +79,7 @@ export function PlayerDuelSections({ me }: { me: string }) {
       {incoming.length > 0 && (
         <section>
           <SectionTitle>⚔️ Ajakan duel</SectionTitle>
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {incoming.map((d) => {
               const { a } = duelNames(d)
               return (
@@ -122,7 +122,7 @@ export function PlayerDuelSections({ me }: { me: string }) {
       {mine.length > 0 && (
         <section>
           <SectionTitle>Duel kamu</SectionTitle>
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {mine.map((d) => {
               const { a, b } = duelNames(d)
               const canCancel = (d.status === 'pending' && d.challenger_id === me) || d.status === 'accepted'
@@ -180,7 +180,7 @@ export function DealerDuelSections({ me }: { me: string }) {
       {waiting.length > 0 && (
         <section>
           <SectionTitle>⚔️ Duel menunggu persetujuan</SectionTitle>
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {waiting.map((d) => {
               const { a, b } = duelNames(d)
               return (
@@ -218,7 +218,7 @@ export function DealerDuelSections({ me }: { me: string }) {
       {hosting.length > 0 && (
         <section>
           <SectionTitle>Duel yang kamu host</SectionTitle>
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {hosting.map((d) => {
               const { a, b } = duelNames(d)
               const askWinner = (winnerId: string, winner: string, loser: string) =>

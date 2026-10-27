@@ -33,7 +33,7 @@ export default function DuelNew() {
 
   if (profile.role !== 'player' || opponent === null || opponent.player_id === profile.id)
     return (
-      <Card>
+      <Card className="md:mx-auto md:max-w-xl">
         <EmptyState icon="⚔️" title="Duel tidak tersedia" text="Duel hanya bisa antar dua akun player yang berbeda." />
         <Link to="/players" className="block text-center text-sm font-semibold text-gold-400">
           Kembali ke daftar pemain
@@ -71,7 +71,7 @@ export default function DuelNew() {
 
   if (confirming)
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 md:mx-auto md:max-w-xl">
         {header}
         <Card className="space-y-4">
           <div className="space-y-2 text-sm">
@@ -119,7 +119,7 @@ export default function DuelNew() {
     )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:mx-auto md:max-w-xl">
       {header}
 
       {maxStake < 1 ? (

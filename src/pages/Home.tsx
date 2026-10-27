@@ -49,7 +49,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
       {hosted.length > 0 && (
         <section>
           <SectionTitle>Match yang kamu host</SectionTitle>
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {hosted.map((m) => (
               <Link key={m.id} to={`/matches/${m.id}`} className="block">
                 <Card className="flex items-center justify-between gap-3 border-gold-400/30 transition hover:bg-felt-700/80">
@@ -67,7 +67,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
 
       <Link
         to="/matches/new"
-        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-gold-400/50 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10 active:scale-[0.98]"
+        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-gold-400/50 md:w-fit md:px-8 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10 active:scale-[0.98]"
       >
         <span className="text-lg">＋</span> Buat Match ({MATCH_CREATION_COST} poin)
       </Link>
@@ -125,7 +125,8 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
     adjustments.filter((a) => a.counts_monthly && a.created_at >= monthStart).reduce((sum, a) => sum + a.amount, 0)
 
   return (
-    <>
+    <div className="space-y-5 md:grid md:grid-cols-2 md:items-start md:gap-6 md:space-y-0">
+      <div className="space-y-5 md:sticky md:top-24">
       {duels.length > 0 && (
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
           {(['match', 'duel'] as const).map((t) => (
@@ -166,7 +167,9 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
           </p>
         )}
       </Card>
+      </div>
 
+      <div className="space-y-5">
       {showDuels ? (
         <section>
           <SectionTitle>Riwayat duel</SectionTitle>
@@ -263,7 +266,8 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
       </section>
       </>
       )}
-    </>
+      </div>
+    </div>
   )
 }
 
@@ -307,6 +311,7 @@ function DealerHome({ profile }: { profile: Profile }) {
     <div className="space-y-5">
       <Greeting profile={profile} subtitle="Panel dealer" />
 
+      <div className="space-y-5 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
       <Card className="relative overflow-hidden">
         <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-white/[0.03]">♦</div>
         <p className="text-sm text-slate-400">Match yang sudah di-host</p>
@@ -319,13 +324,14 @@ function DealerHome({ profile }: { profile: Profile }) {
       >
         <span className="text-xl">＋</span> Buat Match Baru
       </Link>
+      </div>
 
       <DealerDuelSections me={profile.id} />
 
       {active.length > 0 && (
         <section>
           <SectionTitle>Match aktif</SectionTitle>
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-2">
             {active.map((m) => (
               <Link key={m.id} to={`/matches/${m.id}`} className="block">
                 <Card className="flex items-center justify-between gap-3 border-gold-400/30 transition hover:bg-felt-700/80">

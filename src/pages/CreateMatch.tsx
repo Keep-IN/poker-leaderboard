@@ -43,7 +43,7 @@ export default function CreateMatch() {
 
   if (confirming && balance !== null)
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 md:mx-auto md:max-w-xl">
         <div>
           <p className="text-sm text-slate-400">Konfirmasi</p>
           <h1 className="text-2xl font-bold">Buat match pakai poin?</h1>
@@ -84,7 +84,7 @@ export default function CreateMatch() {
     )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 md:mx-auto md:max-w-xl">
       <div>
         <p className="text-sm text-slate-400">{isPlayer ? `Biaya ${MATCH_CREATION_COST} poin` : 'Menu dealer'}</p>
         <h1 className="text-2xl font-bold">Buat Match Baru</h1>
