@@ -11,6 +11,7 @@ import Home from './pages/Home'
 import Leaderboard from './pages/Leaderboard'
 import MatchRoom from './pages/MatchRoom'
 import Matches from './pages/Matches'
+import MissionNew from './pages/MissionNew'
 import Players, { PlayerProfile } from './pages/Players'
 import { ForgotPassword, ResetPassword } from './pages/PasswordPages'
 
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="players/:id" element={<PlayerProfile />} />
             <Route path="duel/:opponentId" element={<DuelNew />} />
             <Route path="matches/new" element={<CreateMatch />} />
+            <Route path="missions/new" element={<MissionNew />} />
             <Route path="dealer/new" element={<Navigate to="/matches/new" replace />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

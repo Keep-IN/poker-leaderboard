@@ -99,9 +99,31 @@ create index if not exists duels_status_idx     on public.duels (status);
 -- Bagian taruhan yang tertutup poin bulan ini dicatat counts_monthly = true, sisanya hanya total poin,
 -- jadi poin bulanan tidak pernah minus.
 alter table public.point_adjustments add column if not exists duel_id uuid references public.duels (id) on delete cascade;
+
+-- Misi duel dari dealer untuk semua player: menangkan `required_wins` duel dengan taruhan minimal
+-- `min_stake` sebelum `deadline`, dapat `reward` poin. Duel dihitung kalau selesai di antara
+-- dibuatnya misi dan deadline. Reward diberikan otomatis saat duel yang memenuhi target selesai.
+create table if not exists public.missions (
+  id             uuid primary key default gen_random_uuid(),
+  required_wins  int  not null check (required_wins between 1 and 50),
+  min_stake      int  not null check (min_stake >= 1),
+  reward         int  not null check (reward between 1 and 1000),
+  deadline       timestamptz not null,
+  status         text not null default 'active' check (status in ('active', 'cancelled')),
+  created_by     uuid references public.profiles (id) on delete set null,
+  created_at     timestamptz not null default now()
+);
+
+create index if not exists missions_deadline_idx on public.missions (deadline);
+
+alter table public.point_adjustments add column if not exists mission_id uuid references public.missions (id) on delete cascade;
+-- Reward tiap misi hanya sekali per player.
+create unique index if not exists point_adjustments_mission_reward_idx
+  on public.point_adjustments (mission_id, player_id) where reason = 'mission_reward';
+
 alter table public.point_adjustments drop constraint if exists point_adjustments_reason_check;
 alter table public.point_adjustments add constraint point_adjustments_reason_check
-  check (reason in ('create_match', 'duel_stake', 'duel_payout'));
+  check (reason in ('create_match', 'duel_stake', 'duel_payout', 'mission_reward'));
 
 -- ---------- Auto-create profile on sign-up -----------------------------
 
@@ -134,18 +156,21 @@ alter table public.matches       enable row level security;
 alter table public.match_players enable row level security;
 alter table public.point_adjustments enable row level security;
 alter table public.duels enable row level security;
+alter table public.missions enable row level security;
 
 drop policy if exists "profiles readable"      on public.profiles;
 drop policy if exists "matches readable"       on public.matches;
 drop policy if exists "match_players readable" on public.match_players;
 drop policy if exists "point_adjustments readable" on public.point_adjustments;
 drop policy if exists "duels readable" on public.duels;
+drop policy if exists "missions readable" on public.missions;
 
 create policy "profiles readable"      on public.profiles      for select to authenticated using (true);
 create policy "matches readable"       on public.matches       for select to authenticated using (true);
 create policy "match_players readable" on public.match_players for select to authenticated using (true);
 create policy "point_adjustments readable" on public.point_adjustments for select to authenticated using (true);
 create policy "duels readable" on public.duels for select to authenticated using (true);
+create policy "missions readable" on public.missions for select to authenticated using (true);
 
 -- ---------- Helpers ----------------------------------------------------
 
@@ -688,7 +713,114 @@ begin
     values (p_winner, 2 * d.stake - monthly_pot, 'duel_payout', p_duel, false);
   end if;
   update public.duels set status = 'finished', winner_id = p_winner, finished_at = now() where id = p_duel;
+  perform public.award_missions(p_winner);
 end;
+$$;
+
+-- ---------- Misi duel --------------------------------------------------
+
+-- Jumlah duel yang dimenangkan player dan memenuhi syarat misi.
+create or replace function public.mission_wins(p_mission uuid, p_player uuid)
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select count(*)::int
+    from public.duels d
+    join public.missions m on m.id = p_mission
+   where d.status = 'finished'
+     and d.winner_id = p_player
+     and d.stake >= m.min_stake
+     and d.finished_at >= m.created_at
+     and d.finished_at <= m.deadline;
+$$;
+
+-- Beri reward untuk semua misi aktif yang baru saja tercapai oleh player ini.
+create or replace function public.award_missions(p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.point_adjustments (player_id, amount, reason, mission_id, counts_monthly)
+  select p_player, m.reward, 'mission_reward', m.id, true
+    from public.missions m
+   where m.status = 'active'
+     and m.deadline >= now()
+     and public.mission_wins(m.id, p_player) >= m.required_wins
+  on conflict (mission_id, player_id) where reason = 'mission_reward' do nothing;
+end;
+$$;
+
+create or replace function public.create_mission(p_wins int, p_min_stake int, p_reward int, p_deadline timestamptz)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_id uuid;
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa membuat misi';
+  end if;
+  if p_wins is null or p_wins < 1 or p_wins > 50 then
+    raise exception 'Jumlah menang harus 1 sampai 50';
+  end if;
+  if p_min_stake is null or p_min_stake < 1 then
+    raise exception 'Taruhan minimal harus minimal 1 poin';
+  end if;
+  if p_reward is null or p_reward < 1 or p_reward > 1000 then
+    raise exception 'Reward harus 1 sampai 1000 poin';
+  end if;
+  if p_deadline is null or p_deadline <= now() + interval '5 minutes' then
+    raise exception 'Deadline harus di masa depan';
+  end if;
+  insert into public.missions (required_wins, min_stake, reward, deadline, created_by)
+  values (p_wins, p_min_stake, p_reward, p_deadline, auth.uid())
+  returning id into new_id;
+  return new_id;
+end;
+$$;
+
+-- Reward yang sudah diberikan tetap milik player.
+create or replace function public.cancel_mission(p_mission uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa membatalkan misi';
+  end if;
+  update public.missions set status = 'cancelled' where id = p_mission and status = 'active';
+  if not found then
+    raise exception 'Misi tidak ditemukan atau sudah dibatalkan';
+  end if;
+end;
+$$;
+
+-- Misi yang masih berjalan beserta progres player yang login.
+create or replace function public.get_my_missions()
+returns table (id uuid, required_wins int, min_stake int, reward int, deadline timestamptz, created_at timestamptz, wins int, completed boolean)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select m.id, m.required_wins, m.min_stake, m.reward, m.deadline, m.created_at,
+         public.mission_wins(m.id, auth.uid()),
+         exists (select 1 from public.point_adjustments a
+                  where a.mission_id = m.id and a.player_id = auth.uid() and a.reason = 'mission_reward')
+    from public.missions m
+   where m.status = 'active'
+     and m.deadline > now()
+     and auth.uid() is not null
+   order by m.deadline asc;
 $$;
 
 -- ---------- Leaderboard ------------------------------------------------
@@ -770,6 +902,8 @@ revoke all on function public.month_points_balance(uuid) from public, anon, auth
 revoke all on function public.lock_duel(uuid) from public, anon, authenticated;
 revoke all on function public.refund_duel(uuid) from public, anon, authenticated;
 revoke all on function public.hold_duel_stake(uuid, uuid, int) from public, anon, authenticated;
+revoke all on function public.mission_wins(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.award_missions(uuid) from public, anon, authenticated;
 
 do $$
 declare
@@ -795,6 +929,9 @@ begin
     'public.cancel_duel(uuid)',
     'public.review_duel(uuid, boolean)',
     'public.finish_duel(uuid, uuid)',
+    'public.create_mission(int, int, int, timestamptz)',
+    'public.cancel_mission(uuid)',
+    'public.get_my_missions()',
     'public.current_role_name()'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
@@ -817,6 +954,10 @@ begin
   end;
   begin
     alter publication supabase_realtime add table public.duels;
+  exception when duplicate_object then null;
+  end;
+  begin
+    alter publication supabase_realtime add table public.missions;
   exception when duplicate_object then null;
   end;
 end;

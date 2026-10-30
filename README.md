@@ -38,9 +38,16 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
 - Duel yang sudah diterima muncul di **Beranda semua dealer**. Dealer pertama yang menyetujui menjadi **host** dan menetapkan pemenangnya.
 - Di kartu statistik ada tab **Match / Duel**. Tab Duel hanya muncul kalau pemain itu pernah duel, dan berisi win rate duel serta riwayat duel.
 
+### 🎯 Misi Duel
+- Dealer bisa membuat **misi duel** untuk semua player, misalnya *"Menangkan 2 duel dengan taruhan minimal 10 poin"*.
+- Dealer mengisi **jumlah menang**, **taruhan minimal**, **deadline**, dan **reward poin**.
+- Misi muncul di **Beranda player** dengan progres (mis. 1/2 menang) dan **timer hitung mundur** ke deadline.
+- Reward **masuk otomatis** begitu target tercapai.
+
 ### 🎩 Beranda Dealer
 - Jumlah **match yang sudah di-host**.
 - Tombol **Buat Match Baru**.
+- Daftar **misi duel** yang sedang berjalan (jumlah player yang sudah selesai dan sisa waktunya), tombol **Buat misi**, dan tombol untuk membatalkan misi.
 - Daftar match aktif dan riwayat hosting beserta pemenangnya.
 
 ### 🃏 Match
@@ -133,6 +140,14 @@ Player A ajak duel  →  Player B terima  →  Dealer setujui & host  →  Deale
   - Pemenang mendapat **+taruhan** di total poin, dan di poin bulan ini sebanyak poin bulanan yang benar-benar hilang dari lawannya. Jadi poin bulanan juga hanya berpindah, tidak tercipta dari duel.
 - Duel tidak dihitung ke statistik match (match dimainkan, menang, win rate). Duel punya statistiknya sendiri di tab Duel.
 
+### Aturan misi
+
+- Yang dihitung hanya **duel yang dimenangkan** dengan taruhan **minimal sebesar syarat misi**, dan yang **selesai setelah misi dibuat dan sebelum deadline**. Duel lama tidak ikut dihitung.
+- Reward masuk otomatis ke **poin bulan ini dan total poin** saat duel yang memenuhi target selesai. Setiap player hanya bisa mendapat reward **sekali per misi**.
+- Semua player bisa mengerjakan misi yang sama, dan semua yang berhasil mendapat reward.
+- Kalau dealer **membatalkan misi**, misi hilang dari Beranda player. Reward yang sudah didapat tetap jadi milik player.
+- Misi yang sudah lewat deadline hilang dari Beranda player.
+
 ### Bagaimana statistik dihitung
 
 Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwayat match setiap kali halaman dibuka, jadi angkanya selalu sesuai dengan match yang benar-benar terjadi.
@@ -142,8 +157,8 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Match dimainkan | Jumlah match **selesai** yang diikuti pemain                 |
 | Match menang    | Jumlah match selesai di mana pemain menjadi **pemenang**     |
 | Win rate        | Match menang ÷ match dimainkan × 100%                        |
-| Poin bulan ini  | Poin dari match bulan berjalan + hasil duel − biaya membuat match di bulan itu |
-| Total poin      | Poin dari semua match + hasil duel − biaya membuat match     |
+| Poin bulan ini  | Poin dari match bulan berjalan + hasil duel + reward misi − biaya membuat match di bulan itu |
+| Total poin      | Poin dari semua match + hasil duel + reward misi − biaya membuat match |
 | Leaderboard     | Total poin per pemain, untuk bulan terpilih / all time       |
 | Match di-host   | Jumlah match **selesai** yang dibuat dealer                  |
 
@@ -158,6 +173,8 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Tandai pemain kalah & tetapkan pemenang (di match sendiri) |   ✅   |   ✅   |
 | Ajak duel & terima/tolak ajakan duel    |   ✅   |   –    |
 | Setujui, tolak & host duel              |   –    |   ✅   |
+| Kerjakan misi duel                      |   ✅   |   –    |
+| Buat & batalkan misi duel               |   –    |   ✅   |
 
 Semua akun baru otomatis menjadi **Player**. Akun dijadikan **Dealer** oleh admin melalui Supabase (Table Editor → tabel `profiles` → ubah kolom `role` menjadi `dealer`).
 
