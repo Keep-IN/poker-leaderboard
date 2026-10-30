@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { DealerDuelSections, PlayerDuelSections } from '../components/DuelSections'
 import { DealerMissions, PlayerMissions } from '../components/MissionSections'
@@ -44,9 +44,10 @@ function PlayerHome({ profile }: { profile: Profile }) {
   return (
     <div className="space-y-5">
       <Greeting profile={profile} subtitle="Statistik kamu" />
-      <PlayerDuelSections me={profile.id} />
-      <PlayerMissions me={profile.id} />
-      <PlayerStats playerId={profile.id} isMe />
+      <PlayerStats playerId={profile.id} isMe>
+        <PlayerDuelSections me={profile.id} />
+        <PlayerMissions me={profile.id} />
+      </PlayerStats>
 
       {hosted.length > 0 && (
         <section>
@@ -77,8 +78,11 @@ function PlayerHome({ profile }: { profile: Profile }) {
   )
 }
 
-/** Stat card, active matches and match history for one player. Used on Beranda and on a player's profile. */
-export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boolean }) {
+/**
+ * Stat card, active matches and match history for one player. Used on Beranda and on a player's profile.
+ * `children` render right below the stat card (duel invites and missions on Beranda).
+ */
+export function PlayerStats({ playerId, isMe, children }: { playerId: string; isMe?: boolean; children?: ReactNode }) {
   const [rows, setRows] = useState<PlayerMatchRow[] | null>(null)
   const [adjustments, setAdjustments] = useState<Adjustment[]>([])
   const [duels, setDuels] = useState<Duel[]>([])
@@ -129,7 +133,7 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
 
   return (
     <div className="space-y-5 md:grid md:grid-cols-2 md:items-start md:gap-6 md:space-y-0">
-      <div className="space-y-5 md:sticky md:top-24">
+      <div className={cx('space-y-5', !children && 'md:sticky md:top-24')}>
       {duels.length > 0 && (
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
           {(['match', 'duel'] as const).map((t) => (
@@ -174,6 +178,7 @@ export function PlayerStats({ playerId, isMe }: { playerId: string; isMe?: boole
           </p>
         )}
       </Card>
+      {children}
       </div>
 
       <div className="space-y-5">

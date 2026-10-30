@@ -37,7 +37,7 @@ export function PlayerMissions({ me }: { me: string }) {
   return (
     <section>
       <SectionTitle>🎯 Misi duel</SectionTitle>
-      <div className="grid gap-2 md:grid-cols-2">
+      <div className="grid gap-2">
         {visible.map((m) => {
           const left = new Date(m.deadline).getTime() - now
           const progress = Math.min(m.wins, m.required_wins)
