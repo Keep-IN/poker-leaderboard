@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDateTime } from '../lib/format'
-import { MISSION_SELECT, formatCountdown, missionText, useNow, type Mission, type MyMission } from '../lib/missions'
+import { MISSION_SELECT, formatCountdown, missionText, useNow, type Mission, type MissionKind, type MyMission } from '../lib/missions'
 import { errorMessage, supabase } from '../lib/supabase'
 import ConfirmSheet from './ConfirmSheet'
 import { Card, ErrorText, SectionTitle, cx } from './ui'
 
-/** Runs `load` now and whenever missions or duels change (a finished duel moves progress). */
+/** Runs `load` now and whenever missions, duels or matches change (a finished duel or match moves progress). */
 function useLive(name: string, load: () => void) {
   useEffect(() => {
     load()
@@ -14,6 +14,7 @@ function useLive(name: string, load: () => void) {
       .channel(name)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'duels' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, load)
       .subscribe()
     return () => {
       supabase.removeChannel(sub)
@@ -36,15 +37,19 @@ export function PlayerMissions({ me }: { me: string }) {
 
   return (
     <section>
-      <SectionTitle>🎯 Misi duel</SectionTitle>
+      <SectionTitle>🎯 Misi</SectionTitle>
       <div className="grid gap-2">
         {visible.map((m) => {
           const left = new Date(m.deadline).getTime() - now
-          const progress = Math.min(m.wins, m.required_wins)
+          const streak = m.kind === 'match_streak'
+          const progress = m.completed ? m.required_wins : Math.min(m.wins, m.required_wins)
           return (
             <Card key={m.id} className={m.completed ? 'border-emerald-400/40' : 'border-gold-400/40'}>
               <div className="flex items-start justify-between gap-3">
-                <p className="font-semibold">{missionText(m)}</p>
+                <div className="min-w-0">
+                  <MissionKindLabel kind={m.kind} />
+                  <p className="font-semibold">{missionText(m)}</p>
+                </div>
                 <span className="shrink-0 rounded-lg bg-gold-400/15 px-2 py-1 text-xs font-bold text-gold-300">+{m.reward} poin</span>
               </div>
               <div className="mt-3 flex items-center gap-3">
@@ -55,12 +60,14 @@ export function PlayerMissions({ me }: { me: string }) {
                   />
                 </div>
                 <span className="shrink-0 text-xs font-semibold text-slate-300">
-                  {progress}/{m.required_wins} menang
+                  {streak ? `🔥 ${progress}/${m.required_wins} beruntun` : `${progress}/${m.required_wins} menang`}
                 </span>
               </div>
               <div className="mt-3 flex items-center justify-between text-xs">
                 {m.completed ? (
                   <span className="font-semibold text-emerald-300">✓ Selesai · +{m.reward} poin sudah masuk</span>
+                ) : streak ? (
+                  <span className="text-slate-400">Kalah sekali, streak mulai dari 0{m.best > 0 && ` · terbaik ${m.best}`}</span>
                 ) : (
                   <span className="text-slate-400">Duel di bawah {m.min_stake} poin tidak dihitung</span>
                 )}
@@ -110,7 +117,7 @@ export function DealerMissions() {
   return (
     <section>
       <div className="flex items-center justify-between">
-        <SectionTitle>🎯 Misi duel</SectionTitle>
+        <SectionTitle>🎯 Misi</SectionTitle>
         <Link to="/missions/new" className="mb-2 text-sm font-semibold text-gold-400 hover:text-gold-300">
           ＋ Buat misi
         </Link>
@@ -119,14 +126,17 @@ export function DealerMissions() {
 
       {active.length === 0 ? (
         <Card>
-          <p className="text-center text-sm text-slate-400">Belum ada misi aktif. Buat misi supaya player makin semangat duel.</p>
+          <p className="text-center text-sm text-slate-400">Belum ada misi aktif. Buat misi duel atau misi match supaya player makin semangat main.</p>
         </Card>
       ) : (
         <div className="grid gap-2 md:grid-cols-2">
           {active.map((m) => (
             <Card key={m.id} className="border-gold-400/30">
               <div className="flex items-start justify-between gap-3">
-                <p className="font-semibold">{missionText(m)}</p>
+                <div className="min-w-0">
+                  <MissionKindLabel kind={m.kind} />
+                  <p className="font-semibold">{missionText(m)}</p>
+                </div>
                 <span className="shrink-0 rounded-lg bg-gold-400/15 px-2 py-1 text-xs font-bold text-gold-300">+{m.reward} poin</span>
               </div>
               <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
@@ -175,5 +185,13 @@ export function DealerMissions() {
         />
       )}
     </section>
+  )
+}
+
+function MissionKindLabel({ kind }: { kind: MissionKind }) {
+  return (
+    <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+      {kind === 'match_streak' ? '🃏 Misi match' : '⚔️ Misi duel'}
+    </p>
   )
 }

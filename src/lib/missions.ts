@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 
+export type MissionKind = 'duel' | 'match_streak'
+
 export interface Mission {
   id: string
+  kind: MissionKind
   required_wins: number
-  min_stake: number
+  min_stake: number | null
   reward: number
   deadline: string
   status: 'active' | 'cancelled'
@@ -15,19 +18,25 @@ export interface Mission {
 /** A mission with the signed-in player's progress, from get_my_missions(). */
 export interface MyMission {
   id: string
+  kind: MissionKind
   required_wins: number
-  min_stake: number
+  min_stake: number | null
   reward: number
   deadline: string
   created_at: string
+  /** Duel: qualifying wins. Match streak: current winning streak. */
   wins: number
+  /** Duel: same as wins. Match streak: longest streak during the mission. */
+  best: number
   completed: boolean
 }
 
 export const MISSION_SELECT = '*, creator:profiles!missions_created_by_fkey(name), rewards:point_adjustments(count)'
 
-export function missionText(m: { required_wins: number; min_stake: number }) {
-  return `Menangkan ${m.required_wins} duel dengan taruhan minimal ${m.min_stake} poin`
+export function missionText(m: { kind: MissionKind; required_wins: number; min_stake: number | null }) {
+  return m.kind === 'match_streak'
+    ? `Menangkan ${m.required_wins} match berturut-turut`
+    : `Menangkan ${m.required_wins} duel dengan taruhan minimal ${m.min_stake} poin`
 }
 
 /** Current time, ticking every second. */

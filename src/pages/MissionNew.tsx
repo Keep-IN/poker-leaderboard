@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorText, PageLoader } from '../components/ui'
+import { Button, Card, EmptyState, ErrorText, PageLoader, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
-import { missionText, useNow } from '../lib/missions'
+import { missionText, useNow, type MissionKind } from '../lib/missions'
 import { errorMessage, supabase } from '../lib/supabase'
 
 /** datetime-local value (browser local time) for 7 days from now at 23:59. */
@@ -18,7 +18,9 @@ function defaultDeadline() {
 export default function MissionNew() {
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const [kind, setKind] = useState<MissionKind>('duel')
   const [wins, setWins] = useState(2)
+  const [streak, setStreak] = useState(3)
   const [minStake, setMinStake] = useState(10)
   const [reward, setReward] = useState(15)
   const [deadline, setDeadline] = useState(defaultDeadline)
@@ -40,14 +42,18 @@ export default function MissionNew() {
   const deadlineDate = new Date(deadline)
   const validDeadline = !Number.isNaN(deadlineDate.getTime()) && deadlineDate.getTime() > now + 5 * 60_000
 
+  const isStreak = kind === 'match_streak'
+  const preview = { kind, required_wins: isStreak ? streak : wins, min_stake: isStreak ? null : minStake }
+
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!validDeadline) return setError('Deadline harus di masa depan.')
     setError('')
     setLoading(true)
     const { error } = await supabase.rpc('create_mission', {
-      p_wins: wins,
-      p_min_stake: minStake,
+      p_kind: kind,
+      p_wins: isStreak ? streak : wins,
+      p_min_stake: isStreak ? null : minStake,
       p_reward: reward,
       p_deadline: deadlineDate.toISOString(),
     })
@@ -60,13 +66,35 @@ export default function MissionNew() {
     <div className="space-y-4 md:mx-auto md:max-w-xl">
       <div>
         <p className="text-sm text-slate-400">Menu dealer</p>
-        <h1 className="text-2xl font-bold">Buat Misi Duel</h1>
+        <h1 className="text-2xl font-bold">Buat Misi</h1>
+      </div>
+
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
+        {(['duel', 'match_streak'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setKind(k)}
+            className={cx(
+              'min-h-10 rounded-lg text-sm font-semibold transition',
+              kind === k ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+            )}
+          >
+            {k === 'duel' ? '⚔️ Misi duel' : '🃏 Misi match'}
+          </button>
+        ))}
       </div>
 
       <form onSubmit={submit} className="space-y-4">
         <Card className="space-y-5">
-          <Stepper label="Jumlah menang" unit="duel" value={wins} min={1} max={50} onChange={setWins} />
-          <Stepper label="Taruhan minimal" unit="poin" value={minStake} min={1} max={1000} onChange={setMinStake} />
+          {isStreak ? (
+            <Stepper label="Menang berturut-turut" unit="match" value={streak} min={2} max={20} onChange={setStreak} />
+          ) : (
+            <>
+              <Stepper label="Jumlah menang" unit="duel" value={wins} min={1} max={50} onChange={setWins} />
+              <Stepper label="Taruhan minimal" unit="poin" value={minStake} min={1} max={1000} onChange={setMinStake} />
+            </>
+          )}
           <Stepper label="Reward" unit="poin" value={reward} min={1} max={1000} onChange={setReward} />
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-slate-300">Deadline</span>
@@ -82,14 +110,19 @@ export default function MissionNew() {
 
         <Card className="border-gold-400/40">
           <p className="text-xs uppercase tracking-wider text-slate-400">Pratinjau</p>
-          <p className="mt-1 font-semibold">{missionText({ required_wins: wins, min_stake: minStake })}</p>
+          <p className="mt-1 font-semibold">{missionText(preview)}</p>
           <p className="mt-1 text-sm text-slate-400">
             Reward <span className="font-semibold text-gold-300">+{reward} poin</span>
             {validDeadline && ` · sampai ${formatDateTime(deadlineDate.toISOString())}`}
           </p>
           <ul className="mt-3 space-y-1.5 text-sm text-slate-300">
             <li>• Misi muncul di beranda semua player, lengkap dengan timer deadline.</li>
-            <li>• Hanya duel yang selesai setelah misi dibuat dan sebelum deadline yang dihitung.</li>
+            <li>
+              • Hanya {isStreak ? 'match' : 'duel'} yang selesai setelah misi dibuat dan sebelum deadline yang dihitung.
+            </li>
+            {isStreak && (
+              <li>• Kalah di match yang diikuti membuat streak mulai dari 0. Match yang tidak diikuti tidak memutus streak.</li>
+            )}
             <li>• Reward masuk otomatis ke poin bulan ini dan total poin, sekali per player.</li>
           </ul>
         </Card>

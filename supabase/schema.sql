@@ -116,6 +116,14 @@ create table if not exists public.missions (
 
 create index if not exists missions_deadline_idx on public.missions (deadline);
 
+-- Jenis misi: 'duel' (menang X duel dengan taruhan minimal) atau 'match_streak' (menang X match berturut-turut).
+-- Misi match tidak punya taruhan minimal.
+alter table public.missions add column if not exists kind text not null default 'duel';
+alter table public.missions alter column min_stake drop not null;
+alter table public.missions drop constraint if exists missions_kind_check;
+alter table public.missions add constraint missions_kind_check
+  check ((kind = 'duel' and min_stake is not null) or (kind = 'match_streak' and min_stake is null));
+
 alter table public.point_adjustments add column if not exists mission_id uuid references public.missions (id) on delete cascade;
 -- Reward tiap misi hanya sekali per player.
 create unique index if not exists point_adjustments_mission_reward_idx
@@ -436,6 +444,7 @@ begin
   update public.matches
      set status = 'finished', winner_id = p_player, finished_at = now()
    where id = p_match;
+  perform public.award_missions(p_player);
 end;
 $$;
 
@@ -717,24 +726,51 @@ begin
 end;
 $$;
 
--- ---------- Misi duel --------------------------------------------------
+-- ---------- Misi -------------------------------------------------------
 
--- Jumlah duel yang dimenangkan player dan memenuhi syarat misi.
-create or replace function public.mission_wins(p_mission uuid, p_player uuid)
-returns int
-language sql
+drop function if exists public.mission_wins(uuid, uuid);
+
+-- Progres player untuk satu misi. Hanya duel/match yang selesai antara dibuatnya misi dan deadline.
+--   duel:         current = best = jumlah duel menang dengan taruhan >= min_stake
+--   match_streak: current = streak menang terakhir, best = streak terpanjang (kalah mengulang dari 0)
+create or replace function public.mission_progress(p_mission uuid, p_player uuid, out current int, out best int)
+language plpgsql
 stable
 security definer
 set search_path = public
 as $$
-  select count(*)::int
-    from public.duels d
-    join public.missions m on m.id = p_mission
-   where d.status = 'finished'
-     and d.winner_id = p_player
-     and d.stake >= m.min_stake
-     and d.finished_at >= m.created_at
-     and d.finished_at <= m.deadline;
+declare
+  m public.missions;
+begin
+  select * into m from public.missions where id = p_mission;
+  if m.kind = 'duel' then
+    select count(*)::int into current
+      from public.duels d
+     where d.status = 'finished'
+       and d.winner_id = p_player
+       and d.stake >= m.min_stake
+       and d.finished_at between m.created_at and m.deadline;
+    best := current;
+  else
+    -- Setiap kekalahan membuka grup baru; jumlah menang dalam satu grup = panjang streak.
+    with played as (
+      select mp.status = 'winner' as win, x.finished_at, x.id
+        from public.match_players mp
+        join public.matches x on x.id = mp.match_id
+       where mp.player_id = p_player
+         and x.status = 'finished'
+         and x.finished_at between m.created_at and m.deadline
+    ), grouped as (
+      select win, count(*) filter (where not win) over (order by finished_at, id) as grp from played
+    ), streaks as (
+      select grp, count(*) filter (where win)::int as wins from grouped group by grp
+    )
+    select coalesce(max(wins), 0),
+           coalesce((select wins from streaks order by grp desc limit 1), 0)
+      into best, current
+      from streaks;
+  end if;
+end;
 $$;
 
 -- Beri reward untuk semua misi aktif yang baru saja tercapai oleh player ini.
@@ -750,12 +786,13 @@ begin
     from public.missions m
    where m.status = 'active'
      and m.deadline >= now()
-     and public.mission_wins(m.id, p_player) >= m.required_wins
+     and (public.mission_progress(m.id, p_player)).best >= m.required_wins
   on conflict (mission_id, player_id) where reason = 'mission_reward' do nothing;
 end;
 $$;
 
-create or replace function public.create_mission(p_wins int, p_min_stake int, p_reward int, p_deadline timestamptz)
+drop function if exists public.create_mission(int, int, int, timestamptz);
+create or replace function public.create_mission(p_wins int, p_min_stake int, p_reward int, p_deadline timestamptz, p_kind text default 'duel')
 returns uuid
 language plpgsql
 security definer
@@ -767,10 +804,16 @@ begin
   if public.current_role_name() is distinct from 'dealer' then
     raise exception 'Hanya dealer yang bisa membuat misi';
   end if;
-  if p_wins is null or p_wins < 1 or p_wins > 50 then
+  if p_kind is null or p_kind not in ('duel', 'match_streak') then
+    raise exception 'Jenis misi tidak dikenal';
+  end if;
+  if p_kind = 'duel' and (p_wins is null or p_wins < 1 or p_wins > 50) then
     raise exception 'Jumlah menang harus 1 sampai 50';
   end if;
-  if p_min_stake is null or p_min_stake < 1 then
+  if p_kind = 'match_streak' and (p_wins is null or p_wins < 2 or p_wins > 20) then
+    raise exception 'Jumlah menang beruntun harus 2 sampai 20';
+  end if;
+  if p_kind = 'duel' and (p_min_stake is null or p_min_stake < 1) then
     raise exception 'Taruhan minimal harus minimal 1 poin';
   end if;
   if p_reward is null or p_reward < 1 or p_reward > 1000 then
@@ -779,8 +822,8 @@ begin
   if p_deadline is null or p_deadline <= now() + interval '5 minutes' then
     raise exception 'Deadline harus di masa depan';
   end if;
-  insert into public.missions (required_wins, min_stake, reward, deadline, created_by)
-  values (p_wins, p_min_stake, p_reward, p_deadline, auth.uid())
+  insert into public.missions (kind, required_wins, min_stake, reward, deadline, created_by)
+  values (p_kind, p_wins, case when p_kind = 'duel' then p_min_stake end, p_reward, p_deadline, auth.uid())
   returning id into new_id;
   return new_id;
 end;
@@ -805,15 +848,18 @@ end;
 $$;
 
 -- Misi yang masih berjalan beserta progres player yang login.
-create or replace function public.get_my_missions()
-returns table (id uuid, required_wins int, min_stake int, reward int, deadline timestamptz, created_at timestamptz, wins int, completed boolean)
+drop function if exists public.get_my_missions();
+create function public.get_my_missions()
+returns table (id uuid, kind text, required_wins int, min_stake int, reward int, deadline timestamptz, created_at timestamptz,
+               wins int, best int, completed boolean)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select m.id, m.required_wins, m.min_stake, m.reward, m.deadline, m.created_at,
-         public.mission_wins(m.id, auth.uid()),
+  select m.id, m.kind, m.required_wins, m.min_stake, m.reward, m.deadline, m.created_at,
+         (public.mission_progress(m.id, auth.uid())).current,
+         (public.mission_progress(m.id, auth.uid())).best,
          exists (select 1 from public.point_adjustments a
                   where a.mission_id = m.id and a.player_id = auth.uid() and a.reason = 'mission_reward')
     from public.missions m
@@ -902,7 +948,7 @@ revoke all on function public.month_points_balance(uuid) from public, anon, auth
 revoke all on function public.lock_duel(uuid) from public, anon, authenticated;
 revoke all on function public.refund_duel(uuid) from public, anon, authenticated;
 revoke all on function public.hold_duel_stake(uuid, uuid, int) from public, anon, authenticated;
-revoke all on function public.mission_wins(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.mission_progress(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.award_missions(uuid) from public, anon, authenticated;
 
 do $$
@@ -929,7 +975,7 @@ begin
     'public.cancel_duel(uuid)',
     'public.review_duel(uuid, boolean)',
     'public.finish_duel(uuid, uuid)',
-    'public.create_mission(int, int, int, timestamptz)',
+    'public.create_mission(int, int, int, timestamptz, text)',
     'public.cancel_mission(uuid)',
     'public.get_my_missions()',
     'public.current_role_name()'
