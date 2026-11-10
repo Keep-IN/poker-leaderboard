@@ -18,6 +18,8 @@ import { randomInt } from 'node:crypto'
 /** Small blind per level; big blind selalu 2× small blind. */
 export const LEVELS = [10, 15, 25, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 30000, 50000]
 const ONLINE_MS = 20000
+/** Pemain yang AFK (istirahat karena kehabisan waktu, tidak beraksi) sebanyak ini hand berturut-turut langsung tersingkir. */
+export const AFK_HANDS = 4
 // waktu bisa dipercepat lewat env untuk pengujian
 const env = (k, d) => +(globalThis.process?.env?.[k] ?? '') || d
 export const TURN_MS = env('TURN_MS', 20000)
@@ -60,7 +62,7 @@ export class Table {
     Object.assign(this, {
       players: [], board: [], deck: [], phase: 'waiting', dealer: -1, turn: -1, bet: 0, minRaise: 0, due: null,
       started: false, hands: 0, handNo: 0, now: 0,
-      level0: 0, levelMs: 10 * 60000, startedAt: null, sb: 0, bb: 0, out: [], winner: null,
+      level0: 0, levelMs: 10 * 60000, startedAt: null, sb: 0, bb: 0, out: [], winner: null, forfeited: 0,
     })
   }
   /**
@@ -75,7 +77,7 @@ export class Table {
     for (const s of order) t.players.push({
       uid: s.uid, name: String(s.name).slice(0, 20), token: null, chips: cfg.start_chips, seen: 0, sitOut: false,
       inHand: false, folded: false, allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0,
-      score: 0, won: 0, last: '', stack0: 0, place: 0,
+      score: 0, won: 0, last: '', stack0: 0, place: 0, afk: 0, afkOut: false,
     })
     t.level0 = Math.max(0, LEVELS.indexOf(cfg.sb))
     t.levelMs = cfg.level_minutes * 60000
@@ -200,15 +202,23 @@ export class Table {
     })
     for (const p of this.players) { p.bet = 0; if (!p.folded) p.last = '' }
     this.phase = 'showdown'; this.turn = -1; this.hands++
+    // hitung hand AFK: masih istirahat di akhir hand = AFK; beraksi atau menekan "Main lagi" = mulai dari 0
+    for (const p of this.players) if (p.inHand && !p.place) p.afk = p.sitOut ? (p.afk || 0) + 1 : 0
     this.eliminate()
     if (this.alive().length < 2) return this.end()
     this.defer('next', Math.max(NEXT_MS, REVEAL_LEAD_MS + this.showdownOrder().length * REVEAL_MS + 2500))
   }
   // Pemain yang chip-nya habis di hand ini tersingkir. Kalau beberapa sekaligus, yang stack awal hand-nya lebih
   // besar dapat peringkat lebih baik (tersingkir "belakangan"); seri = urutan kursi.
+  // Pemain AFK AFK_HANDS hand berturut-turut juga tersingkir (chip-nya hangus) dan mendapat peringkat lebih buruk dari
+  // yang bust di hand yang sama. Kalau semua yang tersisa AFK, yang chip-nya paling banyak tetap bertahan sebagai juara.
   eliminate() {
+    const seat = p => this.players.indexOf(p)
+    const alive = this.alive(), afk = alive.filter(p => p.afk >= AFK_HANDS)
+    if (afk.length && afk.length === alive.length) afk.splice(afk.indexOf([...afk].sort((x, y) => y.chips - x.chips || seat(x) - seat(y))[0]), 1)
+    for (const p of afk) { this.forfeited += p.chips; p.chips = 0; p.afkOut = true }
     const busted = this.players.filter(p => !p.chips && !p.place)
-      .sort((x, y) => x.stack0 - y.stack0 || this.players.indexOf(x) - this.players.indexOf(y))
+      .sort((x, y) => y.afkOut - x.afkOut || x.stack0 - y.stack0 || seat(x) - seat(y))
     for (const p of busted) {
       p.place = this.players.length - this.out.length
       this.out.push(p.uid)
@@ -220,7 +230,7 @@ export class Table {
     this.phase = 'over'; this.turn = -1; this.due = null
   }
 
-  sitIn(i) { this.players[i].sitOut = false }
+  sitIn(i) { this.players[i].sitOut = false; this.players[i].afk = 0 }
 
   // Pemain yang membuka kartu di showdown, dari kombinasi terlemah sampai terkuat (seri: urutan kursi).
   showdownOrder() {
@@ -248,10 +258,10 @@ export class Table {
       // showdown: kombinasi tiap pemain untuk disorot bergantian, terlemah dulu, pemenang terakhir
       reveal: this.showdownOrder().map(({ q, i }) => ({ i, best: bestFive(q.cards.concat(this.board)), hand: handName(q.cards, this.board) })),
       revealMs: REVEAL_MS, revealLead: REVEAL_LEAD_MS,
-      total: N.length, alive: N.filter(q => !q.place || q.place === 1).length,
+      afkLimit: AFK_HANDS, total: N.length, alive: N.filter(q => !q.place || q.place === 1).length,
       players: N.map(q => ({
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,
-        online: this.online(q), won: q.won, hand: hand(q), last: q.last, place: q.place,
+        online: this.online(q), won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
         cards: q === me || q.show ? q.cards : q.inHand && !q.folded ? [-1, -1] : [],
       })),
     }

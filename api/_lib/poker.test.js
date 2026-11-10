@@ -1,6 +1,6 @@
 // Tes mesin turnamen: `node api/_lib/poker.test.js` (mencetak "semua tes lulus").
 import assert from 'node:assert'
-import { LEVELS, REVEAL_MS, TURN_MS, Table, best, bestFive, handName } from './poker.js'
+import { AFK_HANDS, LEVELS, REVEAL_MS, TURN_MS, Table, best, bestFive, handName } from './poker.js'
 
 const C = s => s.split(' ').map(x => 'shdc'.indexOf(x[1]) * 13 + '23456789TJQKA'.indexOf(x[0]))
 const S = s => best(C(s))
@@ -103,6 +103,34 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.deepEqual(u.view(u.players[0]).reveal, [])
 }
 
+{ // AFK: istirahat AFK_HANDS hand berturut-turut = tersingkir, chip hangus, peringkat terburuk di hand itu
+  const t = mk([1000, 1000, 1000]); begin(t)
+  t.players[2].off = true; t.players[2].seen = -1e12 // P2 tidak pernah beraksi
+  const play = () => { while (t.betting) { if (t.turn === 2 || t.turn < 0) run(t, Math.max(0, t.due.at - t.now)); else ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check') } }
+  for (let h = 0; h < AFK_HANDS - 1; h++) { play(); assert.equal(t.players[2].place, 0, 'belum boleh tersingkir'); nxt(t) }
+  assert.equal(t.players[2].afk, AFK_HANDS - 1)
+  play()
+  assert.equal(t.players[2].afkOut, true)
+  assert.equal(t.players[2].chips, 0)
+  assert.deepEqual(t.out, ['u2'])
+  assert.equal(t.players[2].place, 3)
+  assert.equal(t.players.reduce((s, p) => s + p.chips, 0) + t.forfeited, 3000)
+  assert.equal(t.view(t.players[0]).players[2].afkOut, true)
+  // beraksi lagi atau "Main lagi" mengulang hitungan
+  const u = mk([1000, 1000, 1000]); begin(u)
+  u.players[1].afk = AFK_HANDS - 1; u.sitIn(1); assert.equal(u.players[1].afk, 0)
+}
+
+{ // semua yang tersisa AFK: yang chip-nya terbanyak tetap jadi juara, turnamen selesai
+  const t = mk([500, 900, 700]); begin(t)
+  t.players.forEach(p => { p.off = true; p.seen = -1e12 })
+  for (let g = 0; g < 500 && t.phase !== 'over'; g++) run(t, Math.max(0, t.due.at - t.now))
+  assert.equal(t.phase, 'over')
+  assert.equal(t.players.filter(p => p.place === 1).length, 1)
+  assert.equal(t.out.length, 2)
+  assert(t.winner)
+}
+
 { // dua pemain tersingkir di hand yang sama: stack awal hand lebih besar = peringkat lebih baik
   const t = mk([200, 300, 2000]); rig(t, '2c 7d 3c 8d As Ah Kh 9d 4c 5s Jd'); begin(t)
   ok(t, 0, 'raise', 200); ok(t, 1, 'raise', 300); ok(t, 2, 'call'); drain(t)
@@ -136,7 +164,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   if (t.turn === 0) assert(t.due.at - t.now <= 3000)
 }
 
-{ // pemain yang tidak pernah membuka meja (offline) tetap ikut dan habis dimakan blind; turnamen tetap selesai
+{ // pemain yang tidak pernah membuka meja (offline) tetap dibagi kartu, lalu keluar karena AFK; turnamen tetap selesai
   let t = mk([300, 300, 300])
   t.players[2].off = true; t.players[2].seen = -1e12
   begin(t)
@@ -148,7 +176,8 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   }
   assert.equal(t.phase, 'over')
   assert.equal(t.out.length, 2)
-  assert.equal(t.players.reduce((s, p) => s + p.chips, 0), 900)
+  assert.equal(t.players.reduce((s, p) => s + p.chips, 0) + t.forfeited, 900)
+  assert(t.players[2].afkOut, 'pemain yang tidak pernah membuka meja keluar karena AFK')
 }
 
 { // privasi: kartu lawan, token, uid, dan dek tidak bocor ke pemain lain atau penonton
@@ -177,7 +206,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
         else ok(t, i, 'raise', c.minTo + R(c.maxTo - c.minTo + 1))
       } else if (t.due) run(t, Math.max(0, t.due.at - t.now))
       assert(t.players.every(p => p.chips >= 0))
-      if (!t.betting) assert.equal(t.players.reduce((s, p) => s + p.chips, 0), total)
+      if (!t.betting) assert.equal(t.players.reduce((s, p) => s + p.chips, 0) + t.forfeited, total)
       if (t.turn >= 0) { const p = t.players[t.turn]; assert(p.inHand && !p.folded && !p.allIn && p.chips > 0, 'giliran jatuh ke pemain yang salah') }
     }
     assert.equal(t.phase, 'over', 'turnamen macet')

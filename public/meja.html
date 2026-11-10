@@ -474,7 +474,8 @@ const card = (c, key = '') => {
 };
 // tumpukan chip per denominasi (maks 6 keping per tumpukan supaya tidak melebar)
 const chips = n => { let h = ''; for (const [d, c] of DEN) { const k = Math.min(n / d | 0, 6); n %= d; if (k) h += `<span class="stk">${`<i class="chip" style="--c:${c}"></i>`.repeat(k)}</span>`; } return h; };
-const tagOf = (p, betting) => p.place > 1 ? ['', '#' + p.place + ' keluar'] : p.place === 1 ? ['grn', 'juara'] : p.sitOut ? ['', 'istirahat'] : !p.online ? ['', 'offline']
+const tagOf = (p, betting) => p.place > 1 ? ['', '#' + p.place + (p.afkOut ? ' AFK' : ' keluar')] : p.place === 1 ? ['grn', 'juara']
+  : p.sitOut ? ['red', p.afk ? `AFK ${p.afk}/${S.afkLimit}` : 'istirahat'] : !p.online ? ['', 'offline']
   : p.allIn && p.inHand && betting ? ['red', 'all-in'] : p.last ? [/^(bet|raise)/.test(p.last) ? 'red' : '', p.last]
   : p.inHand && p.folded ? ['', 'fold'] : !p.chips && !p.inHand ? ['', 'habis'] : null;
 const row3 = (p, mine, betting) => p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
@@ -636,9 +637,10 @@ function render() {
     if (w) msg += ' · juara: ' + esc(w.name);
     h = `<div class="row"><a class="btn gold" href="/matches/${match}">Lihat hasil match</a></div>`;
   } else if (!P) msg = isHost ? 'Kamu host match ini · menonton dan bisa chat' : 'Kamu menonton';
-  else if (P.place) msg = `Kamu tersingkir di posisi #${P.place} · masih bisa menonton`;
+  else if (P.place) msg = P.afkOut ? `Kamu keluar karena AFK ${S.afkLimit} putaran · posisi #${P.place} · masih bisa menonton`
+    : `Kamu tersingkir di posisi #${P.place} · masih bisa menonton`;
   else if (S.ctl) { msg = 'Giliran kamu'; h = controls(S.ctl, P); }
-  else if (P.sitOut) msg = 'Kamu istirahat · kartu otomatis check/fold';
+  else if (P.sitOut) msg = `Kamu AFK · kartu otomatis check/fold · keluar setelah ${S.afkLimit} putaran AFK (${P.afk}/${S.afkLimit}) · tekan Main lagi`;
   else if (betting) msg = S.turn >= 0 ? 'Giliran ' + esc(ps[S.turn].name) + (P.folded ? ' · kamu fold' : '') : 'Membuka kartu…';
   else if (phase === 'showdown') msg = 'Hand berikutnya sebentar lagi';
   else msg = 'Hand pertama dimulai <span id="st"></span>';
