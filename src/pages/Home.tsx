@@ -56,7 +56,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
           <div className="grid gap-2 md:grid-cols-2">
             {hosted.map((m) => (
               <Link key={m.id} to={`/matches/${m.id}`} className="block">
-                <Card className="flex items-center justify-between gap-3 border-gold-400/30 transition hover:bg-felt-700/80">
+                <Card className="flex items-center justify-between gap-3 border-brand-400/30 transition hover:bg-surface-700/80">
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{m.title}</p>
                     <p className="text-xs text-slate-400">{m.players[0]?.count ?? 0} player</p>
@@ -71,7 +71,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
 
       <Link
         to="/matches/new"
-        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-gold-400/50 md:w-fit md:px-8 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10 active:scale-[0.98]"
+        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-brand-400/50 md:w-fit md:px-8 text-sm font-bold text-brand-300 transition hover:bg-brand-400/10 active:scale-[0.98]"
       >
         <span className="text-lg">＋</span> Buat Match ({MATCH_CREATION_COST} poin)
       </Link>
@@ -141,14 +141,14 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
     <div className="space-y-5 md:grid md:grid-cols-2 md:items-start md:gap-6 md:space-y-0">
       <div className={cx('space-y-5', !children && 'md:sticky md:top-24')}>
       {tabs.length > 1 && (
-        <div className={cx('grid gap-1 rounded-xl bg-felt-950/60 p-1', tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
+        <div className={cx('grid gap-1 rounded-xl bg-surface-950/60 p-1', tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
           {tabs.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={cx(
                 'min-h-9 rounded-lg text-sm font-semibold transition',
-                shown === t ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+                shown === t ? 'bg-brand-400 text-on-accent' : 'text-slate-400 hover:text-slate-200',
               )}
             >
               {tabLabels[t]}
@@ -158,7 +158,7 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
       )}
 
       <Card className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-white/[0.03]">
+        <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-ink/[0.03]">
           {showDuels ? '⚔' : shown === 'online' ? '♦' : '♠'}
         </div>
         <div className="flex items-center gap-5">
@@ -191,7 +191,7 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
       {showDuels ? (
         <section>
           <SectionTitle>Riwayat duel</SectionTitle>
-          <Card className="divide-y divide-white/5 p-0">
+          <Card className="divide-y divide-ink/5 p-0">
             {duels.map((d) => {
               const won = d.winner_id === playerId
               const foe = d.challenger_id === playerId ? d.opponent : d.challenger
@@ -200,7 +200,7 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
                   <span
                     className={cx(
                       'flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
-                      won ? 'bg-gold-400 text-felt-950' : 'bg-white/8 text-slate-400',
+                      won ? 'bg-brand-400 text-on-accent' : 'bg-ink/8 text-slate-400',
                     )}
                   >
                     {won ? 'WIN' : 'LOSE'}
@@ -211,7 +211,7 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
                       {d.finished_at && formatDate(d.finished_at)} · Dealer {d.dealer?.name ?? '-'}
                     </p>
                   </div>
-                  <span className={cx('shrink-0 text-sm font-bold', won ? 'text-gold-400' : 'text-red-300')}>
+                  <span className={cx('shrink-0 text-sm font-bold', won ? 'text-brand-400' : 'text-red-300')}>
                     {won ? '+' : '−'}
                     {d.stake}
                   </span>
@@ -228,7 +228,7 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
           <div className="space-y-2">
             {active.map((r) => (
               <Link key={r.match.id} to={`/matches/${r.match.id}`} className="block">
-                <Card className="flex items-center justify-between border-gold-400/30 transition hover:bg-felt-700/80">
+                <Card className="flex items-center justify-between border-brand-400/30 transition hover:bg-surface-700/80">
                   <span className="font-semibold">{r.match.title}</span>
                   <StatusBadge status={r.match.status} />
                 </Card>
@@ -253,7 +253,7 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
             />
           </Card>
         ) : (
-          <Card className="divide-y divide-white/5 p-0">
+          <Card className="divide-y divide-ink/5 p-0">
             {finished.map((r) => {
               const won = r.status === 'winner'
               const podium = r.placement === 2 || r.placement === 3
@@ -261,12 +261,12 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
                 <Link
                   key={r.match.id}
                   to={`/matches/${r.match.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition hover:bg-white/5"
+                  className="flex items-center gap-3 px-4 py-3 transition hover:bg-ink/5"
                 >
                   <span
                     className={cx(
                       'flex size-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
-                      won ? 'bg-gold-400 text-felt-950' : podium ? 'bg-slate-300/20 text-slate-200' : 'bg-white/8 text-slate-400',
+                      won ? 'bg-brand-400 text-on-accent' : podium ? 'bg-slate-300/20 text-slate-200' : 'bg-ink/8 text-slate-400',
                     )}
                   >
                     {won ? 'WIN' : podium ? `#${r.placement}` : 'OUT'}
@@ -278,7 +278,7 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
                       {!won && r.match.winner && ` · Pemenang: ${r.match.winner.name}`}
                     </p>
                   </div>
-                  {r.points > 0 && <span className="shrink-0 text-sm font-bold text-gold-400">+{r.points}</span>}
+                  {r.points > 0 && <span className="shrink-0 text-sm font-bold text-brand-400">+{r.points}</span>}
                   <Chevron />
                 </Link>
               )
@@ -339,14 +339,14 @@ function DealerHome({ profile }: { profile: Profile }) {
 
       <div className="space-y-5 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
       <Card className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-white/[0.03]">♦</div>
+        <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-ink/[0.03]">♦</div>
         <p className="text-sm text-slate-400">Match yang sudah di-host</p>
-        <p className="mt-1 text-5xl font-extrabold text-gold-400">{hosted}</p>
+        <p className="mt-1 text-5xl font-extrabold text-brand-400">{hosted}</p>
       </Card>
 
       <Link
         to="/dealer/new"
-        className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gold-400 text-base font-bold text-felt-950 shadow-lg shadow-gold-500/20 transition active:scale-[0.98]"
+        className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-brand-400 text-base font-bold text-on-accent shadow-lg shadow-brand-500/20 transition active:scale-[0.98]"
       >
         <span className="text-xl">＋</span> Buat Match Baru
       </Link>
@@ -361,7 +361,7 @@ function DealerHome({ profile }: { profile: Profile }) {
           <div className="grid gap-2 md:grid-cols-2">
             {active.map((m) => (
               <Link key={m.id} to={`/matches/${m.id}`} className="block">
-                <Card className="flex items-center justify-between gap-3 border-gold-400/30 transition hover:bg-felt-700/80">
+                <Card className="flex items-center justify-between gap-3 border-brand-400/30 transition hover:bg-surface-700/80">
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{m.title}</p>
                     <p className="text-xs text-slate-400">{m.players[0]?.count ?? 0} player</p>
@@ -381,9 +381,9 @@ function DealerHome({ profile }: { profile: Profile }) {
             <EmptyState icon="🎲" title="Belum ada match selesai" />
           </Card>
         ) : (
-          <Card className="divide-y divide-white/5 p-0">
+          <Card className="divide-y divide-ink/5 p-0">
             {history.map((m) => (
-              <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-white/5">
+              <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-ink/5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{m.title}</p>
                   <p className="truncate text-xs text-slate-400">
@@ -415,8 +415,8 @@ function Greeting({ profile, subtitle }: { profile: Profile; subtitle: string })
 
 function Stat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
   return (
-    <div className="rounded-xl bg-felt-950/50 p-3">
-      <p className={cx('text-3xl font-extrabold', accent && 'text-gold-400')}>{value}</p>
+    <div className="rounded-xl bg-surface-950/50 p-3">
+      <p className={cx('text-3xl font-extrabold', accent && 'text-brand-400')}>{value}</p>
       <p className="mt-0.5 text-xs leading-tight text-slate-400">{label}</p>
     </div>
   )
@@ -428,7 +428,7 @@ function WinRateRing({ value }: { value: number }) {
   return (
     <div className="relative size-28 shrink-0">
       <svg viewBox="0 0 100 100" className="size-full -rotate-90">
-        <circle cx="50" cy="50" r={r} fill="none" stroke="currentColor" strokeWidth="9" className="text-white/8" />
+        <circle cx="50" cy="50" r={r} fill="none" stroke="currentColor" strokeWidth="9" className="text-ink/8" />
         <circle
           cx="50"
           cy="50"
@@ -439,7 +439,7 @@ function WinRateRing({ value }: { value: number }) {
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c - (c * value) / 100}
-          className="text-gold-400 transition-[stroke-dashoffset] duration-700"
+          className="text-brand-400 transition-[stroke-dashoffset] duration-700"
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">

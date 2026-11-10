@@ -54,7 +54,7 @@ export default function Matches() {
         {profile && (
           <Link
             to="/matches/new"
-            className="inline-flex min-h-10 items-center gap-1 rounded-xl bg-gold-400 px-3 text-sm font-bold text-felt-950"
+            className="inline-flex min-h-10 items-center gap-1 rounded-xl bg-brand-400 px-3 text-sm font-bold text-on-accent"
           >
             ＋ Buat
           </Link>
@@ -85,9 +85,9 @@ export default function Matches() {
       {recent.length > 0 && (
         <section>
           <SectionTitle>Baru selesai</SectionTitle>
-          <Card className="divide-y divide-white/5 p-0">
+          <Card className="divide-y divide-ink/5 p-0">
             {recent.map((m) => (
-              <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-white/5">
+              <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-ink/5">
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{m.title}</p>
                   <p className="truncate text-xs text-slate-400">
@@ -108,7 +108,7 @@ function MatchCard({ m }: { m: MatchListRow }) {
   const count = m.players[0]?.count ?? 0
   return (
     <Link to={`/matches/${m.id}`} className="block">
-      <Card className="transition hover:bg-felt-700/80">
+      <Card className="transition hover:bg-surface-700/80">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">{m.title}</p>
@@ -121,7 +121,7 @@ function MatchCard({ m }: { m: MatchListRow }) {
         <div className="mt-3 flex items-center gap-3">
           <div className="flex gap-1">
             {Array.from({ length: m.max_players }, (_, i) => (
-              <span key={i} className={i < count ? 'size-2.5 rounded-full bg-gold-400' : 'size-2.5 rounded-full bg-white/10'} />
+              <span key={i} className={i < count ? 'size-2.5 rounded-full bg-brand-400' : 'size-2.5 rounded-full bg-ink/10'} />
             ))}
           </div>
           <span className="text-xs text-slate-400">

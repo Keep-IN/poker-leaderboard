@@ -80,14 +80,14 @@ export default function CreateMatch() {
             <SummaryRow label="Maksimal player">{maxPlayers} player</SummaryRow>
             {online && <SummaryRow label="Meja">{onlineConfigText(config)}</SummaryRow>}
           </div>
-          <div className="rounded-xl bg-felt-950/60 p-4">
+          <div className="rounded-xl bg-surface-950/60 p-4">
             <p className="text-xs uppercase tracking-wider text-slate-400">Biaya</p>
             <p className="mt-1 text-3xl font-extrabold text-chip-red">−{MATCH_CREATION_COST} poin</p>
             <div className="mt-3 flex items-center gap-2 text-sm text-slate-300">
               <span>Poin kamu</span>
               <span className="font-bold">{balance}</span>
               <span className="text-slate-500">→</span>
-              <span className="font-bold text-gold-400">{balance - MATCH_CREATION_COST}</span>
+              <span className="font-bold text-brand-400">{balance - MATCH_CREATION_COST}</span>
             </div>
           </div>
           <ul className="space-y-1.5 text-sm text-slate-300">
@@ -123,7 +123,7 @@ export default function CreateMatch() {
         <div
           className={
             enoughPoints
-              ? 'rounded-xl bg-gold-400/10 px-3 py-2 text-sm text-gold-300'
+              ? 'rounded-xl bg-brand-400/10 px-3 py-2 text-sm text-brand-300'
               : 'rounded-xl bg-chip-red/15 px-3 py-2 text-sm text-red-300'
           }
         >
@@ -142,13 +142,13 @@ export default function CreateMatch() {
               onChange={(e) => setTitle(e.target.value)}
               maxLength={60}
               required
-              className="h-12 w-full rounded-xl border border-white/10 bg-felt-950/60 px-4 text-base outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-400/20"
+              className="h-12 w-full rounded-xl border border-ink/10 bg-surface-950/60 px-4 text-base outline-none focus:border-brand-400/70 focus:ring-2 focus:ring-brand-400/20"
             />
           </label>
 
           <div>
             <span className="mb-1.5 block text-sm font-medium text-slate-300">Mode</span>
-            <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-950/60 p-1">
               {(['offline', 'online'] as const).map((m) => (
                 <button
                   key={m}
@@ -156,7 +156,7 @@ export default function CreateMatch() {
                   onClick={() => setMode(m)}
                   className={cx(
                     'min-h-10 rounded-lg text-sm font-semibold transition',
-                    mode === m ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+                    mode === m ? 'bg-brand-400 text-on-accent' : 'text-slate-400 hover:text-slate-200',
                   )}
                 >
                   {m === 'offline' ? '🃏 Offline' : '🌐 Online'}
@@ -174,14 +174,14 @@ export default function CreateMatch() {
             <span className="mb-1.5 block text-sm font-medium text-slate-300">
               Maksimal player <span className="font-normal text-slate-500">(min. {MIN_MATCH_PLAYERS} untuk mulai)</span>
             </span>
-            <div className="flex items-center justify-between rounded-xl bg-felt-950/60 p-2">
+            <div className="flex items-center justify-between rounded-xl bg-surface-950/60 p-2">
               <StepButton
                 label="−"
                 onClick={() => setMaxPlayers((n) => Math.max(MIN_MATCH_PLAYERS, n - 1))}
                 disabled={maxPlayers <= MIN_MATCH_PLAYERS}
               />
               <div className="text-center">
-                <span className="text-3xl font-extrabold text-gold-400">{maxPlayers}</span>
+                <span className="text-3xl font-extrabold text-brand-400">{maxPlayers}</span>
                 <span className="ml-1 text-sm text-slate-400">player</span>
               </div>
               <StepButton label="+" onClick={() => setMaxPlayers((n) => Math.min(8, n + 1))} disabled={maxPlayers >= 8} />
@@ -200,7 +200,7 @@ export default function CreateMatch() {
                       onClick={() => setSb(v)}
                       className={cx(
                         'rounded-full px-3 py-1.5 text-xs font-semibold transition',
-                        sb === v ? 'bg-gold-400 text-felt-950' : 'bg-white/5 text-slate-300 hover:bg-white/10',
+                        sb === v ? 'bg-brand-400 text-on-accent' : 'bg-ink/5 text-slate-300 hover:bg-ink/10',
                       )}
                     >
                       {formatChips(v)}/{formatChips(v * 2)}
@@ -219,7 +219,7 @@ export default function CreateMatch() {
                   step={100}
                   value={startChips}
                   onChange={(e) => setStartChips(Math.floor(Number(e.target.value) || 0))}
-                  className="h-12 w-full rounded-xl border border-white/10 bg-felt-950/60 px-4 text-base outline-none focus:border-gold-400/70 focus:ring-2 focus:ring-gold-400/20"
+                  className="h-12 w-full rounded-xl border border-ink/10 bg-surface-950/60 px-4 text-base outline-none focus:border-brand-400/70 focus:ring-2 focus:ring-brand-400/20"
                 />
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {CHIP_PRESETS.map((v) => (
@@ -227,7 +227,7 @@ export default function CreateMatch() {
                       key={v}
                       type="button"
                       onClick={() => setStartChips(v)}
-                      className="rounded-full bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10"
+                      className="rounded-full bg-ink/5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-ink/10"
                     >
                       {formatChips(v)}
                     </button>
@@ -245,10 +245,10 @@ export default function CreateMatch() {
 
               <div>
                 <span className="mb-1.5 block text-sm font-medium text-slate-300">Blind naik tiap</span>
-                <div className="flex items-center justify-between rounded-xl bg-felt-950/60 p-2">
+                <div className="flex items-center justify-between rounded-xl bg-surface-950/60 p-2">
                   <StepButton label="−" onClick={() => setLevelMinutes((n) => Math.max(2, n - 1))} disabled={levelMinutes <= 2} />
                   <div className="text-center">
-                    <span className="text-3xl font-extrabold text-gold-400">{levelMinutes}</span>
+                    <span className="text-3xl font-extrabold text-brand-400">{levelMinutes}</span>
                     <span className="ml-1 text-sm text-slate-400">menit</span>
                   </div>
                   <StepButton label="+" onClick={() => setLevelMinutes((n) => Math.min(60, n + 1))} disabled={levelMinutes >= 60} />
@@ -290,7 +290,7 @@ function StepButton({ label, onClick, disabled }: { label: string; onClick: () =
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="size-12 rounded-xl bg-white/8 text-2xl font-bold text-slate-100 transition hover:bg-white/15 active:scale-95 disabled:opacity-30"
+      className="size-12 rounded-xl bg-ink/8 text-2xl font-bold text-slate-100 transition hover:bg-ink/15 active:scale-95 disabled:opacity-30"
     >
       {label}
     </button>

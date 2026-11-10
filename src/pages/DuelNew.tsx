@@ -35,7 +35,7 @@ export default function DuelNew() {
     return (
       <Card className="md:mx-auto md:max-w-xl">
         <EmptyState icon="⚔️" title="Duel tidak tersedia" text="Duel hanya bisa antar dua akun player yang berbeda." />
-        <Link to="/players" className="block text-center text-sm font-semibold text-gold-400">
+        <Link to="/players" className="block text-center text-sm font-semibold text-brand-400">
           Kembali ke daftar pemain
         </Link>
       </Card>
@@ -78,12 +78,12 @@ export default function DuelNew() {
             <SummaryRow label="Lawan">{opponent.name}</SummaryRow>
             <SummaryRow label="Taruhan">{stake} poin per pemain</SummaryRow>
           </div>
-          <div className="rounded-xl bg-felt-950/60 p-4 text-sm">
+          <div className="rounded-xl bg-surface-950/60 p-4 text-sm">
             <div className="flex items-center gap-2 text-slate-300">
               <span>Total poin kamu</span>
               <span className="font-bold">{myPoints}</span>
               <span className="text-slate-500">→</span>
-              <span className="font-bold text-gold-400">{myPoints - stake}</span>
+              <span className="font-bold text-brand-400">{myPoints - stake}</span>
               <span className="text-xs text-slate-500">(ditahan)</span>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-center">
@@ -129,7 +129,7 @@ export default function DuelNew() {
             : `${opponent.name} belum punya poin, jadi tidak bisa menerima taruhan.`}
         </p>
       ) : (
-        <p className="rounded-xl bg-gold-400/10 px-3 py-2 text-sm text-gold-300">
+        <p className="rounded-xl bg-brand-400/10 px-3 py-2 text-sm text-brand-300">
           Total poin kamu {myPoints}, {opponent.name} {opponent.points}. Taruhan maksimal {maxStake} poin.
         </p>
       )}
@@ -137,7 +137,7 @@ export default function DuelNew() {
       <form onSubmit={submit} className="space-y-4">
         <Card className="space-y-4">
           <span className="block text-sm font-medium text-slate-300">Taruhan (poin per pemain)</span>
-          <div className="flex items-center justify-between rounded-xl bg-felt-950/60 p-2">
+          <div className="flex items-center justify-between rounded-xl bg-surface-950/60 p-2">
             <StepButton label="−" onClick={() => setStake((n) => Math.max(1, n - 1))} disabled={stake <= 1} />
             <input
               type="number"
@@ -147,7 +147,7 @@ export default function DuelNew() {
               value={stake}
               onChange={(e) => setStake(Math.floor(Number(e.target.value) || 0))}
               aria-label="Jumlah taruhan"
-              className="w-24 bg-transparent text-center text-3xl font-extrabold text-gold-400 outline-none"
+              className="w-24 bg-transparent text-center text-3xl font-extrabold text-brand-400 outline-none"
             />
             <StepButton label="+" onClick={() => setStake((n) => Math.min(maxStake, n + 1))} disabled={stake >= maxStake} />
           </div>
@@ -158,7 +158,7 @@ export default function DuelNew() {
                   key={n}
                   type="button"
                   onClick={() => setStake(n)}
-                  className="rounded-full bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-white/10"
+                  className="rounded-full bg-ink/5 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-ink/10"
                 >
                   {n === maxStake ? `Maks ${n}` : n}
                 </button>
@@ -194,7 +194,7 @@ function StepButton({ label, onClick, disabled }: { label: string; onClick: () =
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="size-12 rounded-xl bg-white/8 text-2xl font-bold text-slate-100 transition hover:bg-white/15 active:scale-95 disabled:opacity-30"
+      className="size-12 rounded-xl bg-ink/8 text-2xl font-bold text-slate-100 transition hover:bg-ink/15 active:scale-95 disabled:opacity-30"
     >
       {label}
     </button>

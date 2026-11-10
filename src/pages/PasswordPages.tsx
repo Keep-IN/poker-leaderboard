@@ -45,7 +45,7 @@ export function ForgotPassword() {
       )}
 
       <p className="mt-6 text-center text-sm text-slate-400">
-        <Link to="/login" className="font-semibold text-gold-400">
+        <Link to="/login" className="font-semibold text-brand-400">
           ‹ Kembali ke login
         </Link>
       </p>
@@ -83,7 +83,7 @@ export function ResetPassword() {
           <ErrorText>
             {linkError ? 'Link reset sudah tidak berlaku atau sudah pernah dipakai.' : 'Buka halaman ini dari link di email reset password.'}
           </ErrorText>
-          <Link to="/forgot-password" className="inline-block text-sm font-semibold text-gold-400">
+          <Link to="/forgot-password" className="inline-block text-sm font-semibold text-brand-400">
             Kirim link baru
           </Link>
         </div>

@@ -6,17 +6,17 @@ export function cx(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(' ')
 }
 
-type Variant = 'gold' | 'ghost' | 'danger' | 'outline'
+type Variant = 'primary' | 'ghost' | 'danger' | 'outline'
 
 const variants: Record<Variant, string> = {
-  gold: 'bg-gold-400 text-felt-950 hover:bg-gold-300 shadow-lg shadow-gold-500/20',
-  ghost: 'bg-white/5 text-slate-100 hover:bg-white/10',
+  primary: 'bg-brand-400 text-on-accent hover:bg-brand-300 shadow-lg shadow-brand-500/20',
+  ghost: 'bg-ink/5 text-slate-100 hover:bg-ink/10',
   danger: 'bg-chip-red/15 text-red-300 hover:bg-chip-red/25',
-  outline: 'border border-gold-400/50 text-gold-300 hover:bg-gold-400/10',
+  outline: 'border border-brand-400/50 text-brand-300 hover:bg-brand-400/10',
 }
 
 export function Button({
-  variant = 'gold',
+  variant = 'primary',
   loading,
   className,
   children,
@@ -41,7 +41,7 @@ export function Button({
 
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cx('rounded-2xl border border-white/8 bg-felt-800/80 p-4 backdrop-blur', className)}>{children}</div>
+    <div className={cx('rounded-2xl border border-ink/8 bg-surface-800/80 p-4 backdrop-blur', className)}>{children}</div>
   )
 }
 
@@ -50,7 +50,7 @@ export function Spinner({ small }: { small?: boolean }) {
     <span
       className={cx(
         'inline-block animate-spin rounded-full border-2 border-current border-t-transparent',
-        small ? 'size-4' : 'size-7 text-gold-400',
+        small ? 'size-4' : 'size-7 text-brand-400',
       )}
     />
   )
@@ -85,7 +85,7 @@ export function Avatar({ name, id, size = 'md' }: { name: string; id: string; si
 const statusStyles: Record<MatchStatus, [string, string]> = {
   open: ['Menunggu player', 'bg-sky-500/15 text-sky-300'],
   ongoing: ['Berlangsung', 'bg-emerald-500/15 text-emerald-300'],
-  finished: ['Selesai', 'bg-white/10 text-slate-300'],
+  finished: ['Selesai', 'bg-ink/10 text-slate-300'],
   cancelled: ['Dibatalkan', 'bg-chip-red/15 text-red-300'],
 }
 

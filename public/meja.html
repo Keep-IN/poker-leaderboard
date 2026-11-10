@@ -4,27 +4,50 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Meja Online · BTP Poker League</title>
+<meta name="theme-color" content="#081530">
+<script>
+// Tema sama dengan website utama: pilihan tersimpan, kalau tidak ada ikut sistem (dan ikut berubah bersama sistem).
+(function () {
+  var mq = matchMedia('(prefers-color-scheme: dark)');
+  function apply() {
+    var p = null; try { p = localStorage.getItem('theme') } catch (e) {}
+    var m = p === 'light' || p === 'dark' ? p : mq.matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = m;
+    var t = document.querySelector('meta[name="theme-color"]'); if (t) t.setAttribute('content', m === 'dark' ? '#081530' : '#f3f6fb');
+  }
+  apply(); mq.addEventListener('change', apply); addEventListener('storage', function (e) { if (e.key === 'theme') apply() });
+})();
+</script>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
 :root{
-  --ink:#1c1612;--paper:#f1e7cf;--paper-d:#d9c9a3;--baize:#1e5240;--baize-d:#133628;
-  --rail:#3b2417;--red:#c8402a;--gold:#e0a82e;--dim:#a99b7f;--sw:90px;
+  /* meja & kartu (sama di kedua tema): felt Biru Nusantara, aksen Mentari */
+  --ink:#0b1a33;--paper:#f7f9fd;--paper-d:#c9d6ee;--baize:#0857c3;--baize-d:#04347a;--baize-l:#1b6bd6;
+  --rail:#0b1c3d;--red:#d8343a;--gold:#71c5eb;--sw:90px;
+  /* halaman di sekitar meja: mode gelap (ditimpa di [data-theme=light]) */
+  --fg:#eef3fb;--fg2:#8fa3c4;--line:#ffffff33;--line-strong:#c9d6ee;--hover:#ffffff1f;--panel:#0a1630;
+  --page1:#10245a;--page2:#050d1f;--btn-shadow:#8fa3c4;--won:#d6effb;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
-  --backpat:repeating-linear-gradient(45deg,transparent 0 4px,#f1e7cf30 4px 5px),repeating-linear-gradient(-45deg,transparent 0 4px,#f1e7cf30 4px 5px),#c8402a;
+  --backpat:repeating-linear-gradient(45deg,transparent 0 4px,#ffffff30 4px 5px),repeating-linear-gradient(-45deg,transparent 0 4px,#ffffff30 4px 5px),#0857c3;
   --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .45 -.16'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
 }
+:root{color-scheme:dark}
+:root{--hn:var(--gold)}
+:root[data-theme=light]{--hn:#0857c3}
+:root[data-theme=light]{color-scheme:light;--fg:#0b1a33;--fg2:#55627a;--line:#0b1f4433;--line-strong:#0b1f4466;--hover:#0b1f4414;
+  --panel:#ffffff;--page1:#ffffff;--page2:#dbe5f5;--btn-shadow:#0b1a33}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
-html,body{margin:0;height:100%;overflow:hidden;color:var(--paper);font:15px/1.25 var(--serif);
-  background:var(--grain),radial-gradient(120% 90% at 50% 30%,#2b1e14,#120d09 70%)}
+html,body{margin:0;height:100%;overflow:hidden;color:var(--fg);font:15px/1.25 var(--serif);
+  background:var(--grain),radial-gradient(120% 90% at 50% 30%,var(--page1),var(--page2) 70%)}
 button,input{font:inherit;color:inherit}
 .lbl,.kicker,.fine,label,.sub,.tag,.btn,#top{font-family:var(--mono);text-transform:uppercase;letter-spacing:.1em}
 
 /* ---------- join: tiket ---------- */
 #join{display:grid;place-items:center;height:100dvh;padding:24px}
 .ticket{position:relative;width:min(340px,100%);background:var(--grain),var(--paper);color:var(--ink);padding:26px 26px 20px;transform:rotate(-1.2deg);box-shadow:6px 8px 0 #000a}
-.ticket::before,.ticket::after{content:"";position:absolute;top:58%;width:22px;height:22px;border-radius:50%;background:#1c140e}
+.ticket::before,.ticket::after{content:"";position:absolute;top:58%;width:22px;height:22px;border-radius:50%;background:var(--page2)}
 .ticket::before{left:-11px}.ticket::after{right:-11px}
 .kicker,.fine,label{font-size:10.5px;color:#1c1612b3}
 .ticket h1{margin:10px 0 8px;font-size:56px;line-height:.9;font-weight:700;letter-spacing:-.025em}
@@ -40,38 +63,38 @@ button,input{font:inherit;color:inherit}
 .fine{margin-top:14px;text-align:center;font-size:9.5px}
 .status{margin:0 0 20px;font-size:19px;font-style:italic;line-height:1.3}
 a.btn{display:block;text-align:center;text-decoration:none}
-#top a{background:none;border:1px solid #a99b7f66;padding:4px 8px;color:var(--dim);text-decoration:none}
-.over{display:block;margin:0 auto;padding:10px 16px;background:#0b0a08d9;border:3px double var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+#top a{background:none;border:1px solid var(--line);padding:4px 8px;color:var(--fg2);text-decoration:none}
+.over{display:block;margin:0 auto;padding:10px 16px;background:#04122bd9;border:3px double var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
 .over b{display:block;margin-bottom:6px;font-family:var(--serif);font-size:20px;font-style:italic;letter-spacing:0;text-transform:none;color:var(--gold)}
 .over ol{margin:0;padding-left:22px;text-align:left}
 
 /* ---------- tombol ---------- */
-.btn{border:2px solid var(--ink);background:var(--c,transparent);color:var(--paper);font-weight:700;font-size:13px;padding:13px 10px;cursor:pointer;flex:1;box-shadow:3px 3px 0 var(--paper-d);transition:transform .08s,box-shadow .08s}
-.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--paper-d)}
-.btn.red{--c:var(--red)}.btn.green{--c:#2f7a5c}.btn.gold{--c:var(--gold);color:var(--ink)}
-.btn.ghost{border-color:var(--paper-d);box-shadow:none}
+.btn{border:2px solid var(--ink);background:var(--c,transparent);color:var(--fg);font-weight:700;font-size:13px;padding:13px 10px;cursor:pointer;flex:1;box-shadow:3px 3px 0 var(--btn-shadow);transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--btn-shadow)}
+.btn.red{--c:var(--red);color:#fff}.btn.green{--c:#0857c3;color:#fff}.btn.gold{--c:var(--gold);color:var(--ink)}
+.btn.ghost{border-color:var(--line-strong);box-shadow:none}
 .ticket .btn{width:100%;--c:var(--red);box-shadow:3px 3px 0 var(--ink)}
 
 /* ---------- game ---------- */
 #game{position:relative;display:flex;flex-direction:column;height:100dvh;max-width:980px;margin:auto}
-#top{position:relative;display:flex;justify-content:space-between;align-items:flex-start;min-height:70px;padding:12px 14px 0;font-size:11px;color:var(--dim)}
-#top b{color:var(--paper)}
-#top button{background:none;border:1px solid #a99b7f66;padding:4px 8px;font:inherit;text-transform:inherit;letter-spacing:inherit;color:var(--dim);cursor:pointer}
+#top{position:relative;display:flex;justify-content:space-between;align-items:flex-start;min-height:70px;padding:12px 14px 0;font-size:11px;color:var(--fg2)}
+#top b{color:var(--fg)}
+#top button{background:none;border:1px solid var(--line);padding:4px 8px;font:inherit;text-transform:inherit;letter-spacing:inherit;color:var(--fg2);cursor:pointer}
 #top .btns{display:flex;gap:6px}
 #top button.off{text-decoration:line-through;opacity:.55}
 #table{position:relative;flex:1;min-height:0}
 #felt{position:absolute;inset:18px 2% 3% 2%;border-radius:9999px;overflow:hidden;
-  background:var(--grain),radial-gradient(ellipse at 50% 40%,#2b6a52,var(--baize) 55%,var(--baize-d));
+  background:var(--grain),radial-gradient(ellipse at 50% 40%,var(--baize-l),var(--baize) 55%,var(--baize-d));
   border:11px solid var(--rail);box-shadow:0 0 0 2px #000a,inset 0 12px 40px #0009,0 14px 40px #000c}
-#felt::before{content:"";position:absolute;inset:6px;border:1.5px solid #f1e7cf40;border-radius:inherit}
-#felt::after{content:"Hold'em";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:clamp(54px,13vw,120px);font-style:italic;letter-spacing:-.03em;color:#f1e7cf0d;white-space:nowrap}
+#felt::before{content:"";position:absolute;inset:6px;border:1.5px solid #ffffff40;border-radius:inherit}
+#felt::after{content:"Hold'em";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:clamp(54px,13vw,120px);font-style:italic;letter-spacing:-.03em;color:#ffffff12;white-space:nowrap}
 #center{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:76%}
 #board{display:flex;gap:5px;justify-content:center}
 #pot{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;min-height:22px}
 #pot .lbl{font-size:10.5px;color:var(--paper-d)}
 #pot .num{font-size:24px;font-weight:700;font-style:italic;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
 #win{position:absolute;left:50%;top:100%;margin-top:14px;transform:translateX(-50%);width:max-content;max-width:92vw;z-index:5}
-.stamp{display:block;transform:rotate(-2.5deg);margin:0 auto 6px;padding:5px 14px;text-align:center;border:3px double var(--paper);background:#0b0a08b3;color:var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;animation:stamp .35s cubic-bezier(.2,1.6,.4,1) .9s both}
+.stamp{display:block;transform:rotate(-2.5deg);margin:0 auto 6px;padding:5px 14px;text-align:center;border:3px double var(--paper);background:#04122bb3;color:var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;animation:stamp .35s cubic-bezier(.2,1.6,.4,1) .9s both}
 .stamp em{font-family:var(--serif);font-size:17px;font-style:italic;letter-spacing:0;text-transform:none;color:var(--gold)}
 @keyframes stamp{from{opacity:0;transform:rotate(-9deg) scale(1.9)}}
 
@@ -100,14 +123,14 @@ a.btn{display:block;text-align:center;text-decoration:none}
 @keyframes nod{40%{transform:rotate(-2.5deg) translateY(1px)}}
 
 /* ---------- kartu ---------- */
-.card{--rest:rotate(0deg);position:relative;flex:none;width:42px;height:60px;border-radius:5px;background:var(--grain),#f7f0dc;color:var(--ink);border:1px solid #1c161266;box-shadow:0 2px 0 #0007,0 8px 12px -6px #000c;font-family:var(--serif);transform:var(--rest)}
+.card{--rest:rotate(0deg);position:relative;flex:none;width:42px;height:60px;border-radius:5px;background:var(--grain),#fbfcff;color:var(--ink);border:1px solid #1c161266;box-shadow:0 2px 0 #0007,0 8px 12px -6px #000c;font-family:var(--serif);transform:var(--rest)}
 .card.r{color:#b8321f}
 .card b{position:absolute;top:3px;left:5px;font-size:17px;line-height:1;font-weight:700;letter-spacing:-.04em}
 .card i{position:absolute;top:21px;left:5px;font-style:normal;font-size:13px;line-height:1}
 .card::after{content:attr(data-s);position:absolute;right:4px;bottom:1px;font-size:30px;line-height:1}
-.card.back{background:var(--backpat);border:3px solid #f7f0dc}
+.card.back{background:var(--backpat);border:3px solid #fbfcff}
 .card.back::after{content:none}
-.card.empty{background:none;border:1.5px dashed #f1e7cf40;box-shadow:none}
+.card.empty{background:none;border:1.5px dashed #ffffff55;box-shadow:none}
 .card.empty::after{content:none}
 /* animasi: kartu terbang dari dealer (fly), lalu terbalik dari punggung ke muka (flip / reveal) */
 .card.fly{--t:.9s;animation:fly var(--t) cubic-bezier(.25,.8,.3,1) both}
@@ -141,7 +164,7 @@ a.btn{display:block;text-align:center;text-decoration:none}
 .plate{position:relative;width:100%;background:var(--grain),var(--paper);color:var(--ink);border:2px solid var(--ink);border-radius:3px;padding:4px 7px 5px;box-shadow:3px 3px 0 #000b}
 .seat.me .plate{background:var(--grain),var(--ink);color:var(--paper);border-color:var(--paper-d)}
 .seat.turn .plate{outline:3px solid var(--gold);outline-offset:2px}
-.seat.won .plate{background:var(--grain),#cfe3b0;color:var(--ink)}
+.seat.won .plate{background:var(--grain),var(--won);color:var(--ink)}
 .nm{font-weight:700;font-size:13px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crown{color:#a8741a;margin-right:3px}
 .seat.me .crown{color:var(--gold)}
@@ -164,15 +187,15 @@ a.btn{display:block;text-align:center;text-decoration:none}
 .chip::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--c);border:1px solid #f4ecd8cc}
 
 /* ---------- panel bawah ---------- */
-#panel{padding:10px 14px calc(14px + env(safe-area-inset-bottom));background:var(--grain),#1a1510;border-top:3px double #e0a82e80}
+#panel{padding:10px 14px calc(14px + env(safe-area-inset-bottom));background:var(--grain),var(--panel);border-top:3px double #307fe2aa}
 #me{position:relative;display:flex;align-items:center;gap:6px;min-height:100px}
 #mine{position:relative;display:flex;flex:none;padding:8px 16px 0 10px;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-#eye{position:absolute;right:0;top:4px;width:36px;height:36px;padding:0;border-radius:50%;border:1.5px solid #f1e7cf66;background:#1a1510;color:var(--paper);display:grid;place-items:center;cursor:pointer;z-index:2}
+#eye{position:absolute;right:0;top:4px;width:36px;height:36px;padding:0;border-radius:50%;border:1.5px solid var(--line);background:var(--panel);color:var(--fg);display:grid;place-items:center;cursor:pointer;z-index:2}
 #eye svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #eye .off{display:none}
 #eye.on{background:var(--gold);color:var(--ink);border-color:var(--ink)}
 #eye.on .open{display:none}#eye.on .off{display:block}
-.hint{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-top:6px}
+.hint{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin-top:6px}
 #mine .card{width:64px;height:92px;border-radius:7px}
 #mine .card b{top:5px;left:7px;font-size:25px}
 #mine .card i{top:32px;left:7px;font-size:19px}
@@ -180,21 +203,21 @@ a.btn{display:block;text-align:center;text-decoration:none}
 #mine .card:nth-child(1){--rest:rotate(-6deg) translateX(8px)}
 #mine .card:nth-child(2){--rest:rotate(5deg) translate(-8px,3px)}
 #msg{flex:1;min-width:0;padding-right:44px}
-.hn{font-size:27px;font-style:italic;font-weight:700;color:var(--gold);line-height:1;margin-bottom:6px}
-.sub{font-size:11px;color:var(--paper-d)}
+.hn{font-size:27px;font-style:italic;font-weight:700;color:var(--hn);line-height:1;margin-bottom:6px}
+.sub{font-size:11px;color:var(--fg2)}
 #ctl{display:flow-root;min-height:158px} /* flow-root: margin baris tombol tidak bocor keluar, tinggi panel tetap = meja tidak loncat */
 #ctl.wait{pointer-events:none;opacity:.55}
 .row{display:flex;gap:10px;margin-top:10px;align-items:center}
 .row .btn.big{flex:1.5}
 .q{gap:6px}
-.q button{flex:1;padding:7px 0;border:1.5px solid #f1e7cf55;background:none;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
-.q button:active{background:#f1e7cf22}
+.q button{flex:1;padding:7px 0;border:1.5px solid var(--line);background:none;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.q button:active{background:var(--hover)}
 input[type=range]{-webkit-appearance:none;appearance:none;flex:1.4;min-width:0;height:28px;background:transparent;margin:0}
-input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--paper-d);border-radius:2px}
+input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--line-strong);border-radius:2px}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-11px;border-radius:50%;border:2px solid var(--ink);background:repeating-conic-gradient(var(--gold) 0 20deg,#f4ecd8 20deg 40deg)}
-input[type=range]::-moz-range-track{height:4px;background:var(--paper-d)}
+input[type=range]::-moz-range-track{height:4px;background:var(--line-strong)}
 input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;border:2px solid var(--ink);background:var(--gold)}
-#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--red);color:var(--paper);padding:9px 14px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;border:2px solid var(--ink);box-shadow:3px 3px 0 #000;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
+#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--red);color:#fff;padding:9px 14px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;border:2px solid var(--ink);box-shadow:3px 3px 0 #000;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
 #toast.on{opacity:1}
 #toast.good{background:#2f7a5c}
 
@@ -221,7 +244,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
 .bubble.me{background:var(--gold)}.bubble.me::after{background:var(--gold)}
 .bubble.out{animation:fade .4s ease both}
 .bubble.emo{font-size:26px;font-style:normal;padding:2px 8px}
-.chatnote{display:inline-block;margin-top:6px;font-size:10px;color:var(--dim);text-transform:none;letter-spacing:.02em}
+.chatnote{display:inline-block;margin-top:6px;font-size:10px;color:var(--fg2);text-transform:none;letter-spacing:.02em}
 /* bubble host: di bawah bandar, ekornya menunjuk ke atas */
 .bubble.host{transform:translate(-50%,0);border-color:var(--gold)}
 .bubble.host::after{bottom:auto;top:-8px;border:2px solid var(--gold);border-right:0;border-bottom:0}
@@ -230,13 +253,13 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
 @keyframes fade{to{opacity:0;translate:0 -8px}}
 #panel{position:relative}
 /* chat menutupi area kartu sendiri (bukan menambah tinggi panel), jadi ukuran meja tidak berubah */
-#chat{position:absolute;z-index:3;top:10px;left:14px;right:14px;min-height:100px;display:flex;flex-direction:column;justify-content:center;gap:8px;background:var(--grain),#1a1510}
+#chat{position:absolute;z-index:3;top:10px;left:14px;right:14px;min-height:100px;display:flex;flex-direction:column;justify-content:center;gap:8px;background:var(--grain),var(--panel)}
 @media(min-width:700px){#chat{right:auto;width:300px}}
 #chat .quick{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
-#chat .quick button{flex:none;padding:5px 9px;border:1.5px solid #f1e7cf55;background:none;font-size:15px;cursor:pointer}
+#chat .quick button{flex:none;padding:5px 9px;border:1.5px solid var(--line);background:none;font-size:15px;cursor:pointer}
 #chat .quick button.txt{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
 #chat .line{display:flex;gap:8px}
-#chatIn{flex:1;min-width:0;border:0;border-bottom:2px solid var(--paper-d);background:transparent;padding:6px 2px;font-size:16px;color:var(--paper);outline:0}
+#chatIn{flex:1;min-width:0;border:0;border-bottom:2px solid var(--line-strong);background:transparent;padding:6px 2px;font-size:16px;color:var(--fg);outline:0}
 #chatIn:focus{border-bottom-color:var(--gold)}
 #chat .btn{flex:none;padding:8px 14px;box-shadow:none}
 #chat .btn:disabled{opacity:.45}
@@ -263,63 +286,69 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
     <span id="info"></span>
     <svg id="dealer" viewBox="0 0 120 96" role="img" aria-label="Dealer">
     <defs>
-      <linearGradient id="dl-skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7d2b8"/><stop offset="1" stop-color="#e3aa8b"/></linearGradient>
-      <linearGradient id="dl-hair" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6a2a1a"/><stop offset=".5" stop-color="#34140e"/><stop offset="1" stop-color="#1a0a07"/></linearGradient>
-      <linearGradient id="dl-satin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3a3a46"/><stop offset=".5" stop-color="#101016"/><stop offset="1" stop-color="#22222c"/></linearGradient>
-      <linearGradient id="dl-lip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dc3b38"/><stop offset="1" stop-color="#9c1c25"/></linearGradient>
-      <radialGradient id="dl-iris" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#8a5a2a"/><stop offset="1" stop-color="#2b1408"/></radialGradient>
+      <linearGradient id="dl-skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe3d1"/><stop offset="1" stop-color="#f3bfa1"/></linearGradient>
+      <linearGradient id="dl-hair" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5a3424"/><stop offset=".45" stop-color="#2e1912"/><stop offset="1" stop-color="#160b08"/></linearGradient>
+      <linearGradient id="dl-vest" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a63c9"/><stop offset=".55" stop-color="#0857c3"/><stop offset="1" stop-color="#063a86"/></linearGradient>
+      <linearGradient id="dl-lip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7d95"/><stop offset="1" stop-color="#d9476a"/></linearGradient>
+      <radialGradient id="dl-iris" cx=".45" cy=".4" r=".6"><stop offset="0" stop-color="#9a6438"/><stop offset=".7" stop-color="#4a2a14"/><stop offset="1" stop-color="#24120a"/></radialGradient>
     </defs>
-    <!-- dealer perempuan: ilustrasi orisinal, berdiri di balik meja -->
+    <!-- dealer muda berseragam biru: ilustrasi orisinal, berdiri di balik meja -->
     <g class="body">
-      <path class="hairB" d="M36 42C29 20 44 3 62 3C82 3 93 22 86 46C84 60 90 74 96 88C84 86 76 76 74 64L46 64C44 76 36 86 24 88C30 74 38 60 36 42Z" fill="url(#dl-hair)"/>
-      <path d="M53 47H67V66C64 70 56 70 53 66Z" fill="#e0a588"/>
-      <path d="M12 96C12 82 26 73 42 69C49 67 50 62 53 58H67C70 62 71 67 78 69C94 73 108 82 108 96Z" fill="url(#dl-skin)"/>
-      <ellipse cx="60" cy="58.5" rx="7.5" ry="2.6" fill="#c98b6b" opacity=".2"/>
-      <path d="M18 96C19 84 31 78 46 79C52 80 56 83.5 60 83.5C64 83.5 68 80 74 79C89 78 101 84 102 96Z" fill="url(#dl-satin)"/>
-      <path d="M20 88C23 82 33 78.5 46 79C52 80 56 83.5 60 83.5C64 83.5 68 80 74 79C87 78.5 97 82 100 88" fill="none" stroke="#e0a82e" stroke-width=".9"/>
-      <path d="M30 92C38 86 48 85 55 87" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width="1.2" stroke-linecap="round"/>
-      <path d="M52.8 59.5C55 66 65 66 67.2 59.5" fill="none" stroke="#e0a82e" stroke-width=".8"/>
-      <path d="M60 64.6L62.1 67.4L60 70.2L57.9 67.4Z" fill="#c8402a" stroke="#e0a82e" stroke-width=".7"/>
+      <path class="hairB" d="M38 40C33 18 46 5 61 5C78 5 89 19 84 42C83 56 88 70 93 84C82 83 75 74 73 63L47 63C45 74 38 83 27 84C32 70 39 56 38 40Z" fill="url(#dl-hair)"/>
+      <path d="M54.6 48H65.4V64C63 67 57 67 54.6 64Z" fill="#efb596"/>
+      <!-- seragam: rompi biru, kemeja putih, dasi kupu-kupu Mentari -->
+      <path d="M12 96C12 83 25 74 41 70.5C48.5 69 52 65.5 54.6 62H65.4C68 65.5 71.5 69 79 70.5C95 74 108 83 108 96Z" fill="url(#dl-vest)"/>
+      <path d="M49.5 69.5C52.5 67.5 54 65 54.6 62H65.4C66 65 67.5 67.5 70.5 69.5L60 92Z" fill="#fbfcff"/>
+      <path d="M54.6 62.5L50.6 70.5L58.4 67.4Z M65.4 62.5L69.4 70.5L61.6 67.4Z" fill="#ffffff" stroke="#c9d6ee" stroke-width=".5"/>
+      <path d="M49.5 69.5L60 92L70.5 69.5" fill="none" stroke="#71c5eb" stroke-width=".8"/>
+      <path d="M60 66.6L53.6 63.4V69.8Z M60 66.6L66.4 63.4V69.8Z" fill="#71c5eb" stroke="#307fe2" stroke-width=".5"/>
+      <circle cx="60" cy="66.6" r="1.5" fill="#307fe2"/>
+      <circle cx="60" cy="76" r=".9" fill="#c9d6ee"/><circle cx="60" cy="82" r=".9" fill="#c9d6ee"/>
+      <rect x="76" y="78" width="12" height="4" rx="1" fill="#fbfcff"/><rect x="76" y="78" width="3.2" height="4" rx="1" fill="#71c5eb"/>
+      <path d="M26 86C34 80 44 78.5 50 80" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1.2" stroke-linecap="round"/>
       <g class="head">
-        <path d="M45 32C45 20 52 13 60 13C68 13 75 20 75 32C75 44 69 54.5 60 55.5C51 54.5 45 44 45 32Z" fill="url(#dl-skin)"/>
-        <path d="M71.5 26C75 37 71 49 62 54.4C70.5 52 76.2 42 75 29Z" fill="#c98b6b" opacity=".22"/>
-        <circle cx="49.5" cy="42.5" r="3.3" fill="#e5806f" opacity=".28"/><circle cx="70.5" cy="42.5" r="3.3" fill="#e5806f" opacity=".28"/>
-        <path d="M47.2 31.6C50.4 29 55 29 58.2 30.8M72.8 31.6C69.6 29 65 29 61.8 30.8" fill="none" stroke="#2a120d" stroke-width="1.3" stroke-linecap="round"/>
+        <path d="M46 31C46 20 52 14 60 14C68 14 74 20 74 31C74 42.5 68.5 52 60 53.6C51.5 52 46 42.5 46 31Z" fill="url(#dl-skin)"/>
+        <path d="M71 25C74.4 36 70.6 47.5 62.2 53C69.8 50.4 75 41 74 28Z" fill="#e8a383" opacity=".22"/>
+        <circle cx="50.6" cy="42.6" r="3.3" fill="#ff8fa3" opacity=".35"/><circle cx="69.4" cy="42.6" r="3.3" fill="#ff8fa3" opacity=".35"/>
+        <path d="M48.6 30.3C51.1 28.7 54.9 28.6 57.4 30M71.4 30.3C68.9 28.7 65.1 28.6 62.6 30" fill="none" stroke="#3a2016" stroke-width="1.05" stroke-linecap="round"/>
         <g class="wkL"><g class="eyeL">
-          <path d="M48.5 35.8C50.5 33 55.8 33 58 35.6C55.6 38.2 50.6 38.2 48.5 35.8Z" fill="#fff"/>
-          <circle cx="53.4" cy="35.6" r="2.35" fill="url(#dl-iris)"/><circle cx="53.4" cy="35.6" r="1.05" fill="#120808"/><circle cx="54.2" cy="34.7" r=".65" fill="#fff"/>
-          <path d="M47.8 35.9C50 32.6 55.8 32.4 58.4 35.3" fill="none" stroke="#140808" stroke-width="1.05" stroke-linecap="round"/>
-          <path d="M48.2 35.7L46.5 34.5M49.3 34.5L48 33.2" stroke="#140808" stroke-width=".55" stroke-linecap="round"/>
+          <path d="M48.6 35.8C50.6 32.4 56.1 32.4 58.2 35.5C56.1 38.6 50.9 38.7 48.6 35.8Z" fill="#fdf6f2"/>
+          <circle cx="53.4" cy="35.7" r="3" fill="url(#dl-iris)"/><circle cx="53.4" cy="35.7" r="1.2" fill="#120806"/>
+          <circle cx="54.4" cy="34.5" r=".85" fill="#fff"/><circle cx="52.5" cy="36.7" r=".4" fill="#fff" opacity=".8"/>
+          <path d="M47.9 35.8C50.1 32 56.2 31.7 58.7 35.1" fill="none" stroke="#140808" stroke-width="1.25" stroke-linecap="round"/>
+          <path d="M48.3 35.4L46.5 34.3M49.2 34.2L47.7 32.8M50.5 33.3L49.5 31.7" stroke="#140808" stroke-width=".6" stroke-linecap="round"/>
         </g></g>
         <g class="wkR"><g class="eyeR">
-          <path d="M71.5 35.8C69.5 33 64.2 33 62 35.6C64.4 38.2 69.4 38.2 71.5 35.8Z" fill="#fff"/>
-          <circle cx="66.6" cy="35.6" r="2.35" fill="url(#dl-iris)"/><circle cx="66.6" cy="35.6" r="1.05" fill="#120808"/><circle cx="67.4" cy="34.7" r=".65" fill="#fff"/>
-          <path d="M72.2 35.9C70 32.6 64.2 32.4 61.6 35.3" fill="none" stroke="#140808" stroke-width="1.05" stroke-linecap="round"/>
-          <path d="M71.8 35.7L73.5 34.5M70.7 34.5L72 33.2" stroke="#140808" stroke-width=".55" stroke-linecap="round"/>
+          <path d="M71.4 35.8C69.4 32.4 63.9 32.4 61.8 35.5C63.9 38.6 69.1 38.7 71.4 35.8Z" fill="#fdf6f2"/>
+          <circle cx="66.6" cy="35.7" r="3" fill="url(#dl-iris)"/><circle cx="66.6" cy="35.7" r="1.2" fill="#120806"/>
+          <circle cx="67.6" cy="34.5" r=".85" fill="#fff"/><circle cx="65.7" cy="36.7" r=".4" fill="#fff" opacity=".8"/>
+          <path d="M72.1 35.8C69.9 32 63.8 31.7 61.3 35.1" fill="none" stroke="#140808" stroke-width="1.25" stroke-linecap="round"/>
+          <path d="M71.7 35.4L73.5 34.3M70.8 34.2L72.3 32.8M69.5 33.3L70.5 31.7" stroke="#140808" stroke-width=".6" stroke-linecap="round"/>
         </g></g>
-        <path d="M60.5 39.6C59.9 41.8 59.4 43 60.2 43.6C60.9 43.5 61.4 43.2 61.4 42.8" fill="none" stroke="#c98b6b" stroke-width=".75" stroke-linecap="round"/>
+        <path d="M60.3 40.2C60 41.7 59.7 42.5 60.4 42.9" fill="none" stroke="#d99c80" stroke-width=".7" stroke-linecap="round"/>
         <g class="lips">
-          <path d="M54.4 48.4C56.4 46.6 58.6 46.8 60 47.8C61.4 46.8 63.6 46.6 65.6 48.4C64 52.2 56 52.2 54.4 48.4Z" fill="url(#dl-lip)"/>
-          <path d="M54.9 48.5C57.6 49.5 62.4 49.5 65.1 48.5" fill="none" stroke="#6e0f16" stroke-width=".5"/>
-          <ellipse cx="58.3" cy="50.3" rx="1.8" ry=".55" fill="#fff" opacity=".4"/>
+          <path d="M56.4 48.1C57.7 47.2 59 47.4 60 48C61 47.4 62.3 47.2 63.6 48.1C62.5 50.7 57.5 50.7 56.4 48.1Z" fill="url(#dl-lip)"/>
+          <path d="M56.8 48.2C58.6 48.9 61.4 48.9 63.2 48.2" fill="none" stroke="#a8304f" stroke-width=".4"/>
+          <ellipse cx="58.7" cy="49.6" rx="1.3" ry=".45" fill="#fff" opacity=".45"/>
         </g>
-        <circle cx="65.8" cy="51.2" r=".5" fill="#3a1a12"/>
-        <path d="M43.4 37C42 19 52 8 63 8C75 8 81 19 78.6 35C76 26 70 18.4 60.6 18C52.4 18 46.4 26 43.4 37Z" fill="url(#dl-hair)"/>
-        <path d="M44.4 36C45 28.4 50 21.4 61 18C54 23.4 49.6 29 47.6 35.6C46.4 35.6 45.2 35.8 44.4 36Z" fill="#2a100b"/>
-        <path d="M55 13.6C58.5 12 63 12 66.5 13.4" fill="none" stroke="#b5603f" stroke-opacity=".38" stroke-width="1" stroke-linecap="round"/>
+        <!-- poni samping + jepit rambut biru -->
+        <path d="M44.6 35C43 20 51.2 10.4 62 10.4C72.4 10.4 77.8 19.2 75.8 33.4C73.6 25.2 68.6 20.6 61.6 19.4C57.6 24.6 51.6 29 44.6 35Z" fill="url(#dl-hair)"/>
+        <path d="M61.6 19.4C64.8 23.4 66.4 26.6 66.8 30C68.8 26.4 70 23.2 69.8 20.6C67.4 19.6 64.6 19.2 61.6 19.4Z" fill="#2e1912"/>
+        <path d="M52 15.4C55.4 13.4 60.4 12.8 64.4 13.8" fill="none" stroke="#a8684a" stroke-opacity=".45" stroke-width="1" stroke-linecap="round"/>
+        <rect x="68.2" y="17.2" width="6" height="2" rx="1" fill="#71c5eb" transform="rotate(28 71.2 18.2)"/>
       </g>
       <g class="hairF">
-        <path d="M43.6 37C41 50 40 62 33 74C29 81 25 86 22 91C35 89 41 79 45 67C47.4 58 47.6 47 48 39Z" fill="url(#dl-hair)"/>
-        <path d="M76.4 37C79 50 82 62 89 74C93 81 97 86 100 91C87 89 80 79 76 67C73.6 58 72.4 47 72 39Z" fill="url(#dl-hair)"/>
-        <path d="M40 60C38 68 34 76 28 84M80 60C82 68 86 76 92 84" fill="none" stroke="#b5603f" stroke-opacity=".45" stroke-width="1" stroke-linecap="round"/>
+        <path d="M44.6 36C43 48 42 58 37 70C35 76 33 80 31 84C40 81 44 73 46.5 63C48 55 48.2 45 48.2 38Z" fill="url(#dl-hair)"/>
+        <path d="M75.4 36C77 48 78 58 83 70C85 76 87 80 89 84C80 81 76 73 73.5 63C72 55 71.8 45 71.8 38Z" fill="url(#dl-hair)"/>
+        <path d="M41 60C39.4 68 36.4 75 32.6 81M79 60C80.6 68 83.6 75 87.4 81" fill="none" stroke="#a8684a" stroke-opacity=".4" stroke-width="1" stroke-linecap="round"/>
       </g>
-      <circle cx="43.4" cy="43" r="2.2" fill="none" stroke="#e0a82e" stroke-width=".9"/><circle cx="76.6" cy="43" r="2.2" fill="none" stroke="#e0a82e" stroke-width=".9"/>
+      <circle cx="45.4" cy="41.6" r="1.2" fill="#71c5eb" stroke="#fff" stroke-width=".4"/><circle cx="74.6" cy="41.6" r="1.2" fill="#71c5eb" stroke="#fff" stroke-width=".4"/>
     </g>
     <g class="arm">
-      <path d="M89 75C89 71.5 99 71.5 99 75L97.6 91H90.4Z" fill="#e8b697"/>
-      <rect x="89" y="86.4" width="10" height="2.2" rx="1.1" fill="#e0a82e"/>
-      <circle cx="94" cy="95" r="5" fill="#f0c3a5"/>
-      <rect x="91" y="89" width="10" height="14" rx="1.5" fill="#c8402a" stroke="#f7f0dc" transform="rotate(12 96 96)"/>
+      <path d="M89 75C89 71.5 99 71.5 99 75L97.6 91H90.4Z" fill="#0857c3"/>
+      <rect x="89" y="86.4" width="10" height="2.4" rx="1.1" fill="#fbfcff"/>
+      <circle cx="94" cy="95" r="5" fill="#f6c9ad"/>
+      <rect x="91" y="89" width="10" height="14" rx="1.5" fill="#0857c3" stroke="#fbfcff" transform="rotate(12 96 96)"/>
     </g>
   </svg>
     <span class="btns"><button id="snd" title="Nyalakan/matikan suara">Suara</button><a id="leave" href="/matches">Keluar</a></span>

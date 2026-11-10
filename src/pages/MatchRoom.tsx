@@ -66,7 +66,7 @@ export default function MatchRoom() {
     return (
       <Card>
         <EmptyState icon="🂠" title="Match tidak ditemukan" />
-        <Link to="/matches" className="block text-center text-sm font-semibold text-gold-400">
+        <Link to="/matches" className="block text-center text-sm font-semibold text-brand-400">
           Kembali ke daftar match
         </Link>
       </Card>
@@ -94,11 +94,11 @@ export default function MatchRoom() {
       </Link>
 
       {/* Header */}
-      <div className="relative overflow-hidden rounded-3xl border border-gold-400/20 bg-gradient-to-br from-felt-600 to-felt-800 p-5 shadow-xl">
-        <div className="pointer-events-none absolute -right-6 -bottom-10 text-[140px] leading-none text-black/15">♠</div>
+      <div className="relative overflow-hidden rounded-3xl border border-brand-400/20 bg-gradient-to-br from-surface-600 to-surface-800 p-5 shadow-xl">
+        <div className="pointer-events-none absolute -right-6 -bottom-10 text-[140px] leading-none text-ink/[0.06]">♠</div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={match.status} />
-          <span className="rounded-full bg-black/25 px-2.5 py-1 text-xs font-semibold text-slate-200">
+          <span className="rounded-full bg-ink/10 px-2.5 py-1 text-xs font-semibold text-slate-200">
             {online ? '🌐 Online' : '🃏 Offline'}
           </span>
         </div>
@@ -122,10 +122,10 @@ export default function MatchRoom() {
 
       {/* Winner banner */}
       {match.status === 'finished' && winner && (
-        <div className="flex items-center gap-4 rounded-2xl border border-gold-400/50 bg-gold-400/10 p-4">
+        <div className="flex items-center gap-4 rounded-2xl border border-brand-400/50 bg-brand-400/10 p-4">
           <span className="text-4xl">🏆</span>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gold-300">Pemenang</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-brand-300">Pemenang</p>
             <p className="truncate text-xl font-extrabold">{nameOf(winner)}</p>
           </div>
         </div>
@@ -143,7 +143,7 @@ export default function MatchRoom() {
       <ErrorText>{error}</ErrorText>
 
       {isDealer && hostedByPlayer && match.status !== 'finished' && match.status !== 'cancelled' && (
-        <p className="rounded-xl bg-gold-400/10 px-3 py-2 text-xs text-gold-300">
+        <p className="rounded-xl bg-brand-400/10 px-3 py-2 text-xs text-brand-300">
           {online
             ? 'Kamu host match ini dan tidak ikut main. Setelah dimulai, hasilnya dicatat otomatis oleh meja poker.'
             : 'Kamu host match ini, jadi kamu yang mengatur jalannya match dan tidak ikut main.'}
@@ -155,21 +155,21 @@ export default function MatchRoom() {
         me ? (
           <a
             href={`/meja.html?m=${id}`}
-            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gold-400 text-base font-bold text-felt-950 shadow-lg shadow-gold-500/20 transition active:scale-[0.98]"
+            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-brand-400 text-base font-bold text-on-accent shadow-lg shadow-brand-500/20 transition active:scale-[0.98]"
           >
             🃏 {me.status === 'playing' ? 'Masuk meja poker' : 'Lihat meja poker'}
           </a>
         ) : (
           <a
             href={`/meja.html?m=${id}`}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gold-400/50 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-brand-400/50 text-sm font-bold text-brand-300 transition hover:bg-brand-400/10"
           >
             👀 Tonton meja poker
           </a>
         )
       )}
       {online && match.status === 'finished' && (
-        <a href={`/meja.html?m=${id}`} className="block text-center text-sm font-semibold text-gold-400 hover:text-gold-300">
+        <a href={`/meja.html?m=${id}`} className="block text-center text-sm font-semibold text-brand-400 hover:text-brand-300">
           Lihat meja terakhir
         </a>
       )}
@@ -227,7 +227,7 @@ export default function MatchRoom() {
       )}
 
       {manual && match.status === 'ongoing' && !canPickWinner && (
-        <p className="rounded-xl bg-white/5 px-3 py-2 text-xs text-slate-400">
+        <p className="rounded-xl bg-ink/5 px-3 py-2 text-xs text-slate-400">
           Tekan <span className="font-semibold text-red-300">Kalah</span> sesuai urutan pemain tersingkir. Tombol Menang muncul saat
           tersisa 2 pemain.
         </p>
@@ -241,24 +241,24 @@ export default function MatchRoom() {
             <EmptyState icon="🪑" title="Belum ada yang join" text="Player bisa join dari halaman ini." />
           </Card>
         ) : (
-          <Card className="divide-y divide-white/5 p-0">
+          <Card className="divide-y divide-ink/5 p-0">
             {sorted.map((p, i) => {
               const out = p.status === 'eliminated' && !(match.status === 'finished' && p.points > 0)
               return (
-              <div key={p.player_id} className={cx('px-4 py-3', p.player_id === profile.id && 'bg-gold-400/8')}>
+              <div key={p.player_id} className={cx('px-4 py-3', p.player_id === profile.id && 'bg-brand-400/8')}>
               <div className={cx('flex items-center gap-3', out && 'opacity-60')}>
                 <span className="w-5 text-center text-xs font-bold text-slate-500">{i + 1}</span>
                 <Avatar name={nameOf(p)} id={p.player_id} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="flex items-baseline gap-1.5 font-medium">
                     <span className={cx('truncate', out && 'line-through decoration-slate-500')}>{nameOf(p)}</span>
-                    {p.player_id === profile.id && <span className="shrink-0 text-xs text-gold-300">(kamu)</span>}
+                    {p.player_id === profile.id && <span className="shrink-0 text-xs text-brand-300">(kamu)</span>}
                   </p>
                   <PlayerStatusLabel player={p} matchStatus={match.status} />
                 </div>
 
                 {match.status === 'finished' && p.points > 0 && (
-                  <span className="shrink-0 rounded-lg bg-gold-400/15 px-2 py-1 text-xs font-bold text-gold-300">+{p.points} poin</span>
+                  <span className="shrink-0 rounded-lg bg-brand-400/15 px-2 py-1 text-xs font-bold text-brand-300">+{p.points} poin</span>
                 )}
 
                 {isDealer && match.status === 'open' && (
@@ -292,7 +292,7 @@ export default function MatchRoom() {
                     ✕ Kalah
                   </SmallButton>
                   {canPickWinner && (
-                    <SmallButton tone="gold" onClick={() => askWinner(p)}>
+                    <SmallButton tone="primary" onClick={() => askWinner(p)}>
                       🏆 Menang
                     </SmallButton>
                   )}
@@ -381,7 +381,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 function PlayerStatusLabel({ player, matchStatus }: { player: MatchPlayer; matchStatus: Match['status'] }) {
   const { status, placement } = player
   if (matchStatus === 'open') return <p className="text-xs text-sky-300">Sudah join</p>
-  if (status === 'winner') return <p className="text-xs font-semibold text-gold-400">🏆 Juara</p>
+  if (status === 'winner') return <p className="text-xs font-semibold text-brand-400">🏆 Juara</p>
   if (matchStatus === 'finished' && (placement === 2 || placement === 3))
     return <p className="text-xs font-semibold text-slate-200">{placement === 2 ? '🥈 Runner-up 1' : '🥉 Runner-up 2'}</p>
   if (status === 'eliminated') return <p className="text-xs text-red-300">Kalah</p>
@@ -394,7 +394,7 @@ function SmallButton({
   onClick,
   children,
 }: {
-  tone: 'gold' | 'danger' | 'ghost'
+  tone: 'primary' | 'danger' | 'ghost'
   loading?: boolean
   onClick: () => void
   children: ReactNode

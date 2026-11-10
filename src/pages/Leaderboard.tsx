@@ -47,14 +47,14 @@ export default function Leaderboard() {
       <div className="space-y-4 md:grid md:grid-cols-2 md:items-start md:gap-6 md:space-y-0">
       <div className="space-y-4">
 
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-950/60 p-1">
         {(['monthly', 'all'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cx(
               'min-h-10 rounded-lg text-sm font-semibold transition',
-              tab === t ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+              tab === t ? 'bg-brand-400 text-on-accent' : 'text-slate-400 hover:text-slate-200',
             )}
           >
             {t === 'monthly' ? 'Bulanan' : 'All Time'}
@@ -84,22 +84,22 @@ export default function Leaderboard() {
       </div>
 
       {rows && rest.length > 0 && (
-            <Card className="divide-y divide-white/5 p-0">
+            <Card className="divide-y divide-ink/5 p-0">
               {rest.map((r) => (
                 <Link
                   key={r.player_id}
                   to={`/players/${r.player_id}`}
-                  className={cx('flex items-center gap-3 px-4 py-3 transition hover:bg-white/5', r.player_id === profile?.id && 'bg-gold-400/8')}
+                  className={cx('flex items-center gap-3 px-4 py-3 transition hover:bg-ink/5', r.player_id === profile?.id && 'bg-brand-400/8')}
                 >
                   <span className="w-6 text-center text-sm font-bold text-slate-400">{r.rank}</span>
                   <Avatar name={r.name} id={r.player_id} size="sm" />
                   <span className="min-w-0 flex-1 truncate font-medium">
                     {r.name}
-                    {r.player_id === profile?.id && <span className="ml-1.5 text-xs text-gold-300">(kamu)</span>}
+                    {r.player_id === profile?.id && <span className="ml-1.5 text-xs text-brand-300">(kamu)</span>}
                   </span>
                   <span className="text-right">
                     <span className="block leading-tight">
-                      <span className="font-bold text-gold-400">{r.points}</span>
+                      <span className="font-bold text-brand-400">{r.points}</span>
                       <span className="ml-1 text-xs text-slate-400">poin</span>
                     </span>
                     <span className="block text-[11px] text-slate-500">{r.wins} menang</span>
@@ -132,7 +132,7 @@ function rank(rows: LeaderboardRow[]): Ranked[] {
 }
 
 const podiumStyles = [
-  { height: 'h-28', medal: '🥇', ring: 'ring-gold-400', bar: 'from-gold-400/40 to-gold-500/10 border-gold-400/50' },
+  { height: 'h-28', medal: '🥇', ring: 'ring-brand-400', bar: 'from-brand-400/40 to-brand-500/10 border-brand-400/50' },
   { height: 'h-20', medal: '🥈', ring: 'ring-slate-300', bar: 'from-slate-300/30 to-slate-400/5 border-slate-300/40' },
   { height: 'h-14', medal: '🥉', ring: 'ring-amber-700', bar: 'from-amber-700/40 to-amber-800/10 border-amber-700/50' },
 ]
@@ -152,11 +152,11 @@ function Podium({ entries, meId }: { entries: Ranked[]; meId?: string }) {
             <div className={cx('rounded-full ring-4', style.ring)}>
               <Avatar name={e.name} id={e.player_id} size={idx === 0 ? 'xl' : 'lg'} />
             </div>
-            <p className={cx('mt-2 w-full truncate text-center text-sm font-semibold', e.player_id === meId && 'text-gold-300')}>
+            <p className={cx('mt-2 w-full truncate text-center text-sm font-semibold', e.player_id === meId && 'text-brand-300')}>
               {e.name}
             </p>
             <p className="text-xs text-slate-400">
-              <span className="text-base font-extrabold text-gold-400">{e.points}</span> poin
+              <span className="text-base font-extrabold text-brand-400">{e.points}</span> poin
             </p>
             <div
               className={cx(
@@ -180,7 +180,7 @@ function MonthButton({ dir, onClick, disabled }: { dir: 'prev' | 'next'; onClick
       onClick={onClick}
       disabled={disabled}
       aria-label={dir === 'prev' ? 'Bulan sebelumnya' : 'Bulan berikutnya'}
-      className="flex size-10 items-center justify-center rounded-xl bg-white/5 text-slate-300 transition hover:bg-white/10 disabled:opacity-30"
+      className="flex size-10 items-center justify-center rounded-xl bg-ink/5 text-slate-300 transition hover:bg-ink/10 disabled:opacity-30"
     >
       <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d={dir === 'prev' ? 'm15 6-6 6 6 6' : 'm9 6 6 6-6 6'} strokeLinecap="round" strokeLinejoin="round" />

@@ -64,7 +64,7 @@ function SetupNotice() {
       <p className="text-4xl">♠</p>
       <h1 className="mt-3 text-xl font-bold">Supabase belum dikonfigurasi</h1>
       <p className="mt-2 text-sm text-slate-400">
-        Isi <code className="text-gold-300">VITE_SUPABASE_URL</code> dan <code className="text-gold-300">VITE_SUPABASE_KEY</code> di
+        Isi <code className="text-brand-300">VITE_SUPABASE_URL</code> dan <code className="text-brand-300">VITE_SUPABASE_KEY</code> di
         file <code>.env</code> (lokal) atau Environment Variables di Vercel. Lihat README.
       </p>
     </div>

@@ -77,7 +77,7 @@ export default function Players() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Cari nama pemain…"
-        className="h-11 w-full rounded-xl border md:max-w-xs border-white/10 bg-felt-950/60 px-4 text-base outline-none placeholder:text-slate-500 focus:border-gold-400/70 focus:ring-2 focus:ring-gold-400/20"
+        className="h-11 w-full rounded-xl border md:max-w-xs border-ink/10 bg-surface-950/60 px-4 text-base outline-none placeholder:text-slate-500 focus:border-brand-400/70 focus:ring-2 focus:ring-brand-400/20"
       />
 
       <div className="flex gap-1.5 overflow-x-auto">
@@ -87,7 +87,7 @@ export default function Players() {
             onClick={() => setSort(key)}
             className={cx(
               'shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition',
-              sort === key ? 'bg-gold-400 text-felt-950' : 'bg-white/5 text-slate-300 hover:bg-white/10',
+              sort === key ? 'bg-brand-400 text-on-accent' : 'bg-ink/5 text-slate-300 hover:bg-ink/10',
             )}
           >
             {sortLabels[key]}
@@ -103,25 +103,25 @@ export default function Players() {
           <EmptyState icon="🔍" title={rows.length === 0 ? 'Belum ada pemain' : 'Pemain tidak ditemukan'} />
         </Card>
       ) : (
-        <Card className="divide-y divide-white/5 p-0 md:grid md:grid-cols-2 md:divide-y-0">
+        <Card className="divide-y divide-ink/5 p-0 md:grid md:grid-cols-2 md:divide-y-0">
           {visible.map((r) => (
-            <div key={r.player_id} className={cx('flex items-center md:border-b md:border-white/5 md:odd:border-r', r.player_id === profile?.id && 'bg-gold-400/8')}>
+            <div key={r.player_id} className={cx('flex items-center md:border-b md:border-ink/5 md:odd:border-r', r.player_id === profile?.id && 'bg-brand-400/8')}>
             <Link
               to={`/players/${r.player_id}`}
-              className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 transition hover:bg-white/5"
+              className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 transition hover:bg-ink/5"
             >
               <Avatar name={r.name} id={r.player_id} />
               <div className="min-w-0 flex-1">
                 <p className="flex items-baseline gap-1.5 font-medium">
                   <span className="truncate">{r.name}</span>
-                  {r.player_id === profile?.id && <span className="shrink-0 text-xs text-gold-300">(kamu)</span>}
+                  {r.player_id === profile?.id && <span className="shrink-0 text-xs text-brand-300">(kamu)</span>}
                 </p>
                 <p className="text-xs text-slate-400">
                   {r.played} main · {r.wins} menang · {winRate(r.wins, r.played)}%
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-lg leading-none font-extrabold text-gold-400">{sort === 'month' ? r.month_points : r.points}</p>
+                <p className="text-lg leading-none font-extrabold text-brand-400">{sort === 'month' ? r.month_points : r.points}</p>
                 <p className="text-[10px] uppercase tracking-wider text-slate-400">{sort === 'month' ? 'bln ini' : 'poin'}</p>
               </div>
             </Link>
@@ -129,7 +129,7 @@ export default function Players() {
               <Link
                 to={`/duel/${r.player_id}`}
                 aria-label={`Ajak ${r.name} duel`}
-                className="mx-2 flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-lg transition hover:bg-gold-400/15"
+                className="mx-2 flex size-10 shrink-0 items-center justify-center rounded-xl bg-ink/5 text-lg transition hover:bg-brand-400/15"
               >
                 ⚔️
               </Link>
@@ -186,7 +186,7 @@ export function PlayerProfile() {
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-bold">
                 {player.name}
-                {player.id === me?.id && <span className="ml-2 text-sm font-medium text-gold-300">(kamu)</span>}
+                {player.id === me?.id && <span className="ml-2 text-sm font-medium text-brand-300">(kamu)</span>}
               </h1>
               <p className="text-sm text-slate-400">
                 {player.role === 'dealer' ? 'Dealer · ' : ''}Bergabung {formatDate(player.created_at)}
@@ -196,7 +196,7 @@ export function PlayerProfile() {
           {me?.role === 'player' && player.role === 'player' && player.id !== me.id && (
             <Link
               to={`/duel/${player.id}`}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-gold-400/50 md:w-fit md:px-8 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10 active:scale-[0.98]"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-brand-400/50 md:w-fit md:px-8 text-sm font-bold text-brand-300 transition hover:bg-brand-400/10 active:scale-[0.98]"
             >
               ⚔️ Ajak {player.name.split(' ')[0]} duel
             </Link>

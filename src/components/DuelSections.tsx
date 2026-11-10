@@ -83,7 +83,7 @@ export function PlayerDuelSections({ me }: { me: string }) {
             {incoming.map((d) => {
               const { a } = duelNames(d)
               return (
-                <Card key={d.id} className="border-gold-400/40">
+                <Card key={d.id} className="border-brand-400/40">
                   <div className="flex items-center gap-3">
                     <Avatar name={a} id={d.challenger_id} />
                     <div className="min-w-0 flex-1">
@@ -184,7 +184,7 @@ export function DealerDuelSections({ me }: { me: string }) {
             {waiting.map((d) => {
               const { a, b } = duelNames(d)
               return (
-                <Card key={d.id} className="border-gold-400/40">
+                <Card key={d.id} className="border-brand-400/40">
                   <DuelVersus duel={d} />
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Button
@@ -272,7 +272,7 @@ function DuelVersus({ duel }: { duel: Duel }) {
       <Player name={a} id={duel.challenger_id} />
       <div className="shrink-0 text-center">
         <p className="text-lg">⚔️</p>
-        <p className="text-[11px] font-semibold text-gold-300">{duel.stake} poin</p>
+        <p className="text-[11px] font-semibold text-brand-300">{duel.stake} poin</p>
       </div>
       <Player name={b} id={duel.opponent_id} align="right" />
     </div>

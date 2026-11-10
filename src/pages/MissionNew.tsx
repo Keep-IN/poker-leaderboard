@@ -35,7 +35,7 @@ export default function MissionNew() {
     return (
       <Card className="md:mx-auto md:max-w-xl">
         <EmptyState icon="🎯" title="Khusus dealer" text="Hanya dealer yang bisa membuat misi." />
-        <Link to="/" className="block text-center text-sm font-semibold text-gold-400">
+        <Link to="/" className="block text-center text-sm font-semibold text-brand-400">
           Kembali ke beranda
         </Link>
       </Card>
@@ -77,7 +77,7 @@ export default function MissionNew() {
         <h1 className="text-2xl font-bold">Buat Misi</h1>
       </div>
 
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-950/60 p-1">
         {(['duel', 'match_streak'] as const).map((k) => (
           <button
             key={k}
@@ -85,7 +85,7 @@ export default function MissionNew() {
             onClick={() => setKind(k)}
             className={cx(
               'min-h-10 rounded-lg text-sm font-semibold transition',
-              kind === k ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+              kind === k ? 'bg-brand-400 text-on-accent' : 'text-slate-400 hover:text-slate-200',
             )}
           >
             {k === 'duel' ? '⚔️ Misi duel' : '🃏 Misi match'}
@@ -98,7 +98,7 @@ export default function MissionNew() {
           {isStreak && (
             <div>
               <span className="mb-1.5 block text-sm font-medium text-slate-300">Match yang dihitung</span>
-              <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-surface-950/60 p-1">
                 {(['offline', 'online'] as const).map((m) => (
                   <button
                     key={m}
@@ -106,7 +106,7 @@ export default function MissionNew() {
                     onClick={() => setMatchMode(m)}
                     className={cx(
                       'min-h-10 rounded-lg text-sm font-semibold transition',
-                      matchMode === m ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+                      matchMode === m ? 'bg-brand-400 text-on-accent' : 'text-slate-400 hover:text-slate-200',
                     )}
                   >
                     {m === 'offline' ? '🃏 Offline' : '🌐 Online'}
@@ -131,16 +131,16 @@ export default function MissionNew() {
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
               required
-              className="h-12 w-full rounded-xl border border-white/10 bg-felt-950/60 px-4 text-base outline-none [color-scheme:dark] focus:border-gold-400/70 focus:ring-2 focus:ring-gold-400/20"
+              className="h-12 w-full rounded-xl border border-ink/10 bg-surface-950/60 px-4 text-base outline-none [color-scheme:dark] focus:border-brand-400/70 focus:ring-2 focus:ring-brand-400/20"
             />
           </label>
         </Card>
 
-        <Card className="border-gold-400/40">
+        <Card className="border-brand-400/40">
           <p className="text-xs uppercase tracking-wider text-slate-400">Pratinjau</p>
           <p className="mt-1 font-semibold">{missionText(preview)}</p>
           <p className="mt-1 text-sm text-slate-400">
-            Reward <span className="font-semibold text-gold-300">+{reward} poin</span>
+            Reward <span className="font-semibold text-brand-300">+{reward} poin</span>
             {validDeadline && ` · sampai ${formatDateTime(deadlineDate.toISOString())}`}
           </p>
           <ul className="mt-3 space-y-1.5 text-sm text-slate-300">
@@ -188,7 +188,7 @@ function Stepper({
   return (
     <div>
       <span className="mb-1.5 block text-sm font-medium text-slate-300">{label}</span>
-      <div className="flex items-center justify-between rounded-xl bg-felt-950/60 p-2">
+      <div className="flex items-center justify-between rounded-xl bg-surface-950/60 p-2">
         <StepButton label="−" onClick={() => onChange(clamp(value - 1))} disabled={value <= min} />
         <div className="flex items-baseline justify-center">
           <input
@@ -199,7 +199,7 @@ function Stepper({
             value={value}
             onChange={(e) => onChange(clamp(Math.floor(Number(e.target.value) || min)))}
             aria-label={label}
-            className="w-20 bg-transparent text-center text-3xl font-extrabold text-gold-400 outline-none"
+            className="w-20 bg-transparent text-center text-3xl font-extrabold text-brand-400 outline-none"
           />
           <span className="text-sm text-slate-400">{unit}</span>
         </div>
@@ -215,7 +215,7 @@ function StepButton({ label, onClick, disabled }: { label: string; onClick: () =
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="size-12 rounded-xl bg-white/8 text-2xl font-bold text-slate-100 transition hover:bg-white/15 active:scale-95 disabled:opacity-30"
+      className="size-12 rounded-xl bg-ink/8 text-2xl font-bold text-slate-100 transition hover:bg-ink/15 active:scale-95 disabled:opacity-30"
     >
       {label}
     </button>

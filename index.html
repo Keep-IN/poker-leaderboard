@@ -4,10 +4,20 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b1a14" />
+    <meta name="theme-color" content="#081530" />
+    <script>
+      // Tema sebelum halaman digambar (tanpa kedip): pilihan tersimpan, kalau tidak ada ikut sistem.
+      (function () {
+        var p = null
+        try { p = localStorage.getItem('theme') } catch (e) {}
+        var m = p === 'light' || p === 'dark' ? p : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.dataset.theme = m
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', m === 'dark' ? '#081530' : '#f3f6fb')
+      })()
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="BTP Poker" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>BTP Poker League</title>
   </head>
   <body>

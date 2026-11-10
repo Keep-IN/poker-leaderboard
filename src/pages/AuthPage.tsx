@@ -61,7 +61,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         />
         {!isRegister && (
           <div className="-mt-1 text-right">
-            <Link to="/forgot-password" className="text-sm font-medium text-gold-400">
+            <Link to="/forgot-password" className="text-sm font-medium text-brand-400">
               Lupa password?
             </Link>
           </div>
@@ -77,7 +77,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
       <p className="mt-6 text-center text-sm text-slate-400">
         {isRegister ? 'Sudah punya akun? ' : 'Belum punya akun? '}
-        <Link to={isRegister ? '/login' : '/register'} className="font-semibold text-gold-400">
+        <Link to={isRegister ? '/login' : '/register'} className="font-semibold text-brand-400">
           {isRegister ? 'Masuk' : 'Daftar'}
         </Link>
       </p>
@@ -90,9 +90,9 @@ export function AuthShell({ subtitle, children }: { subtitle: string; children: 
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-5 py-10">
       <div className="mb-8 text-center">
         <div className="mb-3 inline-flex gap-1 text-4xl">
-          <span className="text-gold-400">♠</span>
+          <span className="text-brand-400">♠</span>
           <span className="text-chip-red">♥</span>
-          <span className="text-gold-400">♣</span>
+          <span className="text-brand-400">♣</span>
           <span className="text-chip-red">♦</span>
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight">BTP Poker League</h1>
@@ -118,7 +118,7 @@ export function Field({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-12 w-full rounded-xl border border-white/10 bg-felt-950/60 px-4 text-base text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-gold-400/70 focus:ring-2 focus:ring-gold-400/20"
+        className="h-12 w-full rounded-xl border border-ink/10 bg-surface-950/60 px-4 text-base text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-brand-400/70 focus:ring-2 focus:ring-brand-400/20"
         {...rest}
       />
     </label>

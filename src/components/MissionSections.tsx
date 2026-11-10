@@ -45,18 +45,18 @@ export function PlayerMissions({ me }: { me: string }) {
           const streak = m.kind === 'match_streak'
           const progress = m.completed ? m.required_wins : Math.min(m.wins, m.required_wins)
           return (
-            <Card key={m.id} className={m.completed ? 'border-emerald-400/40' : 'border-gold-400/40'}>
+            <Card key={m.id} className={m.completed ? 'border-emerald-400/40' : 'border-brand-400/40'}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <MissionKindLabel kind={m.kind} mode={m.match_mode} />
                   <p className="font-semibold">{missionText(m)}</p>
                 </div>
-                <span className="shrink-0 rounded-lg bg-gold-400/15 px-2 py-1 text-xs font-bold text-gold-300">+{m.reward} poin</span>
+                <span className="shrink-0 rounded-lg bg-brand-400/15 px-2 py-1 text-xs font-bold text-brand-300">+{m.reward} poin</span>
               </div>
               <div className="mt-3 flex items-center gap-3">
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/8">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink/8">
                   <div
-                    className={cx('h-full rounded-full transition-all', m.completed ? 'bg-emerald-400' : 'bg-gold-400')}
+                    className={cx('h-full rounded-full transition-all', m.completed ? 'bg-emerald-400' : 'bg-brand-400')}
                     style={{ width: `${(progress / m.required_wins) * 100}%` }}
                   />
                 </div>
@@ -119,7 +119,7 @@ export function DealerMissions() {
     <section>
       <div className="flex items-center justify-between">
         <SectionTitle>🎯 Misi</SectionTitle>
-        <Link to="/missions/new" className="mb-2 text-sm font-semibold text-gold-400 hover:text-gold-300">
+        <Link to="/missions/new" className="mb-2 text-sm font-semibold text-brand-400 hover:text-brand-300">
           ＋ Buat misi
         </Link>
       </div>
@@ -132,13 +132,13 @@ export function DealerMissions() {
       ) : (
         <div className="grid gap-2 md:grid-cols-2">
           {active.map((m) => (
-            <Card key={m.id} className="border-gold-400/30">
+            <Card key={m.id} className="border-brand-400/30">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <MissionKindLabel kind={m.kind} mode={m.match_mode} />
                   <p className="font-semibold">{missionText(m)}</p>
                 </div>
-                <span className="shrink-0 rounded-lg bg-gold-400/15 px-2 py-1 text-xs font-bold text-gold-300">+{m.reward} poin</span>
+                <span className="shrink-0 rounded-lg bg-brand-400/15 px-2 py-1 text-xs font-bold text-brand-300">+{m.reward} poin</span>
               </div>
               <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
                 <span>{m.rewards[0]?.count ?? 0} player selesai</span>
@@ -163,7 +163,7 @@ export function DealerMissions() {
       )}
 
       {ended.length > 0 && (
-        <Card className="mt-2 divide-y divide-white/5 p-0">
+        <Card className="mt-2 divide-y divide-ink/5 p-0">
           {ended.map((m) => (
             <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
               <div className="min-w-0 flex-1">
