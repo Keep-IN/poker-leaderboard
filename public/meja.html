@@ -286,63 +286,71 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
     <span id="info"></span>
     <svg id="dealer" viewBox="0 0 120 96" role="img" aria-label="Dealer">
     <defs>
-      <linearGradient id="dl-skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe3d1"/><stop offset="1" stop-color="#f3bfa1"/></linearGradient>
-      <linearGradient id="dl-hair" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5a3424"/><stop offset=".45" stop-color="#2e1912"/><stop offset="1" stop-color="#160b08"/></linearGradient>
+      <linearGradient id="dl-skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe6d6"/><stop offset="1" stop-color="#f6c4a8"/></linearGradient>
+      <linearGradient id="dl-hair" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6b3d27"/><stop offset=".45" stop-color="#3a1f14"/><stop offset="1" stop-color="#1c0d08"/></linearGradient>
       <linearGradient id="dl-vest" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1a63c9"/><stop offset=".55" stop-color="#0857c3"/><stop offset="1" stop-color="#063a86"/></linearGradient>
-      <linearGradient id="dl-lip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7d95"/><stop offset="1" stop-color="#d9476a"/></linearGradient>
-      <radialGradient id="dl-iris" cx=".45" cy=".4" r=".6"><stop offset="0" stop-color="#9a6438"/><stop offset=".7" stop-color="#4a2a14"/><stop offset="1" stop-color="#24120a"/></radialGradient>
+      <linearGradient id="dl-lip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7a8e"/><stop offset="1" stop-color="#d8435f"/></linearGradient>
+      <linearGradient id="dl-shadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c98a7a" stop-opacity=".55"/><stop offset="1" stop-color="#c98a7a" stop-opacity="0"/></linearGradient>
+      <radialGradient id="dl-iris" cx=".45" cy=".4" r=".6"><stop offset="0" stop-color="#a86d3c"/><stop offset=".7" stop-color="#4e2c15"/><stop offset="1" stop-color="#24120a"/></radialGradient>
     </defs>
-    <!-- dealer muda berseragam biru: ilustrasi orisinal, berdiri di balik meja -->
+    <!-- dealer muda berblazer biru: ilustrasi orisinal, berdiri di balik meja -->
     <g class="body">
-      <path class="hairB" d="M38 40C33 18 46 5 61 5C78 5 89 19 84 42C83 56 88 70 93 84C82 83 75 74 73 63L47 63C45 74 38 83 27 84C32 70 39 56 38 40Z" fill="url(#dl-hair)"/>
-      <path d="M54.6 48H65.4V64C63 67 57 67 54.6 64Z" fill="#efb596"/>
-      <!-- seragam: rompi biru, kemeja putih, dasi kupu-kupu Mentari -->
-      <path d="M12 96C12 83 25 74 41 70.5C48.5 69 52 65.5 54.6 62H65.4C68 65.5 71.5 69 79 70.5C95 74 108 83 108 96Z" fill="url(#dl-vest)"/>
-      <path d="M49.5 69.5C52.5 67.5 54 65 54.6 62H65.4C66 65 67.5 67.5 70.5 69.5L60 92Z" fill="#fbfcff"/>
-      <path d="M54.6 62.5L50.6 70.5L58.4 67.4Z M65.4 62.5L69.4 70.5L61.6 67.4Z" fill="#ffffff" stroke="#c9d6ee" stroke-width=".5"/>
-      <path d="M49.5 69.5L60 92L70.5 69.5" fill="none" stroke="#71c5eb" stroke-width=".8"/>
-      <path d="M60 66.6L53.6 63.4V69.8Z M60 66.6L66.4 63.4V69.8Z" fill="#71c5eb" stroke="#307fe2" stroke-width=".5"/>
-      <circle cx="60" cy="66.6" r="1.5" fill="#307fe2"/>
-      <circle cx="60" cy="76" r=".9" fill="#c9d6ee"/><circle cx="60" cy="82" r=".9" fill="#c9d6ee"/>
-      <rect x="76" y="78" width="12" height="4" rx="1" fill="#fbfcff"/><rect x="76" y="78" width="3.2" height="4" rx="1" fill="#71c5eb"/>
-      <path d="M26 86C34 80 44 78.5 50 80" fill="none" stroke="#fff" stroke-opacity=".12" stroke-width="1.2" stroke-linecap="round"/>
+      <!-- rambut panjang bergelombang di belakang -->
+      <path class="hairB" d="M37 40C32 17 46 4 61 4C78 4 90 18 85 41C84 52 88 60 91 68C94 75 92 82 95 86C88 86 82 82 79 76C77 72 75 68 73 63L47 63C45 68 43 72 41 76C38 82 32 86 25 86C28 82 26 75 29 68C32 60 36 52 37 40Z" fill="url(#dl-hair)"/>
+      <path d="M54.8 48H65.2V64C63 67 57 67 54.8 64Z" fill="#f0b697"/>
+      <!-- blazer biru + blus putih kerah terbuka -->
+      <path d="M12 96C12 83 25 74 41 70.5C48.5 69 52 65.5 54.8 62H65.2C68 65.5 71.5 69 79 70.5C95 74 108 83 108 96Z" fill="url(#dl-vest)"/>
+      <path d="M48 70C51.5 68 53.5 65.4 54.8 62.4L60 74.5L65.2 62.4C66.5 65.4 68.5 68 72 70L64 96H56Z" fill="#fbfcff"/>
+      <path d="M54.8 62.4L60 74.5L65.2 62.4C63.4 64.6 56.6 64.6 54.8 62.4Z" fill="url(#dl-skin)"/>
+      <path d="M48 70L56 96M72 70L64 96" fill="none" stroke="#063a86" stroke-width="1.4"/>
+      <path d="M41.5 71.5L50 90M78.5 71.5L70 90" fill="none" stroke="#307fe2" stroke-opacity=".55" stroke-width=".8"/>
+      <!-- kalung tipis -->
+      <path d="M55.6 64.2C57 68.2 63 68.2 64.4 64.2" fill="none" stroke="#e8c87a" stroke-width=".5"/>
+      <circle cx="60" cy="67.4" r=".9" fill="#71c5eb" stroke="#e8c87a" stroke-width=".35"/>
+      <rect x="76.5" y="80" width="11" height="3.6" rx="1" fill="#fbfcff"/><rect x="76.5" y="80" width="3" height="3.6" rx="1" fill="#71c5eb"/>
       <g class="head">
-        <path d="M46 31C46 20 52 14 60 14C68 14 74 20 74 31C74 42.5 68.5 52 60 53.6C51.5 52 46 42.5 46 31Z" fill="url(#dl-skin)"/>
-        <path d="M71 25C74.4 36 70.6 47.5 62.2 53C69.8 50.4 75 41 74 28Z" fill="#e8a383" opacity=".22"/>
-        <circle cx="50.6" cy="42.6" r="3.3" fill="#ff8fa3" opacity=".35"/><circle cx="69.4" cy="42.6" r="3.3" fill="#ff8fa3" opacity=".35"/>
-        <path d="M48.6 30.3C51.1 28.7 54.9 28.6 57.4 30M71.4 30.3C68.9 28.7 65.1 28.6 62.6 30" fill="none" stroke="#3a2016" stroke-width="1.05" stroke-linecap="round"/>
+        <path d="M46.2 31C46.2 20 52 14 60 14C68 14 73.8 20 73.8 31C73.8 42 68.6 51.6 60 53.4C51.4 51.6 46.2 42 46.2 31Z" fill="url(#dl-skin)"/>
+        <path d="M70.6 25C74.2 36 70.4 47.4 62.2 52.8C69.8 50.4 74.8 41 73.8 28Z" fill="#e8a383" opacity=".2"/>
+        <ellipse cx="50.4" cy="42.4" rx="3.4" ry="2.4" fill="#ff8fa3" opacity=".32"/><ellipse cx="69.6" cy="42.4" rx="3.4" ry="2.4" fill="#ff8fa3" opacity=".32"/>
+        <!-- alis lembut -->
+        <path d="M48.6 29.2C51 27.5 54.8 27.4 57.2 28.7M71.4 29.2C69 27.5 65.2 27.4 62.8 28.7" fill="none" stroke="#4a2818" stroke-width=".8" stroke-linecap="round"/>
+        <!-- eyeshadow tipis -->
+        <path d="M48.4 34.6C50.6 30.6 56.2 30.4 58.4 34.2C56 32.6 51 32.6 48.4 34.6Z M71.6 34.6C69.4 30.6 63.8 30.4 61.6 34.2C64 32.6 69 32.6 71.6 34.6Z" fill="url(#dl-shadow)"/>
         <g class="wkL"><g class="eyeL">
-          <path d="M48.6 35.8C50.6 32.4 56.1 32.4 58.2 35.5C56.1 38.6 50.9 38.7 48.6 35.8Z" fill="#fdf6f2"/>
-          <circle cx="53.4" cy="35.7" r="3" fill="url(#dl-iris)"/><circle cx="53.4" cy="35.7" r="1.2" fill="#120806"/>
-          <circle cx="54.4" cy="34.5" r=".85" fill="#fff"/><circle cx="52.5" cy="36.7" r=".4" fill="#fff" opacity=".8"/>
-          <path d="M47.9 35.8C50.1 32 56.2 31.7 58.7 35.1" fill="none" stroke="#140808" stroke-width="1.25" stroke-linecap="round"/>
-          <path d="M48.3 35.4L46.5 34.3M49.2 34.2L47.7 32.8M50.5 33.3L49.5 31.7" stroke="#140808" stroke-width=".6" stroke-linecap="round"/>
+          <path d="M48.6 35.8C50.6 32.6 56.1 32.5 58.2 35.6C56.1 38.6 50.9 38.6 48.6 35.8Z" fill="#fdf6f2"/>
+          <circle cx="53.5" cy="35.7" r="3" fill="url(#dl-iris)"/><circle cx="53.5" cy="35.8" r="1.25" fill="#120806"/>
+          <circle cx="54.6" cy="34.6" r=".9" fill="#fff"/><circle cx="52.6" cy="36.8" r=".4" fill="#fff" opacity=".8"/>
+          <path d="M47.8 35.5C50.2 32.5 56.3 32.3 58.6 35.3" fill="none" stroke="#140808" stroke-width="1.35" stroke-linecap="round"/>
+          <path d="M47.9 35.1L45.8 33.7M48.8 33.8L47.1 32.1M50.1 32.9L49 31M51.6 32.3L51.1 30.5" stroke="#140808" stroke-width=".6" stroke-linecap="round"/>
         </g></g>
         <g class="wkR"><g class="eyeR">
-          <path d="M71.4 35.8C69.4 32.4 63.9 32.4 61.8 35.5C63.9 38.6 69.1 38.7 71.4 35.8Z" fill="#fdf6f2"/>
-          <circle cx="66.6" cy="35.7" r="3" fill="url(#dl-iris)"/><circle cx="66.6" cy="35.7" r="1.2" fill="#120806"/>
-          <circle cx="67.6" cy="34.5" r=".85" fill="#fff"/><circle cx="65.7" cy="36.7" r=".4" fill="#fff" opacity=".8"/>
-          <path d="M72.1 35.8C69.9 32 63.8 31.7 61.3 35.1" fill="none" stroke="#140808" stroke-width="1.25" stroke-linecap="round"/>
-          <path d="M71.7 35.4L73.5 34.3M70.8 34.2L72.3 32.8M69.5 33.3L70.5 31.7" stroke="#140808" stroke-width=".6" stroke-linecap="round"/>
+          <path d="M71.4 35.8C69.4 32.6 63.9 32.5 61.8 35.6C63.9 38.6 69.1 38.6 71.4 35.8Z" fill="#fdf6f2"/>
+          <circle cx="66.5" cy="35.7" r="3" fill="url(#dl-iris)"/><circle cx="66.5" cy="35.8" r="1.25" fill="#120806"/>
+          <circle cx="67.6" cy="34.6" r=".9" fill="#fff"/><circle cx="65.6" cy="36.8" r=".4" fill="#fff" opacity=".8"/>
+          <path d="M72.2 35.5C69.8 32.5 63.7 32.3 61.4 35.3" fill="none" stroke="#140808" stroke-width="1.35" stroke-linecap="round"/>
+          <path d="M72.1 35.1L74.2 33.7M71.2 33.8L72.9 32.1M69.9 32.9L71 31M68.4 32.3L68.9 30.5" stroke="#140808" stroke-width=".6" stroke-linecap="round"/>
         </g></g>
-        <path d="M60.3 40.2C60 41.7 59.7 42.5 60.4 42.9" fill="none" stroke="#d99c80" stroke-width=".7" stroke-linecap="round"/>
+        <path d="M60.3 40.3C60 41.7 59.7 42.5 60.5 42.9" fill="none" stroke="#d99c80" stroke-width=".7" stroke-linecap="round"/>
         <g class="lips">
-          <path d="M56.4 48.1C57.7 47.2 59 47.4 60 48C61 47.4 62.3 47.2 63.6 48.1C62.5 50.7 57.5 50.7 56.4 48.1Z" fill="url(#dl-lip)"/>
-          <path d="M56.8 48.2C58.6 48.9 61.4 48.9 63.2 48.2" fill="none" stroke="#a8304f" stroke-width=".4"/>
-          <ellipse cx="58.7" cy="49.6" rx="1.3" ry=".45" fill="#fff" opacity=".45"/>
+          <path d="M56 47.9C57.4 46.8 58.9 47 60 47.8C61.1 47 62.6 46.8 64 47.9C62.8 50.9 57.2 50.9 56 47.9Z" fill="url(#dl-lip)"/>
+          <path d="M56.4 48C58.4 48.8 61.6 48.8 63.6 48" fill="none" stroke="#a52d4c" stroke-width=".45"/>
+          <ellipse cx="58.6" cy="49.6" rx="1.5" ry=".5" fill="#fff" opacity=".5"/>
+          <path d="M55.6 47.6C55.4 47.2 55.6 46.8 56 46.7M64.4 47.6C64.6 47.2 64.4 46.8 64 46.7" fill="none" stroke="#d99c80" stroke-width=".4" stroke-linecap="round"/>
         </g>
-        <!-- poni samping + jepit rambut biru -->
-        <path d="M44.6 35C43 20 51.2 10.4 62 10.4C72.4 10.4 77.8 19.2 75.8 33.4C73.6 25.2 68.6 20.6 61.6 19.4C57.6 24.6 51.6 29 44.6 35Z" fill="url(#dl-hair)"/>
-        <path d="M61.6 19.4C64.8 23.4 66.4 26.6 66.8 30C68.8 26.4 70 23.2 69.8 20.6C67.4 19.6 64.6 19.2 61.6 19.4Z" fill="#2e1912"/>
-        <path d="M52 15.4C55.4 13.4 60.4 12.8 64.4 13.8" fill="none" stroke="#a8684a" stroke-opacity=".45" stroke-width="1" stroke-linecap="round"/>
-        <rect x="68.2" y="17.2" width="6" height="2" rx="1" fill="#71c5eb" transform="rotate(28 71.2 18.2)"/>
+        <circle cx="65.4" cy="50.6" r=".45" fill="#5a2f1f"/>
+        <!-- poni belah samping, bergelombang -->
+        <path d="M44.4 36C42.4 20 50.8 10 62 10C72.8 10 78.4 19 76 34C74.6 27.6 71 23 66 20.6C64.4 24.4 61.4 27 57.4 28.4C55.4 31.2 52 33.6 47.6 34.4C46.4 34.8 45.4 35.4 44.4 36Z" fill="url(#dl-hair)"/>
+        <path d="M66 20.6C67.6 24 68.4 27.4 68 31C70.4 28 71.6 24.6 71.4 22C69.8 21.2 68 20.8 66 20.6Z" fill="#2c160e"/>
+        <path d="M50 16.6C54 13.2 60.6 12.4 65.6 14.2M68.8 15.2C71.4 16.6 73.2 18.6 74.2 21" fill="none" stroke="#b37452" stroke-opacity=".5" stroke-width="1" stroke-linecap="round"/>
       </g>
+      <!-- helai depan bergelombang di bahu -->
       <g class="hairF">
-        <path d="M44.6 36C43 48 42 58 37 70C35 76 33 80 31 84C40 81 44 73 46.5 63C48 55 48.2 45 48.2 38Z" fill="url(#dl-hair)"/>
-        <path d="M75.4 36C77 48 78 58 83 70C85 76 87 80 89 84C80 81 76 73 73.5 63C72 55 71.8 45 71.8 38Z" fill="url(#dl-hair)"/>
-        <path d="M41 60C39.4 68 36.4 75 32.6 81M79 60C80.6 68 83.6 75 87.4 81" fill="none" stroke="#a8684a" stroke-opacity=".4" stroke-width="1" stroke-linecap="round"/>
+        <path d="M44.4 36C43 46 42.6 54 39.6 62C37.2 68 39.8 74 36.4 80C35.2 82.4 33.6 84 32 85C38.6 84 42.6 79.6 43.4 73.6C44.2 68 46.6 63.4 47.4 57C48 51 48.2 44 48.2 38.6Z" fill="url(#dl-hair)"/>
+        <path d="M75.6 36C77 46 77.4 54 80.4 62C82.8 68 80.2 74 83.6 80C84.8 82.4 86.4 84 88 85C81.4 84 77.4 79.6 76.6 73.6C75.8 68 73.4 63.4 72.6 57C72 51 71.8 44 71.8 38.6Z" fill="url(#dl-hair)"/>
+        <path d="M42.4 52C41.6 58 39.6 63 39.8 68M77.6 52C78.4 58 80.4 63 80.2 68" fill="none" stroke="#b37452" stroke-opacity=".45" stroke-width="1" stroke-linecap="round"/>
       </g>
-      <circle cx="45.4" cy="41.6" r="1.2" fill="#71c5eb" stroke="#fff" stroke-width=".4"/><circle cx="74.6" cy="41.6" r="1.2" fill="#71c5eb" stroke="#fff" stroke-width=".4"/>
+      <path d="M45.6 41.2V43.8M74.4 41.2V43.8" stroke="#e8c87a" stroke-width=".6" stroke-linecap="round"/>
+      <circle cx="45.6" cy="44.4" r=".9" fill="#71c5eb"/><circle cx="74.4" cy="44.4" r=".9" fill="#71c5eb"/>
     </g>
     <g class="arm">
       <path d="M89 75C89 71.5 99 71.5 99 75L97.6 91H90.4Z" fill="#0857c3"/>
