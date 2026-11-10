@@ -526,13 +526,13 @@ function flick(n) { // dealer mengayun tangan sebanyak n kartu
   clearTimeout(flick.h); flick.h = setTimeout(() => d.classList.remove('deal'), n * 430 + 100);
 }
 
-// Sudut kursi ke-r (0 = aku, di bawah) searah jarum jam. Bagian atas meja dikosongkan untuk dealer:
-// kursi lain dibagi ke sisi kiri dan kanan, masing-masing sampai batas celah di atas.
-const DEALER_GAP = 100 * Math.PI / 180;
+// Sudut kursi ke-r (0 = aku) searah jarum jam, 0 = tengah bawah. Semua kursi dibagi rata di sepanjang meja kecuali
+// celah di atas untuk dealer, dan simetris kiri-kanan: jumlah ganjil = aku tepat di tengah bawah, genap = aku dan
+// tetangga kananku mengapit tengah bawah.
+const DEALER_GAP = 70 * Math.PI / 180;
 function seatAngle(r, n) {
-  if (r === 0) return 0;
-  const A = Math.PI - DEALER_GAP / 2, left = Math.ceil((n - 1) / 2), right = n - 1 - left;
-  return r <= left ? A * r / left : 2 * Math.PI - A * (n - r) / right;
+  const L = 2 * Math.PI - DEALER_GAP, slot = (Math.floor(n / 2) + r) % n;
+  return Math.PI + DEALER_GAP / 2 + (slot + .5) * L / n;
 }
 
 function render() {
