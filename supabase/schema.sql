@@ -30,6 +30,14 @@ create table if not exists public.matches (
 alter table public.matches drop constraint if exists matches_max_players_check;
 alter table public.matches add constraint matches_max_players_check check (max_players between 3 and 8);
 
+-- Match offline (dimainkan di meja sungguhan, dealer menandai yang kalah) atau online (dimainkan di meja poker
+-- website, mode turnamen). online_config = { sb, start_chips, level_minutes } dari dealer.
+alter table public.matches add column if not exists mode text not null default 'offline';
+alter table public.matches add column if not exists online_config jsonb;
+alter table public.matches drop constraint if exists matches_mode_check;
+alter table public.matches add constraint matches_mode_check
+  check ((mode = 'offline' and online_config is null) or (mode = 'online' and online_config is not null));
+
 create index if not exists matches_status_idx      on public.matches (status);
 create index if not exists matches_finished_at_idx on public.matches (finished_at);
 create index if not exists matches_dealer_idx      on public.matches (dealer_id);
@@ -123,6 +131,13 @@ alter table public.missions alter column min_stake drop not null;
 alter table public.missions drop constraint if exists missions_kind_check;
 alter table public.missions add constraint missions_kind_check
   check ((kind = 'duel' and min_stake is not null) or (kind = 'match_streak' and min_stake is null));
+
+-- Misi match berlaku untuk match offline atau online saja (misi lama = offline).
+alter table public.missions add column if not exists match_mode text;
+update public.missions set match_mode = 'offline' where kind = 'match_streak' and match_mode is null;
+alter table public.missions drop constraint if exists missions_match_mode_check;
+alter table public.missions add constraint missions_match_mode_check
+  check ((kind = 'duel' and match_mode is null) or (kind = 'match_streak' and match_mode in ('offline', 'online')));
 
 alter table public.point_adjustments add column if not exists mission_id uuid references public.missions (id) on delete cascade;
 -- Reward tiap misi hanya sekali per player.
@@ -266,7 +281,17 @@ language sql
 immutable
 as $$ select 1 $$;
 
-create or replace function public.create_match(p_title text, p_max_players int default 8)
+-- Small blind yang boleh dipilih untuk match online (big blind = 2×). Sama dengan LEVELS di api/_lib/poker.js.
+create or replace function public.online_blind_levels()
+returns int[]
+language sql
+immutable
+as $$
+  select array[10, 15, 25, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 30000, 50000];
+$$;
+
+drop function if exists public.create_match(text, int);
+create or replace function public.create_match(p_title text, p_max_players int default 8, p_mode text default 'offline', p_config jsonb default null)
 returns uuid
 language plpgsql
 security definer
@@ -275,6 +300,10 @@ as $$
 declare
   new_id uuid;
   my_role text;
+  cfg jsonb;
+  sb int;
+  chips int;
+  minutes int;
 begin
   -- Kunci baris profil supaya dua request bersamaan tidak sama-sama lolos cek saldo.
   select role into my_role from public.profiles where id = auth.uid() for update;
@@ -284,12 +313,30 @@ begin
   if p_max_players < 3 or p_max_players > 8 then
     raise exception 'Jumlah player harus 3 sampai 8';
   end if;
+  if p_mode is null or p_mode not in ('offline', 'online') then
+    raise exception 'Mode match tidak dikenal';
+  end if;
+  if p_mode = 'online' then
+    sb := (p_config ->> 'sb')::int;
+    chips := (p_config ->> 'start_chips')::int;
+    minutes := (p_config ->> 'level_minutes')::int;
+    if sb is null or not (sb = any (public.online_blind_levels())) then
+      raise exception 'Blind awal tidak valid';
+    end if;
+    if chips is null or chips < 20 * sb or chips > 1000000 then
+      raise exception 'Chip awal minimal 10× big blind dan maksimal 1.000.000';
+    end if;
+    if minutes is null or minutes < 2 or minutes > 60 then
+      raise exception 'Blind naik tiap 2 sampai 60 menit';
+    end if;
+    cfg := jsonb_build_object('sb', sb, 'start_chips', chips, 'level_minutes', minutes);
+  end if;
   if my_role = 'player' and public.points_balance(auth.uid()) < public.match_creation_cost() then
     raise exception 'Poin kamu belum cukup untuk membuat match (butuh % poin)', public.match_creation_cost();
   end if;
 
-  insert into public.matches (title, dealer_id, max_players)
-  values (trim(p_title), auth.uid(), p_max_players)
+  insert into public.matches (title, dealer_id, max_players, mode, online_config)
+  values (trim(p_title), auth.uid(), p_max_players, p_mode, cfg)
   returning id into new_id;
 
   if my_role = 'player' then
@@ -346,6 +393,9 @@ as $$
 declare
   m public.matches := public.lock_own_match(p_match);
 begin
+  if m.mode = 'online' then
+    raise exception 'Hasil match online dicatat otomatis oleh meja poker';
+  end if;
   if m.status <> 'ongoing' then
     raise exception 'Match belum/tidak sedang berlangsung';
   end if;
@@ -367,6 +417,9 @@ as $$
 declare
   m public.matches := public.lock_own_match(p_match);
 begin
+  if m.mode = 'online' then
+    raise exception 'Hasil match online dicatat otomatis oleh meja poker';
+  end if;
   if m.status <> 'ongoing' then
     raise exception 'Match belum/tidak sedang berlangsung';
   end if;
@@ -392,6 +445,21 @@ as $$
          end;
 $$;
 
+-- Match online: setengah poin offline. Juara N, runner-up 1 N÷2, runner-up 2 N÷6 (hanya kalau N ≥ 4), dibulatkan.
+-- Sama dengan pointsFor(..., 'online') di frontend.
+create or replace function public.online_placement_points(p_placement int, p_players int)
+returns int
+language sql
+immutable
+as $$
+  select case
+           when p_placement = 1 then p_players
+           when p_placement = 2 then round(p_players / 2.0)::int
+           when p_placement = 3 and p_players >= 4 then round(p_players / 6.0)::int
+           else 0
+         end;
+$$;
+
 create or replace function public.set_placements(p_match uuid)
 returns void
 language sql
@@ -400,7 +468,9 @@ set search_path = public
 as $$
   update public.match_players mp
      set placement = r.rn,
-         points = public.placement_points(r.rn::int, r.total::int)
+         points = case when (select mode from public.matches where id = p_match) = 'online'
+                       then public.online_placement_points(r.rn::int, r.total::int)
+                       else public.placement_points(r.rn::int, r.total::int) end
     from (
       select player_id,
              row_number() over (order by (status = 'winner') desc, eliminated_at desc nulls last, joined_at) as rn,
@@ -420,6 +490,9 @@ as $$
 declare
   m public.matches := public.lock_own_match(p_match);
 begin
+  if m.mode = 'online' then
+    raise exception 'Hasil match online dicatat otomatis oleh meja poker';
+  end if;
   if m.status <> 'ongoing' then
     raise exception 'Match belum/tidak sedang berlangsung';
   end if;
@@ -759,6 +832,7 @@ begin
         join public.matches x on x.id = mp.match_id
        where mp.player_id = p_player
          and x.status = 'finished'
+         and x.mode = m.match_mode
          and x.finished_at between m.created_at and m.deadline
     ), grouped as (
       select win, count(*) filter (where not win) over (order by finished_at, id) as grp from played
@@ -792,7 +866,9 @@ end;
 $$;
 
 drop function if exists public.create_mission(int, int, int, timestamptz);
-create or replace function public.create_mission(p_wins int, p_min_stake int, p_reward int, p_deadline timestamptz, p_kind text default 'duel')
+drop function if exists public.create_mission(int, int, int, timestamptz, text);
+create or replace function public.create_mission(p_wins int, p_min_stake int, p_reward int, p_deadline timestamptz,
+                                                 p_kind text default 'duel', p_match_mode text default null)
 returns uuid
 language plpgsql
 security definer
@@ -806,6 +882,9 @@ begin
   end if;
   if p_kind is null or p_kind not in ('duel', 'match_streak') then
     raise exception 'Jenis misi tidak dikenal';
+  end if;
+  if p_kind = 'match_streak' and (p_match_mode is null or p_match_mode not in ('offline', 'online')) then
+    raise exception 'Pilih misi match offline atau online';
   end if;
   if p_kind = 'duel' and (p_wins is null or p_wins < 1 or p_wins > 50) then
     raise exception 'Jumlah menang harus 1 sampai 50';
@@ -822,8 +901,9 @@ begin
   if p_deadline is null or p_deadline <= now() + interval '5 minutes' then
     raise exception 'Deadline harus di masa depan';
   end if;
-  insert into public.missions (kind, required_wins, min_stake, reward, deadline, created_by)
-  values (p_kind, p_wins, case when p_kind = 'duel' then p_min_stake end, p_reward, p_deadline, auth.uid())
+  insert into public.missions (kind, match_mode, required_wins, min_stake, reward, deadline, created_by)
+  values (p_kind, case when p_kind = 'match_streak' then p_match_mode end, p_wins,
+          case when p_kind = 'duel' then p_min_stake end, p_reward, p_deadline, auth.uid())
   returning id into new_id;
   return new_id;
 end;
@@ -850,14 +930,14 @@ $$;
 -- Misi yang masih berjalan beserta progres player yang login.
 drop function if exists public.get_my_missions();
 create function public.get_my_missions()
-returns table (id uuid, kind text, required_wins int, min_stake int, reward int, deadline timestamptz, created_at timestamptz,
-               wins int, best int, completed boolean)
+returns table (id uuid, kind text, match_mode text, required_wins int, min_stake int, reward int, deadline timestamptz,
+               created_at timestamptz, wins int, best int, completed boolean)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select m.id, m.kind, m.required_wins, m.min_stake, m.reward, m.deadline, m.created_at,
+  select m.id, m.kind, m.match_mode, m.required_wins, m.min_stake, m.reward, m.deadline, m.created_at,
          (public.mission_progress(m.id, auth.uid())).current,
          (public.mission_progress(m.id, auth.uid())).best,
          exists (select 1 from public.point_adjustments a
@@ -867,6 +947,84 @@ as $$
      and m.deadline > now()
      and auth.uid() is not null
    order by m.deadline asc;
+$$;
+
+-- ---------- Meja poker online -------------------------------------------
+-- State meja (termasuk kartu semua pemain) hanya dibaca/ditulis oleh fungsi server /api/meja memakai secret key.
+-- Tidak ada policy RLS, jadi user biasa tidak bisa membacanya.
+
+create table if not exists public.online_tables (
+  match_id    uuid primary key references public.matches (id) on delete cascade,
+  state       jsonb not null,
+  ver         int  not null default 1,
+  due_at      timestamptz,
+  updated_at  timestamptz not null default now()
+);
+alter table public.online_tables enable row level security;
+
+-- Buat meja sekali saja, saat match online sudah dimulai. Mengembalikan versi, atau null kalau meja sudah ada.
+create or replace function public.meja_create(p_match uuid, p_state jsonb, p_due timestamptz)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.matches where id = p_match and mode = 'online' and status = 'ongoing') then
+    raise exception 'match_not_ongoing';
+  end if;
+  insert into public.online_tables (match_id, state, due_at) values (p_match, p_state, p_due)
+  on conflict (match_id) do nothing;
+  return case when found then 1 end;
+end;
+$$;
+
+-- Simpan state meja kalau versinya masih p_ver (compare-and-set), lalu catat hasil ke match:
+-- p_out = uid pemain tersingkir sesuai urutan (kumulatif), p_winner = juara kalau turnamen selesai.
+-- Mengembalikan versi baru, atau null kalau ada yang menulis lebih dulu.
+create or replace function public.meja_save(p_match uuid, p_ver int, p_state jsonb, p_due timestamptz, p_out uuid[], p_winner uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  nv int;
+begin
+  perform 1 from public.matches where id = p_match and mode = 'online' and status = 'ongoing' for update;
+  if not found then
+    raise exception 'match_not_ongoing';
+  end if;
+  update public.online_tables
+     set state = p_state, ver = ver + 1, due_at = p_due, updated_at = now()
+   where match_id = p_match and ver = p_ver
+  returning ver into nv;
+  if nv is null then
+    return null;
+  end if;
+
+  -- Yang tersingkir belakangan mendapat eliminated_at lebih akhir (= peringkat lebih baik).
+  for i in 1 .. coalesce(array_length(p_out, 1), 0) loop
+    update public.match_players
+       set status = 'eliminated', eliminated_at = clock_timestamp()
+     where match_id = p_match and player_id = p_out[i] and status = 'playing';
+  end loop;
+
+  if p_winner is not null then
+    update public.match_players
+       set status = 'eliminated', eliminated_at = clock_timestamp()
+     where match_id = p_match and player_id <> p_winner and status = 'playing';
+    update public.match_players
+       set status = 'winner', eliminated_at = null
+     where match_id = p_match and player_id = p_winner;
+    perform public.set_placements(p_match);
+    update public.matches
+       set status = 'finished', winner_id = p_winner, finished_at = now()
+     where id = p_match;
+    perform public.award_missions(p_winner);
+  end if;
+  return nv;
+end;
 $$;
 
 -- ---------- Leaderboard ------------------------------------------------
@@ -949,6 +1107,10 @@ revoke all on function public.lock_duel(uuid) from public, anon, authenticated;
 revoke all on function public.refund_duel(uuid) from public, anon, authenticated;
 revoke all on function public.hold_duel_stake(uuid, uuid, int) from public, anon, authenticated;
 revoke all on function public.mission_progress(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.meja_create(uuid, jsonb, timestamptz) from public, anon, authenticated;
+revoke all on function public.meja_save(uuid, int, jsonb, timestamptz, uuid[], uuid) from public, anon, authenticated;
+grant execute on function public.meja_create(uuid, jsonb, timestamptz) to service_role;
+grant execute on function public.meja_save(uuid, int, jsonb, timestamptz, uuid[], uuid) to service_role;
 revoke all on function public.award_missions(uuid) from public, anon, authenticated;
 
 do $$
@@ -956,7 +1118,9 @@ declare
   fn text;
 begin
   foreach fn in array array[
-    'public.create_match(text, int)',
+    'public.create_match(text, int, text, jsonb)',
+    'public.online_blind_levels()',
+    'public.online_placement_points(int, int)',
     'public.start_match(uuid)',
     'public.kick_player(uuid, uuid)',
     'public.eliminate_player(uuid, uuid)',
@@ -975,7 +1139,7 @@ begin
     'public.cancel_duel(uuid)',
     'public.review_duel(uuid, boolean)',
     'public.finish_duel(uuid, uuid)',
-    'public.create_mission(int, int, int, timestamptz, text)',
+    'public.create_mission(int, int, int, timestamptz, text, text)',
     'public.cancel_mission(uuid)',
     'public.get_my_missions()',
     'public.current_role_name()'

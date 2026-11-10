@@ -4,6 +4,8 @@
 
 BTP Poker League adalah website untuk mencatat hasil permainan poker antar teman. Setiap match yang dimainkan tercatat otomatis: siapa yang ikut, siapa yang kalah, dan siapa yang menang. Hasilnya langsung masuk ke statistik tiap pemain dan ke leaderboard bulanan maupun all time.
 
+Ada dua jenis match: **offline** (dimainkan di meja sungguhan, host menandai siapa yang kalah) dan **online** (dimainkan langsung di meja poker website, mode turnamen).
+
 Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semua orang yang membuka match yang sama melihat perubahan yang sama tanpa perlu refresh.
 
 ---
@@ -41,7 +43,7 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
 ### 🎯 Misi
 Dealer bisa membuat misi untuk semua player, dengan **deadline** dan **reward poin**. Ada dua jenis:
 - **Misi duel**, misalnya *"Menangkan 2 duel dengan taruhan minimal 10 poin"*. Dealer mengisi **jumlah menang** dan **taruhan minimal**.
-- **Misi match**, misalnya *"Menangkan 3 match berturut-turut"*. Dealer mengisi **jumlah menang beruntun** (2–20).
+- **Misi match**, misalnya *"Menangkan 3 match online berturut-turut"*. Dealer memilih **match offline atau online** dan mengisi **jumlah menang beruntun** (2–20).
 
 Detailnya:
 - Misi muncul di **Beranda player** dengan progres (mis. 1/2 menang atau 🔥 2/3 beruntun) dan **timer hitung mundur** ke deadline.
@@ -61,6 +63,15 @@ Detailnya:
   - Dealer bisa memulai match, menandai pemain yang kalah, dan menetapkan pemenang.
   - Urutan pemain mengikuti posisi akhir (pemenang di atas, yang kalah paling awal di bawah).
   - Setelah match selesai, tampil **hasil akhir**: Juara, Runner-up 1, Runner-up 2, beserta poinnya.
+
+### 🌐 Match Online
+- Saat membuat match, host memilih **Offline** atau **Online**.
+- Untuk match online, host menentukan **maksimal player**, **blind awal** (10/20, 25/50, 50/100, …), **chip awal** tiap player, dan **blind naik tiap berapa menit**.
+- Setelah host menekan Mulai, pemain menekan **Masuk meja poker** di halaman match dan bermain Texas Hold'em langsung di website. Yang bukan pemain bisa **menonton** (kartu tertutup tidak terlihat).
+- **Mode turnamen**: tidak ada beli chip lagi. Chip habis = tersingkir. Yang terakhir punya chip jadi juara.
+- Peringkat dan poin dicatat **otomatis** oleh meja, jadi host tidak perlu menekan Kalah/Menang.
+- Pemain yang tidak membuka meja atau diam terlalu lama tetap dibagi kartu, tapi otomatis check/fold. Jadi turnamen tetap jalan sampai selesai.
+- Meja poker diadaptasi dari [Meja Hold'em](https://github.com/ragila/meja-holdem) karya Ragil.
 
 ### 🏆 Leaderboard
 - Dua tab: **Bulanan** dan **All Time**.
@@ -98,6 +109,8 @@ Setiap match selesai, pemain mendapat poin sesuai **peringkat akhir** dan **juml
 | 🥈 Runner-up 1 (kalah paling akhir) | **N** |
 | 🥉 Runner-up 2 (kalah kedua dari akhir) | **N ÷ 3**, dibulatkan (hanya kalau minimal 4 pemain) |
 | Pemain lain | 0 |
+
+**Match online mendapat setengah poin match offline**: Juara **N**, Runner-up 1 **N ÷ 2**, Runner-up 2 **N ÷ 6** (dibulatkan, hanya kalau minimal 4 pemain). Contoh 8 pemain: offline 16 / 8 / 3, online 8 / 4 / 1.
 
 | Jumlah pemain | 🏆 Juara | 🥈 Runner-up 1 | 🥉 Runner-up 2 |
 | :---: | :---: | :---: | :---: |
@@ -147,7 +160,7 @@ Player A ajak duel  →  Player B terima  →  Dealer setujui & host  →  Deale
 
 - Yang dihitung hanya duel atau match yang **selesai setelah misi dibuat dan sebelum deadline**. Duel dan match lama tidak ikut dihitung.
 - **Misi duel**: hanya duel yang **dimenangkan** dengan taruhan **minimal sebesar syarat misi**.
-- **Misi match**: player harus menang beberapa match **berturut-turut**. Kalah di match yang diikuti membuat streak mulai lagi dari 0. Match yang tidak diikuti player itu tidak memutus streak-nya. Peringkat 2 dan 3 tetap dihitung kalah untuk streak.
+- **Misi match**: player harus menang beberapa match **berturut-turut**, khusus match **offline** atau khusus match **online** sesuai pilihan dealer. Kalah di match yang dihitung membuat streak mulai lagi dari 0. Match jenis lain dan match yang tidak diikuti player itu tidak memutus streak-nya. Peringkat 2 dan 3 tetap dihitung kalah untuk streak.
 - Reward masuk otomatis ke **poin bulan ini dan total poin** saat duel yang memenuhi target selesai. Setiap player hanya bisa mendapat reward **sekali per misi**.
 - Semua player bisa mengerjakan misi yang sama, dan semua yang berhasil mendapat reward.
 - Kalau dealer **membatalkan misi**, misi hilang dari Beranda player. Reward yang sudah didapat tetap jadi milik player.
@@ -159,8 +172,8 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 
 | Statistik       | Dihitung dari                                                |
 | --------------- | ------------------------------------------------------------ |
-| Match dimainkan | Jumlah match **selesai** yang diikuti pemain                 |
-| Match menang    | Jumlah match selesai di mana pemain menjadi **pemenang**     |
+| Match dimainkan | Jumlah match **selesai** yang diikuti pemain, terpisah untuk tab **Offline** dan **Online** |
+| Match menang    | Jumlah match selesai di mana pemain menjadi **pemenang**, terpisah per tab |
 | Win rate        | Match menang ÷ match dimainkan × 100%                        |
 | Poin bulan ini  | Poin dari match bulan berjalan + hasil duel + reward misi − biaya membuat match di bulan itu |
 | Total poin      | Poin dari semua match + hasil duel + reward misi − biaya membuat match |
@@ -175,7 +188,8 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Join / keluar dari match                |   ✅   |   –    |
 | Buat match                              | ✅ (1 poin) | ✅ (gratis) |
 | Mulai & batalkan match yang dibuat sendiri |   ✅   |   ✅   |
-| Tandai pemain kalah & tetapkan pemenang (di match sendiri) |   ✅   |   ✅   |
+| Tandai pemain kalah & tetapkan pemenang (match offline sendiri) |   ✅   |   ✅   |
+| Main di meja poker online               |   ✅   |   –    |
 | Ajak duel & terima/tolak ajakan duel    |   ✅   |   –    |
 | Setujui, tolak & host duel              |   –    |   ✅   |
 | Kerjakan misi                           |   ✅   |   –    |
@@ -187,6 +201,7 @@ Semua akun baru otomatis menjadi **Player**. Akun dijadikan **Dealer** oleh admi
 
 - Data hanya bisa dilihat oleh user yang sudah login.
 - Semua aksi (join, mulai match, tetapkan pemenang, dll.) dijalankan lewat fungsi di database yang **mengecek peran dan kepemilikan match**. Pemain tidak bisa mengubah hasil match atau menjadikan dirinya dealer, dan dealer hanya bisa mengatur match miliknya sendiri.
+- Meja poker online berjalan di server (fungsi Vercel `api/meja.js`). Kartu dikocok dan dinilai di server, dan tiap pemain hanya menerima kartunya sendiri. State meja disimpan di tabel yang tidak bisa dibaca user, dan hasilnya hanya bisa dicatat oleh server.
 
 ---
 
@@ -196,6 +211,7 @@ Semua akun baru otomatis menjadi **Player**. Akun dijadikan **Dealer** oleh admi
 | -------- | ---------------------------------------------------- |
 | Frontend | React, TypeScript, Vite, Tailwind CSS                |
 | Backend  | Supabase (Auth, PostgreSQL, Realtime, Row Level Security) |
+| Meja online | Fungsi serverless Vercel (`api/meja.js`), mesin poker dari Meja Hold'em |
 | Hosting  | Vercel (auto-deploy setiap push ke `main`)           |
 
 Semua layanan memakai paket gratis, cukup untuk 40–50 pengguna. Project Supabase gratis akan di-pause kalau tidak dipakai selama 7 hari. Klik **Restore** di dashboard Supabase untuk mengaktifkannya lagi.
@@ -215,7 +231,7 @@ Semua layanan memakai paket gratis, cukup untuk 40–50 pengguna. Project Supaba
 
 **Vercel**
 1. Import repo ini di <https://vercel.com>.
-2. Tambahkan environment variable `VITE_SUPABASE_URL` dan `VITE_SUPABASE_KEY`.
+2. Tambahkan environment variable `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`, dan `SUPABASE_SECRET_KEY` (secret key Supabase, khusus untuk server meja online, tandai **Sensitive**).
 3. Deploy.
 
 **Lokal**
@@ -225,8 +241,19 @@ npm install
 npm run dev
 ```
 
+**Tes mesin poker**
+```bash
+node api/_lib/poker.test.js
+node api/_lib/handler.test.js
+```
+
 **Struktur**
 ```
+api/
+  meja.js       Server meja poker online (fungsi Vercel)
+  _lib/         Mesin turnamen Hold'em, logika API, penyimpanan Supabase, dan tesnya
+public/
+  meja.html     Tampilan meja poker online
 src/
   pages/        Beranda, Leaderboard, Match, Match Room, Pemain, Buat Match, Login/Daftar, Reset password
   components/   Layout (header + bottom nav) dan komponen UI

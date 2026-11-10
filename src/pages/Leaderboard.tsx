@@ -111,7 +111,9 @@ export default function Leaderboard() {
       </div>
 
       <p className="text-center text-xs text-slate-500">
-        Poin per match (N = jumlah pemain): Juara 2×N · Runner-up 1 N · Runner-up 2 N÷3 (min. 4 pemain)
+        Poin match offline (N = jumlah pemain): Juara 2×N · Runner-up 1 N · Runner-up 2 N÷3 (min. 4 pemain)
+        <br />
+        Match online: setengahnya, Juara N · Runner-up 1 N÷2 · Runner-up 2 N÷6 (min. 4 pemain)
         <br />
         Membuat match sebagai player: −{MATCH_CREATION_COST} poin
       </p>

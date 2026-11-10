@@ -6,7 +6,7 @@ import { ACTIVE_DUEL_STATUSES, DUEL_SELECT, type Duel, type DuelStatus } from '.
 import { Avatar, Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDate, winRate } from '../lib/format'
-import { MATCH_CREATION_COST, supabase, type MatchStatus, type PlayerStatus, type Profile } from '../lib/supabase'
+import { MATCH_CREATION_COST, supabase, type MatchMode, type MatchStatus, type PlayerStatus, type Profile } from '../lib/supabase'
 
 export default function Home() {
   const { profile } = useAuth()
@@ -21,6 +21,7 @@ interface PlayerMatchRow {
   match: {
     id: string
     title: string
+    mode: MatchMode
     status: MatchStatus
     created_at: string
     finished_at: string | null
@@ -86,12 +87,12 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
   const [rows, setRows] = useState<PlayerMatchRow[] | null>(null)
   const [adjustments, setAdjustments] = useState<Adjustment[]>([])
   const [duels, setDuels] = useState<Duel[]>([])
-  const [tab, setTab] = useState<'match' | 'duel'>('match')
+  const [tab, setTab] = useState<StatsTab>('offline')
 
   useEffect(() => {
     supabase
       .from('match_players')
-      .select('status, placement, points, match:matches!inner(id, title, status, created_at, finished_at, winner:profiles!matches_winner_id_fkey(name))')
+      .select('status, placement, points, match:matches!inner(id, title, mode, status, created_at, finished_at, winner:profiles!matches_winner_id_fkey(name))')
       .eq('player_id', playerId)
       .then(({ data }) => setRows((data as unknown as PlayerMatchRow[]) ?? []))
     supabase
@@ -110,42 +111,47 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
 
   if (!rows) return <PageLoader />
 
-  const finished = rows
+  const allFinished = rows
     .filter((r) => r.match.status === 'finished')
     .sort((a, b) => (b.match.finished_at ?? '').localeCompare(a.match.finished_at ?? ''))
+  const hasOnline = rows.some((r) => r.match.mode === 'online')
+  const tabs: StatsTab[] = ['offline', ...(hasOnline ? ['online' as const] : []), ...(duels.length > 0 ? ['duel' as const] : [])]
+  const shown = tabs.includes(tab) ? tab : 'offline'
+  // Match stats (played, wins, win rate, history) are per mode; points below count everything.
+  const finished = allFinished.filter((r) => r.match.mode === (shown === 'online' ? 'online' : 'offline'))
   const active = rows.filter((r) => r.match.status === 'open' || r.match.status === 'ongoing')
   const played = finished.length
   const wins = finished.filter((r) => r.status === 'winner').length
   const rate = winRate(wins, played)
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
   const totalPoints =
-    finished.reduce((sum, r) => sum + r.points, 0) + adjustments.reduce((sum, a) => sum + a.amount, 0)
+    allFinished.reduce((sum, r) => sum + r.points, 0) + adjustments.reduce((sum, a) => sum + a.amount, 0)
   const spent = -adjustments.filter((a) => a.reason === 'create_match').reduce((sum, a) => sum + a.amount, 0)
   const held = -adjustments
     .filter((a) => a.reason === 'duel_stake' && a.duel && ACTIVE_DUEL_STATUSES.includes(a.duel.status))
     .reduce((sum, a) => sum + a.amount, 0)
   const missionRewards = adjustments.filter((a) => a.reason === 'mission_reward').reduce((sum, a) => sum + a.amount, 0)
   const duelWins = duels.filter((d) => d.winner_id === playerId).length
-  const showDuels = tab === 'duel' && duels.length > 0
+  const showDuels = shown === 'duel'
   const monthPoints =
-    finished.filter((r) => (r.match.finished_at ?? '') >= monthStart).reduce((sum, r) => sum + r.points, 0) +
+    allFinished.filter((r) => (r.match.finished_at ?? '') >= monthStart).reduce((sum, r) => sum + r.points, 0) +
     adjustments.filter((a) => a.counts_monthly && a.created_at >= monthStart).reduce((sum, a) => sum + a.amount, 0)
 
   return (
     <div className="space-y-5 md:grid md:grid-cols-2 md:items-start md:gap-6 md:space-y-0">
       <div className={cx('space-y-5', !children && 'md:sticky md:top-24')}>
-      {duels.length > 0 && (
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
-          {(['match', 'duel'] as const).map((t) => (
+      {tabs.length > 1 && (
+        <div className={cx('grid gap-1 rounded-xl bg-felt-950/60 p-1', tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}>
+          {tabs.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={cx(
                 'min-h-9 rounded-lg text-sm font-semibold transition',
-                tab === t ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+                shown === t ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
               )}
             >
-              {t === 'match' ? '🃏 Match' : '⚔️ Duel'}
+              {tabLabels[t]}
             </button>
           ))}
         </div>
@@ -153,13 +159,13 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
 
       <Card className="relative overflow-hidden">
         <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-white/[0.03]">
-          {showDuels ? '⚔' : '♠'}
+          {showDuels ? '⚔' : shown === 'online' ? '♦' : '♠'}
         </div>
         <div className="flex items-center gap-5">
           <WinRateRing value={showDuels ? winRate(duelWins, duels.length) : rate} />
           <div className="grid flex-1 grid-cols-2 gap-3">
-            <Stat label={showDuels ? 'Duel dimainkan' : 'Match dimainkan'} value={showDuels ? duels.length : played} />
-            <Stat label={showDuels ? 'Duel menang' : 'Match menang'} value={showDuels ? duelWins : wins} />
+            <Stat label={showDuels ? 'Duel dimainkan' : `Match ${shown} dimainkan`} value={showDuels ? duels.length : played} />
+            <Stat label={showDuels ? 'Duel menang' : `Match ${shown} menang`} value={showDuels ? duelWins : wins} />
           </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3">
@@ -233,13 +239,17 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
       )}
 
       <section>
-        <SectionTitle>Riwayat match</SectionTitle>
+        <SectionTitle>Riwayat match {shown}</SectionTitle>
         {finished.length === 0 ? (
           <Card>
             <EmptyState
               icon="🃏"
               title="Belum ada riwayat"
-              text={isMe ? 'Join match dari menu Match untuk mulai mencatat kemenangan.' : 'Pemain ini belum menyelesaikan match.'}
+              text={
+                isMe
+                  ? `Join match ${shown} dari menu Match untuk mulai mencatat kemenangan.`
+                  : `Pemain ini belum menyelesaikan match ${shown}.`
+              }
             />
           </Card>
         ) : (
@@ -282,6 +292,10 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
     </div>
   )
 }
+
+type StatsTab = 'offline' | 'online' | 'duel'
+
+const tabLabels: Record<StatsTab, string> = { offline: '🃏 Offline', online: '🌐 Online', duel: '⚔️ Duel' }
 
 interface Adjustment {
   amount: number

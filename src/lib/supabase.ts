@@ -17,11 +17,22 @@ export interface Profile {
   role: Role
 }
 
+export type MatchMode = 'offline' | 'online'
+
+/** Settings the host picks for an online (tournament) match. Mirrors create_match(). */
+export interface OnlineConfig {
+  sb: number
+  start_chips: number
+  level_minutes: number
+}
+
 export interface Match {
   id: string
   title: string
   dealer_id: string
   status: MatchStatus
+  mode: MatchMode
+  online_config: OnlineConfig | null
   max_players: number
   winner_id: string | null
   created_at: string
@@ -65,11 +76,29 @@ export function errorMessage(err: unknown): string {
  * Points for a final placement in a match with `players` players. Mirrors placement_points() in the database:
  * winner 2×N, runner-up 1 N, runner-up 2 N÷3 rounded (only with 4+ players), everyone else 0.
  */
-export function pointsFor(placement: number, players: number) {
+export function pointsFor(placement: number, players: number, mode: MatchMode = 'offline') {
+  // Online pays half: winner N, runner-up 1 N/2, runner-up 2 N/6. Mirrors online_placement_points().
+  if (mode === 'online') {
+    if (placement === 1) return players
+    if (placement === 2) return Math.round(players / 2)
+    if (placement === 3 && players >= 4) return Math.round(players / 6)
+    return 0
+  }
   if (placement === 1) return 2 * players
   if (placement === 2) return players
   if (placement === 3 && players >= 4) return Math.round(players / 3)
   return 0
+}
+
+/** Small blinds a host can start an online match at (big blind = 2×). Mirrors online_blind_levels(). */
+export const ONLINE_BLIND_LEVELS = [10, 15, 25, 50, 75, 100, 150, 200, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000, 15000, 20000, 30000, 50000]
+
+export function formatChips(n: number) {
+  return n.toLocaleString('id-ID')
+}
+
+export function onlineConfigText(c: OnlineConfig) {
+  return `Blind ${formatChips(c.sb)}/${formatChips(c.sb * 2)} · ${formatChips(c.start_chips)} chip · naik tiap ${c.level_minutes} menit`
 }
 
 /** Points a player pays to host a match (refunded if it is cancelled). Mirrors `match_creation_cost()` in the database. */

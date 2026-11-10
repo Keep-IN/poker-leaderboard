@@ -4,7 +4,17 @@ import ConfirmSheet, { type Confirmation } from '../components/ConfirmSheet'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
-import { MATCH_CREATION_COST, MIN_MATCH_PLAYERS, errorMessage, pointsFor, supabase, type Match, type MatchPlayer, type Role } from '../lib/supabase'
+import {
+  MATCH_CREATION_COST,
+  MIN_MATCH_PLAYERS,
+  errorMessage,
+  onlineConfigText,
+  pointsFor,
+  supabase,
+  type Match,
+  type MatchPlayer,
+  type Role,
+} from '../lib/supabase'
 
 type MatchWithDealer = Match & { dealer: { name: string; role: Role } | null }
 
@@ -62,6 +72,10 @@ export default function MatchRoom() {
     )
 
   const isDealer = match.dealer_id === profile.id
+  const online = match.mode === 'online'
+  // Online results come from the poker table, so the host only starts or cancels.
+  const manual = isDealer && !online
+  const pts = (place: number) => pointsFor(place, players.length, match.mode)
   const hostedByPlayer = match.dealer?.role === 'player'
   const me = players.find((p) => p.player_id === profile.id)
   const full = players.length >= match.max_players
@@ -81,11 +95,17 @@ export default function MatchRoom() {
       {/* Header */}
       <div className="relative overflow-hidden rounded-3xl border border-gold-400/20 bg-gradient-to-br from-felt-600 to-felt-800 p-5 shadow-xl">
         <div className="pointer-events-none absolute -right-6 -bottom-10 text-[140px] leading-none text-black/15">♠</div>
-        <StatusBadge status={match.status} />
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={match.status} />
+          <span className="rounded-full bg-black/25 px-2.5 py-1 text-xs font-semibold text-slate-200">
+            {online ? '🌐 Online' : '🃏 Offline'}
+          </span>
+        </div>
         <h1 className="mt-2 text-2xl font-extrabold">{match.title}</h1>
         <p className="mt-1 text-sm text-slate-300">
           {hostedByPlayer ? 'Host' : 'Dealer'}: <span className="font-semibold">{match.dealer?.name ?? '-'}</span>
         </p>
+        {online && match.online_config && <p className="mt-1 text-xs text-slate-300">{onlineConfigText(match.online_config)}</p>}
         <div className="mt-4 flex gap-4 text-sm">
           <Meta label="Player" value={`${players.length}/${match.max_players}`} />
           {match.status === 'ongoing' && <Meta label="Masih main" value={String(stillPlaying.length)} />}
@@ -93,8 +113,8 @@ export default function MatchRoom() {
         </div>
         {(match.status === 'open' || match.status === 'ongoing') && players.length >= MIN_MATCH_PLAYERS && (
           <p className="mt-3 text-xs text-slate-300">
-            Poin dengan {players.length} pemain: 🏆 {pointsFor(1, players.length)} · 🥈 {pointsFor(2, players.length)}
-            {pointsFor(3, players.length) > 0 && ` · 🥉 ${pointsFor(3, players.length)}`}
+            Poin dengan {players.length} pemain: 🏆 {pts(1)} · 🥈 {pts(2)}
+            {pts(3) > 0 && ` · 🥉 ${pts(3)}`}
           </p>
         )}
       </div>
@@ -114,8 +134,34 @@ export default function MatchRoom() {
 
       {isDealer && hostedByPlayer && match.status !== 'finished' && match.status !== 'cancelled' && (
         <p className="rounded-xl bg-gold-400/10 px-3 py-2 text-xs text-gold-300">
-          Kamu host match ini, jadi kamu yang mengatur jalannya match dan tidak ikut main.
+          {online
+            ? 'Kamu host match ini dan tidak ikut main. Setelah dimulai, hasilnya dicatat otomatis oleh meja poker.'
+            : 'Kamu host match ini, jadi kamu yang mengatur jalannya match dan tidak ikut main.'}
         </p>
+      )}
+
+      {/* Online table */}
+      {online && match.status === 'ongoing' && (
+        me ? (
+          <a
+            href={`/meja.html?m=${id}`}
+            className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gold-400 text-base font-bold text-felt-950 shadow-lg shadow-gold-500/20 transition active:scale-[0.98]"
+          >
+            🃏 {me.status === 'playing' ? 'Masuk meja poker' : 'Lihat meja poker'}
+          </a>
+        ) : (
+          <a
+            href={`/meja.html?m=${id}`}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-gold-400/50 text-sm font-bold text-gold-300 transition hover:bg-gold-400/10"
+          >
+            👀 Tonton meja poker
+          </a>
+        )
+      )}
+      {online && match.status === 'finished' && (
+        <a href={`/meja.html?m=${id}`} className="block text-center text-sm font-semibold text-gold-400 hover:text-gold-300">
+          Lihat meja terakhir
+        </a>
       )}
 
       {/* Player actions */}
@@ -124,7 +170,9 @@ export default function MatchRoom() {
           <Card className="flex items-center justify-between gap-3">
             <p className="text-sm">
               <span className="font-semibold text-emerald-300">Kamu sudah join.</span>
-              <span className="block text-slate-400">Tunggu {hostedByPlayer ? 'host' : 'dealer'} memulai match.</span>
+              <span className="block text-slate-400">
+                Tunggu {hostedByPlayer ? 'host' : 'dealer'} memulai match{online ? ', lalu tombol Masuk meja poker muncul di sini' : ''}.
+              </span>
             </p>
             <Button variant="danger" loading={busy === 'leave'} onClick={() => call('leave', 'leave_match', { p_match: id })}>
               Keluar
@@ -159,7 +207,7 @@ export default function MatchRoom() {
         </div>
       )}
 
-      {isDealer && match.status === 'ongoing' && stillPlaying.length === 1 && (
+      {manual && match.status === 'ongoing' && stillPlaying.length === 1 && (
         <Button
           className="min-h-14 w-full text-base"
           onClick={() => askWinner(stillPlaying[0])}
@@ -168,7 +216,7 @@ export default function MatchRoom() {
         </Button>
       )}
 
-      {isDealer && match.status === 'ongoing' && !canPickWinner && (
+      {manual && match.status === 'ongoing' && !canPickWinner && (
         <p className="rounded-xl bg-white/5 px-3 py-2 text-xs text-slate-400">
           Tekan <span className="font-semibold text-red-300">Kalah</span> sesuai urutan pemain tersingkir. Tombol Menang muncul saat
           tersisa 2 pemain.
@@ -213,7 +261,7 @@ export default function MatchRoom() {
                   </SmallButton>
                 )}
 
-                {isDealer && match.status === 'ongoing' && p.status === 'eliminated' && (
+                {manual && match.status === 'ongoing' && p.status === 'eliminated' && (
                   <SmallButton
                     tone="ghost"
                     loading={busy === `back-${p.player_id}`}
@@ -224,7 +272,7 @@ export default function MatchRoom() {
                 )}
               </div>
 
-              {isDealer && match.status === 'ongoing' && p.status === 'playing' && (
+              {manual && match.status === 'ongoing' && p.status === 'playing' && (
                 <div className={cx('mt-2.5 grid gap-2 pl-8', canPickWinner ? 'grid-cols-2' : 'grid-cols-1')}>
                   <SmallButton
                     tone="danger"
@@ -275,7 +323,7 @@ export default function MatchRoom() {
 
   function askWinner(p: MatchPlayer) {
     const runnerUp = stillPlaying.find((x) => x.player_id !== p.player_id)
-    const [first, second] = [pointsFor(1, players.length), pointsFor(2, players.length)]
+    const [first, second] = [pts(1), pts(2)]
     setConfirm({
       title: `${nameOf(p)} menang?`,
       text:

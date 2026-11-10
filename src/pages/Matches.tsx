@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom'
 import { Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
-import { supabase, type MatchStatus } from '../lib/supabase'
+import { supabase, type MatchMode, type MatchStatus } from '../lib/supabase'
 
 interface MatchListRow {
   id: string
   title: string
   status: MatchStatus
+  mode: MatchMode
   max_players: number
   created_at: string
   finished_at: string | null
@@ -18,7 +19,7 @@ interface MatchListRow {
 }
 
 const SELECT =
-  'id, title, status, max_players, created_at, finished_at, dealer:profiles!matches_dealer_id_fkey(name, role), winner:profiles!matches_winner_id_fkey(name), players:match_players(count)'
+  'id, title, status, mode, max_players, created_at, finished_at, dealer:profiles!matches_dealer_id_fkey(name, role), winner:profiles!matches_winner_id_fkey(name), players:match_players(count)'
 
 export default function Matches() {
   const { profile } = useAuth()
@@ -90,7 +91,7 @@ export default function Matches() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{m.title}</p>
                   <p className="truncate text-xs text-slate-400">
-                    🏆 {m.winner?.name ?? '-'} · {m.finished_at && formatDateTime(m.finished_at)}
+                    {m.mode === 'online' ? '🌐' : '🃏'} 🏆 {m.winner?.name ?? '-'} · {m.finished_at && formatDateTime(m.finished_at)}
                   </p>
                 </div>
                 <Chevron />
@@ -111,7 +112,9 @@ function MatchCard({ m }: { m: MatchListRow }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-lg font-semibold">{m.title}</p>
-            <p className="text-xs text-slate-400">{m.dealer?.role === 'player' ? 'Host' : 'Dealer'}: {m.dealer?.name ?? '-'}</p>
+            <p className="text-xs text-slate-400">
+              {m.mode === 'online' ? '🌐 Online' : '🃏 Offline'} · {m.dealer?.role === 'player' ? 'Host' : 'Dealer'}: {m.dealer?.name ?? '-'}
+            </p>
           </div>
           <StatusBadge status={m.status} />
         </div>

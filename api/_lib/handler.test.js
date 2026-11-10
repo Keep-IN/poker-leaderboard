@@ -1,0 +1,91 @@
+// Tes API meja dengan database tiruan di memori: `node api/_lib/handler.test.js`
+import assert from 'node:assert'
+import { api } from './handler.js'
+
+const MATCH = '11111111-2222-3333-4444-555555555555'
+const users = { tokA: 'uA', tokB: 'uB', tokC: 'uC', tokX: 'uX' }
+
+function fakeDb() {
+  const m = { status: 'ongoing', mode: 'online', online_config: { sb: 10, start_chips: 300, level_minutes: 10 } }
+  const players = [{ uid: 'uA', name: 'Andi' }, { uid: 'uB', name: 'Bela' }, { uid: 'uC', name: 'Citra' }]
+  let row = null
+  const results = { out: [], winner: null }
+  const yieldTurn = () => new Promise(r => setImmediate(r)) // beri kesempatan request lain menyela (uji jalur tabrakan)
+  return {
+    m, results, get row() { return row },
+    async user(t) { await yieldTurn(); return users[t] ?? null },
+    async seats() { await yieldTurn(); return { match: m, players } },
+    async meta() { await yieldTurn(); return row && { ver: row.ver, due_at: row.due_at, status: m.status } },
+    async load() { await yieldTurn(); return row && { state: structuredClone(row.state), ver: row.ver, status: m.status } },
+    async create(_, state, due) { await yieldTurn(); if (row) return null; row = { state, ver: 1, due_at: due }; return 1 },
+    async save(_, ver, state, due, out, winner) {
+      await yieldTurn()
+      if (m.status !== 'ongoing') throw new Error('match_not_ongoing')
+      if (row.ver !== ver) return null
+      row = { state, ver: ver + 1, due_at: due }
+      results.out = out
+      if (winner) { results.winner = winner; m.status = 'finished' }
+      return row.ver
+    },
+  }
+}
+
+const db = fakeDb()
+const post = body => api(db, { method: 'POST', body: { match: MATCH, ...body } })
+const get = query => api(db, { method: 'GET', query: { match: MATCH, ...query } })
+
+assert.equal((await api(db, { method: 'GET', query: { match: 'bukan-uuid' } })).error, 'Match tidak valid')
+assert((await post({ type: 'join', access_token: 'salah' })).auth)
+
+// tiga pemain bergabung bersamaan: meja dibuat sekali, tiap pemain dapat token sendiri
+const [a, b, c] = await Promise.all(['tokA', 'tokB', 'tokC'].map(t => post({ type: 'join', access_token: t })))
+assert(a.token && b.token && c.token && new Set([a.token, b.token, c.token]).size === 3)
+assert.equal(a.s.players.length, 3)
+assert.equal((await post({ type: 'join', access_token: 'tokA' })).token, a.token) // perangkat lain: token sama
+const x = await post({ type: 'join', access_token: 'tokX' })
+assert(x.watch && !x.token) // bukan pemain match: penonton
+const w = await get({ watch: '1' })
+assert.equal(w.s.me, -1)
+assert(!JSON.stringify(w).includes('uA'))
+
+// versi tidak berubah dan belum ada event: jawaban ringan tanpa memuat state
+const s1 = await get({ token: a.token })
+assert.deepEqual(await get({ token: a.token, v: String(s1.v) }), { same: true, v: s1.v })
+assert((await get({ token: 'ngawur' })).gone)
+
+// mulai: majukan jam ke hand pertama (meja menunggu 15 detik)
+const realNow = Date.now
+let offset = 0
+Date.now = () => realNow() + offset
+offset += 16000
+const tok = { [a.token]: 'A', [b.token]: 'B', [c.token]: 'C' }
+let s = (await get({ token: a.token })).s
+assert.equal(s.phase, 'preflop')
+
+// tiap giliran: pemain yang sedang giliran all-in; ulangi sampai turnamen selesai
+let guard = 0
+while (!db.results.winner && ++guard < 500) {
+  const views = await Promise.all([a, b, c].map(p => get({ token: p.token })))
+  const turn = views.find(r => r.s && r.s.ctl)
+  if (turn) {
+    const who = [a, b, c][views.indexOf(turn)]
+    const r = await post({ token: who.token, type: turn.s.ctl.raise ? 'raise' : 'call', amount: turn.s.ctl.maxTo })
+    assert(!r.error, r.error)
+  } else offset += 7000 // tunggu runout / hand berikutnya
+}
+assert(db.results.winner, 'turnamen tidak selesai')
+assert.equal(db.results.out.length, 2)
+assert(!db.results.out.includes(db.results.winner))
+assert(Object.values(tok).length === 3)
+
+// sesudah selesai: aksi ditolak, state akhir masih bisa dilihat
+assert((await post({ token: a.token, type: 'check' })).ended)
+const fin = await get({ token: a.token })
+assert.equal(fin.s.phase, 'over')
+assert.deepEqual(fin.s.players.map(p => p.place).sort(), [1, 2, 3])
+
+// match dibatalkan host: meja berhenti
+db.m.status = 'cancelled'
+assert.deepEqual(await get({ token: a.token, v: '1' }), { ended: true, status: 'cancelled' })
+Date.now = realNow
+console.log('semua tes handler lulus')

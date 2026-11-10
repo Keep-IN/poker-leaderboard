@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDateTime } from '../lib/format'
 import { MISSION_SELECT, formatCountdown, missionText, useNow, type Mission, type MissionKind, type MyMission } from '../lib/missions'
-import { errorMessage, supabase } from '../lib/supabase'
+import { errorMessage, supabase, type MatchMode } from '../lib/supabase'
 import ConfirmSheet from './ConfirmSheet'
 import { Card, ErrorText, SectionTitle, cx } from './ui'
 
@@ -47,7 +47,7 @@ export function PlayerMissions({ me }: { me: string }) {
             <Card key={m.id} className={m.completed ? 'border-emerald-400/40' : 'border-gold-400/40'}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <MissionKindLabel kind={m.kind} />
+                  <MissionKindLabel kind={m.kind} mode={m.match_mode} />
                   <p className="font-semibold">{missionText(m)}</p>
                 </div>
                 <span className="shrink-0 rounded-lg bg-gold-400/15 px-2 py-1 text-xs font-bold text-gold-300">+{m.reward} poin</span>
@@ -134,7 +134,7 @@ export function DealerMissions() {
             <Card key={m.id} className="border-gold-400/30">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <MissionKindLabel kind={m.kind} />
+                  <MissionKindLabel kind={m.kind} mode={m.match_mode} />
                   <p className="font-semibold">{missionText(m)}</p>
                 </div>
                 <span className="shrink-0 rounded-lg bg-gold-400/15 px-2 py-1 text-xs font-bold text-gold-300">+{m.reward} poin</span>
@@ -188,10 +188,10 @@ export function DealerMissions() {
   )
 }
 
-function MissionKindLabel({ kind }: { kind: MissionKind }) {
+function MissionKindLabel({ kind, mode }: { kind: MissionKind; mode: MatchMode | null }) {
   return (
     <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-      {kind === 'match_streak' ? '🃏 Misi match' : '⚔️ Misi duel'}
+      {kind === 'match_streak' ? (mode === 'online' ? '🌐 Misi match online' : '🃏 Misi match offline') : '⚔️ Misi duel'}
     </p>
   )
 }

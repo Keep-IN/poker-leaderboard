@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
+import type { MatchMode } from './supabase'
 
 export type MissionKind = 'duel' | 'match_streak'
 
 export interface Mission {
   id: string
   kind: MissionKind
+  /** Match missions only: which matches count. */
+  match_mode: MatchMode | null
   required_wins: number
   min_stake: number | null
   reward: number
@@ -19,6 +22,7 @@ export interface Mission {
 export interface MyMission {
   id: string
   kind: MissionKind
+  match_mode: MatchMode | null
   required_wins: number
   min_stake: number | null
   reward: number
@@ -33,9 +37,9 @@ export interface MyMission {
 
 export const MISSION_SELECT = '*, creator:profiles!missions_created_by_fkey(name), rewards:point_adjustments(count)'
 
-export function missionText(m: { kind: MissionKind; required_wins: number; min_stake: number | null }) {
+export function missionText(m: { kind: MissionKind; match_mode: MatchMode | null; required_wins: number; min_stake: number | null }) {
   return m.kind === 'match_streak'
-    ? `Menangkan ${m.required_wins} match berturut-turut`
+    ? `Menangkan ${m.required_wins} match ${m.match_mode ?? 'offline'} berturut-turut`
     : `Menangkan ${m.required_wins} duel dengan taruhan minimal ${m.min_stake} poin`
 }
 

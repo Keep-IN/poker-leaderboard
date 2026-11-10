@@ -4,6 +4,7 @@ import { Button, Card, EmptyState, ErrorText, PageLoader, cx } from '../componen
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
 import { missionText, useNow, type MissionKind } from '../lib/missions'
+import type { MatchMode } from '../lib/supabase'
 import { errorMessage, supabase } from '../lib/supabase'
 
 /** datetime-local value (browser local time) for 7 days from now at 23:59. */
@@ -19,6 +20,7 @@ export default function MissionNew() {
   const navigate = useNavigate()
   const { profile } = useAuth()
   const [kind, setKind] = useState<MissionKind>('duel')
+  const [matchMode, setMatchMode] = useState<MatchMode>('offline')
   const [wins, setWins] = useState(2)
   const [streak, setStreak] = useState(3)
   const [minStake, setMinStake] = useState(10)
@@ -43,7 +45,12 @@ export default function MissionNew() {
   const validDeadline = !Number.isNaN(deadlineDate.getTime()) && deadlineDate.getTime() > now + 5 * 60_000
 
   const isStreak = kind === 'match_streak'
-  const preview = { kind, required_wins: isStreak ? streak : wins, min_stake: isStreak ? null : minStake }
+  const preview = {
+    kind,
+    match_mode: isStreak ? matchMode : null,
+    required_wins: isStreak ? streak : wins,
+    min_stake: isStreak ? null : minStake,
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -54,6 +61,7 @@ export default function MissionNew() {
       p_kind: kind,
       p_wins: isStreak ? streak : wins,
       p_min_stake: isStreak ? null : minStake,
+      p_match_mode: isStreak ? matchMode : null,
       p_reward: reward,
       p_deadline: deadlineDate.toISOString(),
     })
@@ -87,6 +95,26 @@ export default function MissionNew() {
 
       <form onSubmit={submit} className="space-y-4">
         <Card className="space-y-5">
+          {isStreak && (
+            <div>
+              <span className="mb-1.5 block text-sm font-medium text-slate-300">Match yang dihitung</span>
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-felt-950/60 p-1">
+                {(['offline', 'online'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMatchMode(m)}
+                    className={cx(
+                      'min-h-10 rounded-lg text-sm font-semibold transition',
+                      matchMode === m ? 'bg-gold-400 text-felt-950' : 'text-slate-400 hover:text-slate-200',
+                    )}
+                  >
+                    {m === 'offline' ? '🃏 Offline' : '🌐 Online'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {isStreak ? (
             <Stepper label="Menang berturut-turut" unit="match" value={streak} min={2} max={20} onChange={setStreak} />
           ) : (
@@ -118,7 +146,8 @@ export default function MissionNew() {
           <ul className="mt-3 space-y-1.5 text-sm text-slate-300">
             <li>• Misi muncul di beranda semua player, lengkap dengan timer deadline.</li>
             <li>
-              • Hanya {isStreak ? 'match' : 'duel'} yang selesai setelah misi dibuat dan sebelum deadline yang dihitung.
+              • Hanya {isStreak ? `match ${matchMode}` : 'duel'} yang selesai setelah misi dibuat dan sebelum deadline yang dihitung.
+              {isStreak && ` Match ${matchMode === 'online' ? 'offline' : 'online'} tidak dihitung dan tidak memutus streak.`}
             </li>
             {isStreak && (
               <li>• Kalah di match yang diikuti membuat streak mulai dari 0. Match yang tidak diikuti tidak memutus streak.</li>
