@@ -472,7 +472,11 @@ async function poll() {
 }
 function connect() { ver = -1; polls = 0; poll(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (tok || watch) && !(S && S.phase === 'over')) poll(); });
-if (tok) { connect(); try { chatStart(JSON.parse(localStorage.getItem('meja:rt'))); } catch {} } else enter();
+// Sudah punya token meja: langsung lanjut. Belum tahu alamat chat (mis. meja dibuka sebelum chat ada): masuk ulang
+// lewat enter(), yang mengembalikan token yang sama beserta alamat chat.
+let savedRt = null;
+try { savedRt = JSON.parse(localStorage.getItem('meja:rt')); } catch {}
+if (tok && savedRt) { connect(); chatStart(savedRt); } else enter();
 onresize = () => S && render();
 
 // ---- kartu sendiri: tombol mata menyembunyikannya (aman dari yang mengintip); tahan kartu untuk mengintip sebentar ----
