@@ -48,6 +48,7 @@ Dealer bisa membuat misi untuk semua player, dengan **deadline** dan **reward po
 Detailnya:
 - Misi muncul di **Beranda player** dengan progres (mis. 1/2 menang atau 🔥 2/3 beruntun) dan **timer hitung mundur** ke deadline.
 - Reward **masuk otomatis** begitu target tercapai.
+- Dealer bisa mengumumkan misi baru ke grup WA lewat tombol **📲 Kirim ke grup WA**.
 
 ### 🎩 Beranda Dealer
 - Jumlah **match yang sudah di-host**.
@@ -63,6 +64,7 @@ Detailnya:
   - Dealer bisa memulai match, menandai pemain yang kalah, dan menetapkan pemenang.
   - Urutan pemain mengikuti posisi akhir (pemenang di atas, yang kalah paling awal di bawah).
   - Setelah match selesai, tampil **hasil akhir**: Juara, Runner-up 1, Runner-up 2, beserta poinnya.
+  - Tombol **📲 Kirim ke grup WA** membuka WhatsApp dengan pesan siap kirim: ajakan join (match baru), info pemain (match dimulai), atau juara dan poin (match selesai). Tinggal pilih grup lalu kirim.
 
 ### 🌐 Match Online
 - Saat membuat match, host memilih **Offline** atau **Online**.

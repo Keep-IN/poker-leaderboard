@@ -4,6 +4,7 @@ import ConfirmSheet, { type Confirmation } from '../components/ConfirmSheet'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { formatDateTime } from '../lib/format'
+import { matchMessage, shareToWhatsApp } from '../lib/share'
 import {
   MATCH_CREATION_COST,
   MIN_MATCH_PLAYERS,
@@ -128,6 +129,15 @@ export default function MatchRoom() {
             <p className="truncate text-xl font-extrabold">{nameOf(winner)}</p>
           </div>
         </div>
+      )}
+
+      {match.status !== 'cancelled' && (
+        <button
+          onClick={() => shareToWhatsApp(matchMessage(match, sorted))}
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/20 active:scale-[0.98]"
+        >
+          📲 Kirim {match.status === 'open' ? 'ajakan join' : match.status === 'ongoing' ? 'info match' : 'hasil match'} ke grup WA
+        </button>
       )}
 
       <ErrorText>{error}</ErrorText>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDateTime } from '../lib/format'
 import { MISSION_SELECT, formatCountdown, missionText, useNow, type Mission, type MissionKind, type MyMission } from '../lib/missions'
+import { missionMessage, shareToWhatsApp } from '../lib/share'
 import { errorMessage, supabase, type MatchMode } from '../lib/supabase'
 import ConfirmSheet from './ConfirmSheet'
 import { Card, ErrorText, SectionTitle, cx } from './ui'
@@ -145,12 +146,17 @@ export function DealerMissions() {
                   ⏱ {formatCountdown(new Date(m.deadline).getTime() - now)}
                 </span>
               </div>
-              <button
-                onClick={() => setCancelling(m)}
-                className="mt-2 w-full text-center text-xs text-slate-500 hover:text-slate-300"
-              >
-                Batalkan misi
-              </button>
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                <button
+                  onClick={() => shareToWhatsApp(missionMessage(m))}
+                  className="font-semibold text-emerald-300 hover:text-emerald-200"
+                >
+                  📲 Kirim ke grup WA
+                </button>
+                <button onClick={() => setCancelling(m)} className="text-slate-500 hover:text-slate-300">
+                  Batalkan misi
+                </button>
+              </div>
             </Card>
           ))}
         </div>
