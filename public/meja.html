@@ -223,10 +223,17 @@ a.btn{display:block;text-align:center;text-decoration:none}
 .q{gap:6px}
 .q button{flex:1;padding:7px 0;border:1.5px solid var(--line);background:none;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .q button:active{background:var(--hover)}
-input[type=range]{-webkit-appearance:none;appearance:none;flex:1.4;min-width:0;height:28px;background:transparent;margin:0}
-input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--line-strong);border-radius:2px}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;margin-top:-11px;border-radius:50%;border:2px solid var(--ink);background:repeating-conic-gradient(var(--gold) 0 20deg,#f4ecd8 20deg 40deg)}
-input[type=range]::-moz-range-track{height:4px;background:var(--line-strong)}
+input[type=range]{-webkit-appearance:none;appearance:none;flex:1.4;min-width:0;height:36px;background:transparent;margin:0;touch-action:pan-y;cursor:pointer;--p:0%}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--gold) var(--p),var(--line-strong) var(--p))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-11px;border-radius:50%;border:2px solid var(--ink);background:repeating-conic-gradient(var(--gold) 0 20deg,#f4ecd8 20deg 40deg)}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--line-strong)}
+input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--gold)}
+/* kolom ketik jumlah taruhan */
+#ri{flex:none;width:76px;min-width:0;padding:8px 6px;border:2px solid var(--line-strong);background:transparent;color:var(--fg);font:700 15px var(--mono);text-align:center;outline:0;-moz-appearance:textfield}
+#ri::-webkit-inner-spin-button,#ri::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+#ri:focus{border-color:var(--gold)}
+#ri.bad{border-color:var(--red);color:var(--red)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;border:2px solid var(--ink);background:var(--gold)}
 #toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--red);color:#fff;padding:9px 14px;font-family:var(--mono);font-size:12px;letter-spacing:.06em;border:2px solid var(--ink);box-shadow:3px 3px 0 #000;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
 #toast.on{opacity:1}
@@ -553,10 +560,38 @@ $('mine').addEventListener('pointerdown', e => { if (hideCards) { e.preventDefau
 $('mine').addEventListener('contextmenu', e => { if (hideCards) e.preventDefault(); }); // tekan lama di Android jangan memunculkan menu
 ['pointerup', 'pointercancel'].forEach(t => addEventListener(t, () => { if (peek) { peek = false; drawMine(); } })); // lepas di mana pun: tutup lagi
 
-function setR(v) {
+// Slider taruhan: 1000 posisi dengan kurva kuadrat (bet kecil lebih presisi), dibulatkan ke kelipatan small blind;
+// ujung kanan = all-in. Kolom angka bisa diketik bebas, tapi tidak bisa di bawah taruhan minimum (min-raise / big blind).
+const SL = 1000;
+function fromPos(pos) {
+  const c = S.ctl;
+  if (pos >= SL || c.maxTo <= c.minTo) return c.maxTo;
+  const t = pos / SL, raw = c.minTo + (c.maxTo - c.minTo) * t * t, step = S.sb || 1;
+  return Math.min(c.maxTo, Math.max(c.minTo, Math.round(raw / step) * step));
+}
+const toPos = v => { const c = S.ctl; return c.maxTo <= c.minTo ? SL : Math.round(Math.sqrt(Math.max(0, v - c.minTo) / (c.maxTo - c.minTo)) * SL); };
+function setR(v, from) {
   const c = S.ctl; raiseTo = Math.max(c.minTo, Math.min(c.maxTo, Math.round(v)));
-  $('rs').value = raiseTo;
+  const pos = from === 'slider' ? +$('rs').value : toPos(raiseTo);
+  if (from !== 'slider') $('rs').value = pos;
+  $('rs').style.setProperty('--p', pos / SL * 100 + '%');
+  if (from !== 'input') $('ri').value = raiseTo;
+  $('ri').classList.remove('bad');
+  $('rb').disabled = false;
   $('rb').textContent = raiseTo >= c.maxTo ? 'All-in ' + raiseTo : (c.bet ? 'Raise ke ' : 'Bet ') + raiseTo;
+}
+// Saat mengetik: angka di luar batas ditandai dan tombol dikunci; saat selesai (blur/Enter) dikembalikan ke batas terdekat.
+function typeR(el) {
+  const c = S.ctl, v = Math.floor(+el.value);
+  if (el.value !== '' && v >= c.minTo && v <= c.maxTo) return setR(v, 'input');
+  el.classList.add('bad');
+  $('rb').disabled = true;
+  $('rb').textContent = v > c.maxTo ? 'Maks ' + c.maxTo : 'Min ' + c.minTo;
+}
+function doneR(el, go) {
+  const v = Math.floor(+el.value) || 0;
+  setR(v);
+  if (go && v >= S.ctl.minTo) { el.blur(); act('raise', raiseTo); }
 }
 
 function controls(c, P) {
@@ -566,7 +601,9 @@ function controls(c, P) {
   let h = `<div class="row"><button class="btn ghost" onclick="act('fold')">Fold</button>
     <button class="btn green" onclick="act('${c.call ? 'call' : 'check'}')">${c.call ? 'Call ' + c.call + (c.call >= P.chips ? ' · all-in' : '') : 'Check'}</button></div>`;
   if (c.raise) h += `<div class="row q">${[['Min', c.minTo], ['½ Pot', f(.5)], ['Pot', f(1)], ['All-in', c.maxTo]].map(([l, v]) => `<button onclick="setR(${v})">${l}</button>`).join('')}</div>
-    <div class="row"><input id="rs" type="range" min="${c.minTo}" max="${c.maxTo}" oninput="setR(+this.value)">
+    <div class="row"><input id="rs" type="range" min="0" max="${SL}" step="1" aria-label="Jumlah taruhan" oninput="setR(fromPos(+this.value),'slider')">
+    <input id="ri" type="number" inputmode="numeric" min="${c.minTo}" max="${c.maxTo}" step="${S.sb || 1}" aria-label="Ketik jumlah taruhan (min ${c.minTo})"
+      oninput="typeR(this)" onblur="doneR(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();doneR(this,true)}">
     <button class="btn red big" id="rb" onclick="act('raise',raiseTo)"></button></div>`;
   return h;
 }
@@ -652,7 +689,7 @@ function render() {
   curMsg = msg; drawMine();
   if (h !== lastCtl) { $('ctl').innerHTML = h; lastCtl = h; } // kontrol yang sama tidak dibongkar (slider yang sedang digeser tetap utuh)
   $('ctl').classList.remove('wait');
-  if (S.ctl && S.ctl.raise) setR(raiseTo);
+  if (S.ctl && S.ctl.raise && document.activeElement !== $('ri')) setR(raiseTo); // jangan timpa angka yang sedang diketik
 
   // ---- kursi melingkar; aku selalu di bawah, urutan giliran searah jarum jam ----
   const W = $('table').clientWidth, H = $('table').clientHeight, sw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sw'));
