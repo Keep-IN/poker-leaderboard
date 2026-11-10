@@ -214,6 +214,28 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
   #panel{display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:center}
   #ctl .row:first-child{margin-top:0}
 }
+/* ---------- chat: bubble di atas kursi, hilang sendiri ---------- */
+#bubbles{position:absolute;inset:0;pointer-events:none;z-index:6}
+.bubble{position:absolute;transform:translate(-50%,calc(-100% - 46px));max-width:min(190px,46vw);padding:6px 10px;border:2px solid var(--ink);border-radius:12px;background:var(--paper);color:var(--ink);font-size:13px;line-height:1.25;font-style:italic;overflow-wrap:anywhere;box-shadow:3px 3px 0 #000b;animation:pop .22s cubic-bezier(.2,1.6,.4,1) both}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-8px;width:12px;height:12px;background:var(--paper);border:2px solid var(--ink);border-top:0;border-left:0;transform:translateX(-50%) rotate(45deg)}
+.bubble.me{background:var(--gold)}.bubble.me::after{background:var(--gold)}
+.bubble.out{animation:fade .4s ease both}
+.bubble.emo{font-size:26px;font-style:normal;padding:2px 8px}
+@keyframes pop{from{opacity:0;scale:.6}}
+@keyframes fade{to{opacity:0;translate:0 -8px}}
+#panel{position:relative}
+/* chat menutupi area kartu sendiri (bukan menambah tinggi panel), jadi ukuran meja tidak berubah */
+#chat{position:absolute;z-index:3;top:10px;left:14px;right:14px;min-height:100px;display:flex;flex-direction:column;justify-content:center;gap:8px;background:var(--grain),#1a1510}
+@media(min-width:700px){#chat{right:auto;width:300px}}
+#chat .quick{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+#chat .quick button{flex:none;padding:5px 9px;border:1.5px solid #f1e7cf55;background:none;font-size:15px;cursor:pointer}
+#chat .quick button.txt{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase}
+#chat .line{display:flex;gap:8px}
+#chatIn{flex:1;min-width:0;border:0;border-bottom:2px solid var(--paper-d);background:transparent;padding:6px 2px;font-size:16px;color:var(--paper);outline:0}
+#chatIn:focus{border-bottom-color:var(--gold)}
+#chat .btn{flex:none;padding:8px 14px;box-shadow:none}
+#chat .btn:disabled{opacity:.45}
+#chatBtn.on{background:var(--gold)!important;color:var(--ink)!important}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-delay:0s!important}}
 </style>
 </head>
@@ -292,19 +314,26 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
       <rect x="91" y="89" width="10" height="14" rx="1.5" fill="#c8402a" stroke="#f7f0dc" transform="rotate(12 96 96)"/>
     </g>
   </svg>
-    <span class="btns"><button id="snd" title="Nyalakan/matikan suara">Suara</button><a id="leave" href="/matches">Keluar</a></span>
+    <span class="btns"><button id="chatBtn" title="Chat ke meja" hidden>Chat</button><button id="snd" title="Nyalakan/matikan suara">Suara</button><a id="leave" href="/matches">Keluar</a></span>
   </div>
   <div id="table">
     <div id="felt"></div><div id="seats"></div>
     <div id="center"><div id="board"></div><div id="pot"></div><div id="win"></div></div>
+    <div id="bubbles" aria-live="polite"></div>
   </div>
-  <div id="panel"><div id="me"><div id="mine"></div><div id="msg"></div>
+  <div id="panel">
+    <form id="chat" hidden autocomplete="off">
+      <div class="quick" id="quick"></div>
+      <div class="line"><input id="chatIn" maxlength="60" placeholder="Tulis pesan… (maks 60 huruf)" enterkeyhint="send"><button class="btn gold" id="chatGo" type="submit">Kirim</button></div>
+    </form>
+  <div id="me"><div id="mine"></div><div id="msg"></div>
     <button id="eye" type="button" aria-label="Sembunyikan kartu" aria-pressed="false" title="Sembunyikan kartu">
       <svg class="open" viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
       <svg class="off" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10.5 7 10.5 7a17.6 17.6 0 0 1-3.2 3.9"/><path d="M6.6 6.6C3.3 8.6 1.5 12 1.5 12S5.5 19 12 19c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
     </button></div><div id="ctl"></div></div>
 </div>
 <div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 <script>
 const $ = id => document.getElementById(id), RK = '23456789TJQKA';
 const SU = ['♠︎', '♥︎', '♦︎', '♣︎'];
@@ -417,6 +446,7 @@ async function enter() {
   if (r.error) return status(r.error, true);
   if (r.token) { tok = r.token; localStorage.setItem(tokKey, tok); }
   else watch = true;
+  if (r.rt) { try { localStorage.setItem('meja:rt', JSON.stringify(r.rt)); } catch {} chatStart(r.rt); }
   if (r.s) apply(r.v, r.s);
   connect();
 }
@@ -442,7 +472,7 @@ async function poll() {
 }
 function connect() { ver = -1; polls = 0; poll(); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (tok || watch) && !(S && S.phase === 'over')) poll(); });
-if (tok) connect(); else enter();
+if (tok) { connect(); try { chatStart(JSON.parse(localStorage.getItem('meja:rt'))); } catch {} } else enter();
 onresize = () => S && render();
 
 // ---- kartu sendiri: tombol mata menyembunyikannya (aman dari yang mengintip); tahan kartu untuk mengintip sebentar ----
@@ -494,6 +524,15 @@ function aim() {
 function flick(n) { // dealer mengayun tangan sebanyak n kartu
   const d = $('dealer'); d.style.setProperty('--n', n); d.classList.remove('deal'); void d.getBoundingClientRect(); d.classList.add('deal');
   clearTimeout(flick.h); flick.h = setTimeout(() => d.classList.remove('deal'), n * 430 + 100);
+}
+
+// Sudut kursi ke-r (0 = aku, di bawah) searah jarum jam. Bagian atas meja dikosongkan untuk dealer:
+// kursi lain dibagi ke sisi kiri dan kanan, masing-masing sampai batas celah di atas.
+const DEALER_GAP = 100 * Math.PI / 180;
+function seatAngle(r, n) {
+  if (r === 0) return 0;
+  const A = Math.PI - DEALER_GAP / 2, left = Math.ceil((n - 1) / 2), right = n - 1 - left;
+  return r <= left ? A * r / left : 2 * Math.PI - A * (n - r) / right;
 }
 
 function render() {
@@ -558,8 +597,10 @@ function render() {
   const W = $('table').clientWidth, H = $('table').clientHeight, sw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sw'));
   const rx = 50 - (sw / 2 + 4) * 100 / W, ry = 50 - (92 / 2 + 4) * 100 / H;
   let seats = '', bets = '', sumBets = 0;
+  seatPos = [];
   ps.forEach((p, k) => {
-    const th = 2 * Math.PI * ((k - base + n) % n) / n, x = 50 - rx * Math.sin(th), y = 50 + ry * Math.cos(th);
+    const th = seatAngle((k - base + n) % n, n), x = 50 - rx * Math.sin(th), y = 50 + ry * Math.cos(th);
+    seatPos[k] = { x, y };
     const dim = p.place > 1 || p.sitOut || !p.online || (betting && (!p.inHand || p.folded));
     const cs = k === me ? '' : p.cards.map((c, j) => card(c, anims.has('r' + k + '.' + j) ? 'r' + k + '.' + j : 'c' + k + '.' + j)).join('');
     seats += `<div class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}" style="left:${x}%;top:${y}%">
@@ -577,6 +618,7 @@ function render() {
     ? `<div class="over"><b>Hasil turnamen</b><ol>${ps.slice().sort((a, b) => a.place - b.place).map(p => `<li>${esc(p.name)}</li>`).join('')}</ol></div>`
     : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}</em></span>`).join(''));
 
+  drawBubbles(); syncChatBtn();
   aim();
   if (deals) flick(deals);
   const win = ps.some(p => p.won);
@@ -600,6 +642,79 @@ setInterval(() => {
   if (t) t.textContent = Math.ceil(left / 1000) + ' dtk';
   if (S.turn === S.me && left > 0 && left <= 5000) { const sec = Math.ceil(left / 1000); if (sec !== tickSec) { tickSec = sec; play('tick'); } } else tickSec = 0; // 5 detik terakhir: tik tiap detik
 }, 250);
+
+// ---- chat: Supabase Realtime Broadcast, tidak disimpan di database. Bubble muncul di atas kursi lalu hilang. ----
+// Batas anti-spam: maks 60 huruf, jeda 2 detik, maks 5 pesan per 30 detik. Penerima juga mengabaikan kursi yang mengirim
+// lebih cepat dari 1 detik, jadi pesan yang dipaksa lewat console tetap tidak membanjiri layar.
+const QUICK = ['😂', '🔥', '😭', '👏', '🤡', '😤', 'GG', 'Nice hand', 'All-in!'];
+const CHAT_MAX = 60, CHAT_GAP = 2000, CHAT_WINDOW = 30000, CHAT_BURST = 5;
+let chan = null, chatOk = false, seatPos = [], sentAt = [];
+const bubbles = new Map(); // indeks kursi -> { text, until, mine }
+const recvAt = new Map();
+const isEmoji = t => /^\p{Extended_Pictographic}(\u200d?\p{Extended_Pictographic}|\ufe0f)*$/u.test(t);
+const clean = t => String(t || '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
+
+function drawBubbles() {
+  const now = Date.now();
+  let h = '';
+  for (const [k, b] of bubbles) {
+    if (now > b.until) { bubbles.delete(k); continue; }
+    const pos = seatPos[k];
+    if (!pos) continue;
+    const out = b.until - now < 400 ? ' out' : '';
+    // geser ke dalam supaya bubble kursi paling pinggir tidak terpotong layar
+    const W = $('table').clientWidth || 1, half = (Math.min(190, innerWidth * .46) / 2 + 6) / W * 100;
+    const x = Math.min(100 - half, Math.max(half, pos.x));
+    h += `<div class="bubble${b.mine ? ' me' : ''}${isEmoji(b.text) ? ' emo' : ''}${out}" style="left:${x}%;top:${pos.y}%">${esc(b.text)}</div>`;
+  }
+  set($('bubbles'), h);
+}
+function chatRecv(m) {
+  if (!S || !m || typeof m.seat !== 'number' || !S.players[m.seat]) return;
+  const text = clean(m.text), now = Date.now();
+  if (!text || now - (recvAt.get(m.seat) || 0) < 1000) return;
+  recvAt.set(m.seat, now);
+  bubbles.set(m.seat, { text, until: now + Math.min(7000, 3500 + text.length * 60), mine: m.seat === S.me });
+  drawBubbles();
+  if (m.seat !== S.me) play('knock');
+}
+async function chatSend(raw) {
+  const text = clean(raw), now = Date.now();
+  if (!text || !chan || !S || S.me < 0) return;
+  sentAt = sentAt.filter(t => now - t < CHAT_WINDOW);
+  if (sentAt.length && now - sentAt[sentAt.length - 1] < CHAT_GAP) return toast('Tunggu sebentar sebelum kirim lagi');
+  if (sentAt.length >= CHAT_BURST) return toast('Pelan-pelan ya, coba lagi sebentar lagi');
+  sentAt.push(now);
+  const msg = { seat: S.me, text };
+  recvAt.set(S.me, 0); chatRecv(msg); // tampilkan punya sendiri langsung
+  $('chatGo').disabled = true; setTimeout(() => { $('chatGo').disabled = false; }, CHAT_GAP);
+  try { const r = await chan.send({ type: 'broadcast', event: 'chat', payload: msg }); if (r !== 'ok') toast('Pesan gagal terkirim'); }
+  catch { toast('Pesan gagal terkirim'); }
+}
+// Dipanggil setelah masuk meja. rt = { url, key } dari server; sesi login dibaca dari localStorage oleh supabase-js.
+async function chatStart(rt) {
+  if (chan || !rt || !window.supabase || !match) return;
+  try {
+    const sb = window.supabase.createClient(rt.url, rt.key);
+    const { data } = await sb.auth.getSession();
+    if (!data.session) return;
+    await sb.realtime.setAuth(data.session.access_token);
+    chan = sb.channel('meja:' + match, { config: { private: true, broadcast: { self: false } } })
+      .on('broadcast', { event: 'chat' }, ({ payload }) => chatRecv(payload))
+      .subscribe(st => { chatOk = st === 'SUBSCRIBED'; syncChatBtn(); });
+  } catch (e) { console.warn('chat tidak tersedia', e); }
+}
+function syncChatBtn() {
+  const can = chatOk && S && S.me >= 0 && S.phase !== 'over';
+  $('chatBtn').hidden = !can;
+  if (!can) $('chat').hidden = true;
+  $('chatBtn').classList.toggle('on', !$('chat').hidden);
+}
+$('quick').innerHTML = QUICK.map(q => `<button type="button" class="${isEmoji(q) ? '' : 'txt'}">${q}</button>`).join('');
+$('quick').onclick = e => { const b = e.target.closest('button'); if (b) chatSend(b.textContent); };
+$('chatBtn').onclick = () => { $('chat').hidden = !$('chat').hidden; syncChatBtn(); if (!$('chat').hidden && matchMedia('(pointer:fine)').matches) $('chatIn').focus(); };
+$('chat').onsubmit = e => { e.preventDefault(); const v = $('chatIn').value; $('chatIn').value = ''; chatSend(v); };
+setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
 
 $('snd').classList.toggle('off', muted);
 $('snd').onclick = () => { muted = !muted; localStorage.setItem('mute', muted ? '1' : '0'); $('snd').classList.toggle('off', muted); play('chips', 3); };
