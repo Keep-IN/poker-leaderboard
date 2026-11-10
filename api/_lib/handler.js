@@ -6,7 +6,7 @@
 //
 // db: {
 //   user(accessToken) -> uid | null
-//   seats(match) -> { match: {status, mode, online_config}, players: [{uid, name}] } | null
+//   seats(match) -> { match: {status, mode, online_config, dealer_id}, players: [{uid, name}] } | null
 //   meta(match) -> { ver, due_at, status } | null           (ringan, tanpa state)
 //   load(match) -> { state, ver, status } | null
 //   create(match, state, dueAt) -> ver | null
@@ -101,7 +101,9 @@ async function join(db, match, accessToken) {
   })
   if (r.missing) return { error: 'Meja hanya bisa dibuka setelah match online dimulai' }
   if (r.status) return r.status === 'finished' ? { watch: true } : ended(r.status)
-  return { ...r.out, v: r.ver, s: r.t.view(r.t.find(r.out.token) ?? null) }
+  // Penonton yang ternyata host match boleh ikut chat (bubble-nya muncul di dekat bandar).
+  const host = r.out.watch ? (await db.seats(match))?.match.dealer_id === uid : false
+  return { ...r.out, ...(host && { host: true }), v: r.ver, s: r.t.view(r.t.find(r.out.token) ?? null) }
 }
 
 async function act(db, match, b) {

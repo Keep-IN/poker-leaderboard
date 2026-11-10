@@ -3,10 +3,10 @@ import assert from 'node:assert'
 import { api } from './handler.js'
 
 const MATCH = '11111111-2222-3333-4444-555555555555'
-const users = { tokA: 'uA', tokB: 'uB', tokC: 'uC', tokX: 'uX' }
+const users = { tokA: 'uA', tokB: 'uB', tokC: 'uC', tokX: 'uX', tokH: 'uH' }
 
 function fakeDb() {
-  const m = { status: 'ongoing', mode: 'online', online_config: { sb: 10, start_chips: 300, level_minutes: 10 } }
+  const m = { status: 'ongoing', mode: 'online', dealer_id: 'uH', online_config: { sb: 10, start_chips: 300, level_minutes: 10 } }
   const players = [{ uid: 'uA', name: 'Andi' }, { uid: 'uB', name: 'Bela' }, { uid: 'uC', name: 'Citra' }]
   let row = null
   const results = { out: [], winner: null }
@@ -43,7 +43,10 @@ assert(a.token && b.token && c.token && new Set([a.token, b.token, c.token]).siz
 assert.equal(a.s.players.length, 3)
 assert.equal((await post({ type: 'join', access_token: 'tokA' })).token, a.token) // perangkat lain: token sama
 const x = await post({ type: 'join', access_token: 'tokX' })
-assert(x.watch && !x.token) // bukan pemain match: penonton
+assert(x.watch && !x.token && !x.host) // bukan pemain match: penonton
+const hst = await post({ type: 'join', access_token: 'tokH' })
+assert(hst.watch && hst.host && !hst.token) // host match: penonton yang boleh chat
+assert(!a.host)
 const w = await get({ watch: '1' })
 assert.equal(w.s.me, -1)
 assert(!JSON.stringify(w).includes('uA'))

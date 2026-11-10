@@ -21,7 +21,7 @@ export function supabaseDb(url, secret) {
       return (await r.json()).id ?? null
     },
     async seats(match) {
-      const m = await one(`/rest/v1/matches?id=eq.${match}&select=status,mode,online_config,players:match_players(player_id,profile:profiles(name))`)
+      const m = await one(`/rest/v1/matches?id=eq.${match}&select=status,mode,online_config,dealer_id,players:match_players(player_id,profile:profiles(name))`)
       if (!m) return null
       return { match: m, players: m.players.map(p => ({ uid: p.player_id, name: p.profile?.name ?? 'Player' })) }
     },

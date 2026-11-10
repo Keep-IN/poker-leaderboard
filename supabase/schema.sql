@@ -1176,7 +1176,7 @@ $$;
 -- ---------- Chat meja online (Realtime Broadcast) ----------------------
 -- Chat tidak disimpan di tabel mana pun: pesan dikirim lewat channel privat 'meja:<match_id>'.
 -- Semua user yang login boleh mendengar (penonton juga); yang boleh mengirim hanya pemain match itu
--- selama match berjalan. Dilewati kalau skema realtime tidak ada (database lokal untuk tes).
+-- dan host-nya, selama match berjalan. Dilewati kalau skema realtime tidak ada (database lokal untuk tes).
 do $$
 begin
   if exists (select 1 from pg_namespace where nspname = 'realtime') then
@@ -1190,13 +1190,22 @@ begin
       create policy "meja chat send" on realtime.messages for insert to authenticated
       with check (
         realtime.messages.extension = 'broadcast'
-        and exists (
-          select 1
-            from public.match_players mp
-            join public.matches m on m.id = mp.match_id
-           where 'meja:' || mp.match_id::text = realtime.topic()
-             and mp.player_id = auth.uid()
-             and m.status = 'ongoing'
+        and (
+          exists (
+            select 1
+              from public.match_players mp
+              join public.matches m on m.id = mp.match_id
+             where 'meja:' || mp.match_id::text = realtime.topic()
+               and mp.player_id = auth.uid()
+               and m.status = 'ongoing'
+          )
+          or exists (
+            select 1
+              from public.matches m
+             where 'meja:' || m.id::text = realtime.topic()
+               and m.dealer_id = auth.uid()
+               and m.status = 'ongoing'
+          )
         )
       )
     $p$;

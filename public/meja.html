@@ -221,6 +221,10 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
 .bubble.me{background:var(--gold)}.bubble.me::after{background:var(--gold)}
 .bubble.out{animation:fade .4s ease both}
 .bubble.emo{font-size:26px;font-style:normal;padding:2px 8px}
+/* bubble host: di bawah bandar, ekornya menunjuk ke atas */
+.bubble.host{transform:translate(-50%,0);border-color:var(--gold)}
+.bubble.host::after{bottom:auto;top:-8px;border:2px solid var(--gold);border-right:0;border-bottom:0}
+.bubble.host b{font-family:var(--mono);font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--red)}
 @keyframes pop{from{opacity:0;scale:.6}}
 @keyframes fade{to{opacity:0;translate:0 -8px}}
 #panel{position:relative}
@@ -395,7 +399,7 @@ const later = (ms, k, ...a) => setTimeout(() => play(k, ...a), Math.max(0, ms));
 // ---- match dari URL (/meja.html?m=<id>); token meja disimpan per match ----
 const match = (new URLSearchParams(location.search).get('m') || '').toLowerCase();
 const tokKey = 'meja:' + match;
-let tok = localStorage.getItem(tokKey), watch = false, S, ver = -1, polls = 0, pollT, endAt = 0, raiseTo = 0, rkey = '', wasMine = false, lastCtl = '';
+let tok = localStorage.getItem(tokKey), watch = false, isHost = false, S, ver = -1, polls = 0, pollT, endAt = 0, raiseTo = 0, rkey = '', wasMine = false, lastCtl = '';
 $('back').href = $('leave').href = match ? '/matches/' + match : '/matches';
 // sesi login Supabase dari website utama (domain sama), dipakai sekali untuk mendapat token meja
 const accessToken = () => {
@@ -450,6 +454,7 @@ async function enter() {
   if (r.error) return status(r.error, true);
   if (r.token) { tok = r.token; localStorage.setItem(tokKey, tok); }
   else watch = true;
+  isHost = !!r.host;
   if (r.rt) { try { localStorage.setItem('meja:rt', JSON.stringify(r.rt)); } catch {} chatStart(r.rt); }
   if (r.s) apply(r.v, r.s);
   connect();
@@ -585,7 +590,7 @@ function render() {
     msg = !P ? 'Turnamen selesai' : P.place === 1 ? 'Selamat, kamu juara!' : `Kamu finis di posisi #${P.place}`;
     if (w) msg += ' · juara: ' + esc(w.name);
     h = `<div class="row"><a class="btn gold" href="/matches/${match}">Lihat hasil match</a></div>`;
-  } else if (!P) msg = 'Kamu menonton';
+  } else if (!P) msg = isHost ? 'Kamu host match ini · menonton dan bisa chat' : 'Kamu menonton';
   else if (P.place) msg = `Kamu tersingkir di posisi #${P.place} · masih bisa menonton`;
   else if (S.ctl) { msg = 'Giliran kamu'; h = controls(S.ctl, P); }
   else if (P.sitOut) msg = 'Kamu istirahat · kartu otomatis check/fold';
@@ -657,7 +662,8 @@ setInterval(() => {
 const QUICK = ['😂', '🔥', '😭', '👏', '🤡', '😤', 'GG', 'Nice hand', 'All-in!'];
 const CHAT_MAX = 60, CHAT_GAP = 2000, CHAT_WINDOW = 30000, CHAT_BURST = 5;
 let chan = null, chatOk = false, seatPos = [], sentAt = [];
-const bubbles = new Map(); // indeks kursi -> { text, until, mine }
+const bubbles = new Map(); // indeks kursi (-1 = host, di dekat bandar) -> { text, until, mine }
+const HOST_SEAT = -1;
 const recvAt = new Map();
 const isEmoji = t => /^\p{Extended_Pictographic}(\u200d?\p{Extended_Pictographic}|\ufe0f)*$/u.test(t);
 const clean = t => String(t || '').replace(/\s+/g, ' ').trim().slice(0, CHAT_MAX);
@@ -667,34 +673,36 @@ function drawBubbles() {
   let h = '';
   for (const [k, b] of bubbles) {
     if (now > b.until) { bubbles.delete(k); continue; }
-    const pos = seatPos[k];
+    const host = k === HOST_SEAT, pos = host ? { x: 50, y: 1 } : seatPos[k];
     if (!pos) continue;
-    const out = b.until - now < 400 ? ' out' : '';
+    const out = (b.until - now < 400 ? ' out' : '') + (host ? ' host' : '');
     // geser ke dalam supaya bubble kursi paling pinggir tidak terpotong layar
     const W = $('table').clientWidth || 1, half = (Math.min(190, innerWidth * .46) / 2 + 6) / W * 100;
     const x = Math.min(100 - half, Math.max(half, pos.x));
-    h += `<div class="bubble${b.mine ? ' me' : ''}${isEmoji(b.text) ? ' emo' : ''}${out}" style="left:${x}%;top:${pos.y}%">${esc(b.text)}</div>`;
+    h += `<div class="bubble${b.mine ? ' me' : ''}${isEmoji(b.text) ? ' emo' : ''}${out}" style="left:${x}%;top:${pos.y}%">${host ? '<b>Host</b> ' : ''}${esc(b.text)}</div>`;
   }
   set($('bubbles'), h);
 }
 function chatRecv(m) {
-  if (!S || !m || typeof m.seat !== 'number' || !S.players[m.seat]) return;
+  if (!S || !m || typeof m.seat !== 'number' || !(m.seat === HOST_SEAT || S.players[m.seat])) return;
   const text = clean(m.text), now = Date.now();
   if (!text || now - (recvAt.get(m.seat) || 0) < 1000) return;
   recvAt.set(m.seat, now);
-  bubbles.set(m.seat, { text, until: now + Math.min(7000, 3500 + text.length * 60), mine: m.seat === S.me });
+  const mine = m.seat === HOST_SEAT ? isHost : m.seat === S.me;
+  bubbles.set(m.seat, { text, until: now + Math.min(7000, 3500 + text.length * 60), mine });
   drawBubbles();
-  if (m.seat !== S.me) play('knock');
+  if (!mine) play('knock');
 }
 async function chatSend(raw) {
   const text = clean(raw), now = Date.now();
-  if (!text || !chan || !S || S.me < 0) return;
+  const seat = S && S.me >= 0 ? S.me : isHost ? HOST_SEAT : null;
+  if (!text || !chan || seat === null) return;
   sentAt = sentAt.filter(t => now - t < CHAT_WINDOW);
   if (sentAt.length && now - sentAt[sentAt.length - 1] < CHAT_GAP) return toast('Tunggu sebentar sebelum kirim lagi');
   if (sentAt.length >= CHAT_BURST) return toast('Pelan-pelan ya, coba lagi sebentar lagi');
   sentAt.push(now);
-  const msg = { seat: S.me, text };
-  recvAt.set(S.me, 0); chatRecv(msg); // tampilkan punya sendiri langsung
+  const msg = { seat, text };
+  recvAt.set(seat, 0); chatRecv(msg); // tampilkan punya sendiri langsung
   $('chatGo').disabled = true; setTimeout(() => { $('chatGo').disabled = false; }, CHAT_GAP);
   try { const r = await chan.send({ type: 'broadcast', event: 'chat', payload: msg }); if (r !== 'ok') toast('Pesan gagal terkirim'); }
   catch { toast('Pesan gagal terkirim'); }
@@ -714,7 +722,7 @@ async function chatStart(rt) {
 }
 // Tombol chat di kanan panel bawah membuka kolom ketik; setelah pesan terkirim kolomnya ditutup lagi.
 function syncChatBtn() {
-  const can = chatOk && S && S.me >= 0 && S.phase !== 'over';
+  const can = chatOk && S && (S.me >= 0 || isHost) && S.phase !== 'over';
   if (!can) $('chat').hidden = true;
   $('chatFab').hidden = !can || !$('chat').hidden;
 }
