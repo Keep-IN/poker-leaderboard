@@ -216,7 +216,7 @@ export class Table {
     const seat = p => this.players.indexOf(p)
     const alive = this.alive(), afk = alive.filter(p => p.afk >= AFK_HANDS)
     if (afk.length && afk.length === alive.length) afk.splice(afk.indexOf([...afk].sort((x, y) => y.chips - x.chips || seat(x) - seat(y))[0]), 1)
-    for (const p of afk) { this.forfeited += p.chips; p.chips = 0; p.afkOut = true }
+    for (const p of afk) { this.forfeited = (this.forfeited || 0) + p.chips; p.chips = 0; p.afkOut = true } // meja lama belum punya forfeited
     const busted = this.players.filter(p => !p.chips && !p.place)
       .sort((x, y) => y.afkOut - x.afkOut || x.stack0 - y.stack0 || seat(x) - seat(y))
     for (const p of busted) {
