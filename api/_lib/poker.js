@@ -42,6 +42,18 @@ export function best(cs, from = 0, pick = []) {
   return m
 }
 export const handName = (cards, board) => HANDS[cat(best(cards.concat(board)))]
+// Lima kartu yang membentuk kombinasi terbaik (untuk disorot saat showdown).
+export function bestFive(cs) {
+  let top = -1, pick = []
+  const walk = (from, cur) => {
+    if (cur.length === 5) { const sc = score5(cur); if (sc > top) { top = sc; pick = cur } return }
+    for (let i = from; i < cs.length; i++) walk(i + 1, [...cur, cs[i]])
+  }
+  walk(0, [])
+  return pick
+}
+// Jeda tambahan sebelum hand berikutnya: tiap kombinasi pemain disorot bergantian di layar.
+export const REVEAL_MS = env('REVEAL_MS', 1500), REVEAL_LEAD_MS = 900
 
 export class Table {
   constructor() {
@@ -190,7 +202,7 @@ export class Table {
     this.phase = 'showdown'; this.turn = -1; this.hands++
     this.eliminate()
     if (this.alive().length < 2) return this.end()
-    this.defer('next', NEXT_MS)
+    this.defer('next', Math.max(NEXT_MS, REVEAL_LEAD_MS + this.showdownOrder().length * REVEAL_MS + 2500))
   }
   // Pemain yang chip-nya habis di hand ini tersingkir. Kalau beberapa sekaligus, yang stack awal hand-nya lebih
   // besar dapat peringkat lebih baik (tersingkir "belakangan"); seri = urutan kursi.
@@ -210,6 +222,13 @@ export class Table {
 
   sitIn(i) { this.players[i].sitOut = false }
 
+  // Pemain yang membuka kartu di showdown, dari kombinasi terlemah sampai terkuat (seri: urutan kursi).
+  showdownOrder() {
+    if (this.phase !== 'showdown' || this.board.length < 5) return []
+    return this.players.map((q, i) => ({ q, i })).filter(({ q }) => q.inHand && !q.folded && q.show && q.score)
+      .sort((a, b) => a.q.score - b.q.score || a.i - b.i)
+  }
+
   // State untuk satu pemain (atau penonton kalau me = null): kartu lawan disembunyikan sampai showdown;
   // token, uid, dan dek tidak pernah ikut.
   view(me) {
@@ -226,6 +245,9 @@ export class Table {
       startIn: this.startedAt === null && this.due ? Math.max(0, this.due.at - this.now) : 0,
       pot: this.betting ? N.reduce((s, q) => s + q.total, 0) : 0,
       left: this.turn >= 0 && this.due ? Math.max(0, this.due.at - this.now) : 0,
+      // showdown: kombinasi tiap pemain untuk disorot bergantian, terlemah dulu, pemenang terakhir
+      reveal: this.showdownOrder().map(({ q, i }) => ({ i, best: bestFive(q.cards.concat(this.board)), hand: handName(q.cards, this.board) })),
+      revealMs: REVEAL_MS, revealLead: REVEAL_LEAD_MS,
       total: N.length, alive: N.filter(q => !q.place || q.place === 1).length,
       players: N.map(q => ({
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,

@@ -1,6 +1,6 @@
 // Tes mesin turnamen: `node api/_lib/poker.test.js` (mencetak "semua tes lulus").
 import assert from 'node:assert'
-import { LEVELS, TURN_MS, Table, best, handName } from './poker.js'
+import { LEVELS, REVEAL_MS, TURN_MS, Table, best, bestFive, handName } from './poker.js'
 
 const C = s => s.split(' ').map(x => 'shdc'.indexOf(x[1]) * 13 + '23456789TJQKA'.indexOf(x[0]))
 const S = s => best(C(s))
@@ -10,6 +10,8 @@ assert(S('Ah 2d 3c 4s 5h 9d Kc') < S('2d 3c 4s 5h 6h 9d Kc'))  // wheel < 6-high
 assert(S('Ah 2d 3c 4s 5h 9d Kc') > S('Ah Ad 3c 4s 9h Jd Kc'))  // wheel > pair
 assert(S('Ah Ad Kc 4s 5h 9d 2c') > S('Ah Ad Qc 4s 5h 9d 2c'))  // kicker
 assert.equal(handName(C('Ah Ad'), C('Ac Ks Kh')), 'Full House')
+assert.deepEqual(bestFive(C('Ah Ad 2c 7d Ac Ks Kh')).sort(), C('Ah Ad Ac Ks Kh').sort()) // pilih 5 kartu terbaik dari 7
+assert.equal(best(bestFive(C('9h 8h 2c 3d 7h 6h 5h'))), S('9h 8h 7h 6h 5h 2c 3d'))
 
 // ---- alat uji: waktu dikendalikan manual, kursi diurutkan P0, P1, ... supaya bisa diprediksi ----
 const cfg = (o = {}) => ({ sb: 10, start_chips: 1000, level_minutes: 10, ...o })
@@ -82,6 +84,23 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.equal(t.out.length, 2)
   assert.equal(t.players.find(p => p.uid === t.winner).place, 1)
   assert.deepEqual(t.players.map(p => p.place).sort(), [1, 2, 3])
+}
+
+{ // showdown: urutan sorotan dari kombinasi terlemah ke terkuat, kartu sorotan = 5 kartu terbaik, jeda hand berikutnya cukup
+  const t = mk([1000, 1000, 1000]); rig(t, 'Kc Kd 2c 7d As Ah Qh 9d 4c 5s Jd'); begin(t)
+  ok(t, 0, 'call'); ok(t, 1, 'call'); ok(t, 2, 'check')
+  for (let k = 0; k < 3; k++) for (let j = 0; j < 3; j++) if (t.turn >= 0) ok(t, t.turn, 'check')
+  drain(t)
+  assert.equal(t.phase, 'showdown')
+  const v = t.view(t.players[1]), r = v.reveal
+  assert.deepEqual(r.map(x => x.i), [1, 0, 2]) // 7-high < pasangan K < pasangan A
+  assert.deepEqual(r.map(x => x.hand), ['High Card', 'One Pair', 'One Pair'])
+  r.forEach(x => { assert.equal(x.best.length, 5); x.best.forEach(c => assert(t.players[x.i].cards.includes(c) || t.board.includes(c))) })
+  assert(r[2].best.includes(t.players[2].cards[0]) && r[2].best.includes(t.players[2].cards[1]))
+  assert(t.due.at - t.now >= 900 + 3 * REVEAL_MS)
+  // menang tanpa showdown (semua fold): tidak ada sorotan
+  const u = mk([1000, 1000, 1000]); begin(u); ok(u, 0, 'fold'); ok(u, 1, 'fold')
+  assert.deepEqual(u.view(u.players[0]).reveal, [])
 }
 
 { // dua pemain tersingkir di hand yang sama: stack awal hand lebih besar = peringkat lebih baik

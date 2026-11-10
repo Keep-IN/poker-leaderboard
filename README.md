@@ -73,6 +73,7 @@ Detailnya:
 - **Mode turnamen**: tidak ada beli chip lagi. Chip habis = tersingkir. Yang terakhir punya chip jadi juara.
 - Peringkat dan poin dicatat **otomatis** oleh meja, jadi host tidak perlu menekan Kalah/Menang.
 - Pemain yang tidak membuka meja atau diam terlalu lama tetap dibagi kartu, tapi otomatis check/fold. Jadi turnamen tetap jalan sampai selesai.
+- **Sorotan showdown**: saat kartu dibuka, kombinasi 5 kartu terbaik tiap pemain yang belum fold disorot bergantian (kartu naik dan menyala, kartu lain meredup), mulai dari kombinasi terlemah sampai pemenang. Cap "Menang" baru muncul di giliran pemenang.
 - **Chat bubble**: pemain bisa kirim pesan singkat atau emoji (tombol 💬 di kanan panel bawah; kolom ketik tertutup lagi setelah pesan terkirim). Pesan muncul sebagai bubble di atas kursi pengirim lalu hilang sendiri. Chat tidak disimpan di database (lewat Supabase Realtime), maksimal 60 huruf, jeda 2 detik, dan maksimal 5 pesan per 30 detik supaya tidak bisa spam. Host match juga bisa chat (bubble-nya muncul di dekat bandar dengan label HOST). Penonton lain bisa membaca tapi tidak bisa mengirim.
 - Meja poker diadaptasi dari [Meja Hold'em](https://github.com/ragila/meja-holdem) karya Ragil.
 

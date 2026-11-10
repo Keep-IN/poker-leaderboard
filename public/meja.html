@@ -93,6 +93,17 @@ a.btn{display:block;text-align:center;text-decoration:none}
 #pot{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;min-height:22px}
 #pot .lbl{font-size:10.5px;color:var(--paper-d)}
 #pot .num{font-size:24px;font-weight:700;font-style:italic;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
+/* sorotan showdown: kartu pembentuk kombinasi naik dan menyala, kartu lain meredup */
+.card{transition:top .25s ease,opacity .25s ease,box-shadow .25s ease}
+.revealing #board .card:not(.hl),.revealing .seat .card:not(.hl),#mine.revealing .card:not(.hl){opacity:.35}
+.card.hl{top:-12px;box-shadow:0 0 0 2.5px var(--gold),0 12px 18px -6px #000d}
+.seat .card.hl{top:-8px}
+.seat.hl .plate{outline:3px solid var(--gold);outline-offset:2px}
+#reveal{position:absolute;left:50%;bottom:100%;margin-bottom:16px;transform:translateX(-50%);width:max-content;max-width:92vw;min-height:24px;text-align:center}
+#reveal span{display:inline-block;padding:4px 12px;border:2px solid var(--gold);background:#04122bd9;color:#fff;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;animation:pop .22s cubic-bezier(.2,1.6,.4,1) both}
+#reveal em{font-family:var(--serif);font-size:16px;font-style:italic;letter-spacing:0;text-transform:none;color:var(--gold)}
+#reveal small{margin-left:6px;opacity:.7;font-size:10px}
+#win.hold{visibility:hidden} /* cap "Menang" ditahan sampai giliran sorotan pemenang */
 #win{position:absolute;left:50%;top:100%;margin-top:14px;transform:translateX(-50%);width:max-content;max-width:92vw;z-index:5}
 .stamp{display:block;transform:rotate(-2.5deg);margin:0 auto 6px;padding:5px 14px;text-align:center;border:3px double var(--paper);background:#04122bb3;color:var(--paper);font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;animation:stamp .35s cubic-bezier(.2,1.6,.4,1) .9s both}
 .stamp em{font-family:var(--serif);font-size:17px;font-style:italic;letter-spacing:0;text-transform:none;color:var(--gold)}
@@ -363,7 +374,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
   </div>
   <div id="table">
     <div id="felt"></div><div id="seats"></div>
-    <div id="center"><div id="board"></div><div id="pot"></div><div id="win"></div></div>
+    <div id="center"><div id="reveal" aria-live="polite"></div><div id="board"></div><div id="pot"></div><div id="win"></div></div>
     <div id="bubbles" aria-live="polite"></div>
   </div>
   <div id="panel">
@@ -459,7 +470,7 @@ const card = (c, key = '') => {
   const cls = !live ? '' : key[0] === 'r' ? ' reveal' : c < 0 ? ' fly' : ' fly flip';
   const st = live ? ` style="animation-delay:${d / 1000}s"` : ''; // jeda negatif = lanjut dari tengah animasi kalau layar di-render ulang
   return c < 0 ? `<div class="card back${cls}"${st}></div>`
-    : `<div class="card${[1, 2].includes(c / 13 | 0) ? ' r' : ''}${cls}"${st} data-s="${SU[c / 13 | 0]}"><b>${RK[c % 13].replace('T', '10')}</b><i>${SU[c / 13 | 0]}</i></div>`;
+    : `<div class="card${[1, 2].includes(c / 13 | 0) ? ' r' : ''}${cls}"${st} data-c="${c}" data-s="${SU[c / 13 | 0]}"><b>${RK[c % 13].replace('T', '10')}</b><i>${SU[c / 13 | 0]}</i></div>`;
 };
 // tumpukan chip per denominasi (maks 6 keping per tumpukan supaya tidak melebar)
 const chips = n => { let h = ''; for (const [d, c] of DEN) { const k = Math.min(n / d | 0, 6); n %= d; if (k) h += `<span class="stk">${`<i class="chip" style="--c:${c}"></i>`.repeat(k)}</span>`; } return h; };
@@ -651,7 +662,7 @@ function render() {
     seatPos[k] = { x, y };
     const dim = p.place > 1 || p.sitOut || !p.online || (betting && (!p.inHand || p.folded));
     const cs = k === me ? '' : p.cards.map((c, j) => card(c, anims.has('r' + k + '.' + j) ? 'r' + k + '.' + j : 'c' + k + '.' + j)).join('');
-    seats += `<div class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}" style="left:${x}%;top:${y}%">
+    seats += `<div data-k="${k}" class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}" style="left:${x}%;top:${y}%">
       <div class="cards">${cs}</div>
       <div class="plate">${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}
         <div class="nm">${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
@@ -666,7 +677,7 @@ function render() {
     ? `<div class="over"><b>Hasil turnamen</b><ol>${ps.slice().sort((a, b) => a.place - b.place).map(p => `<li>${esc(p.name)}</li>`).join('')}</ol></div>`
     : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}</em></span>`).join(''));
 
-  drawBubbles(); syncChatBtn();
+  drawBubbles(); syncChatBtn(); drawReveal();
   aim();
   if (deals) flick(deals);
   const win = ps.some(p => p.won);
@@ -794,6 +805,36 @@ addEventListener('keydown', e => {
 });
 $('chat').onsubmit = e => { e.preventDefault(); const v = $('chatIn').value; closeChat(); chatSend(v); };
 setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
+
+// ---- showdown: sorot kombinasi tiap pemain bergantian, dari yang terlemah sampai pemenang ----
+// S.reveal = [{ i, best, hand }] urut terlemah dulu. Mulai setelah kartu lawan selesai dibuka, tiap pemain
+// S.revealMs, pemain terakhir (terkuat) tetap disorot sampai hand berikutnya.
+let revealNo = -1, revealAt = 0;
+function drawReveal() {
+  const list = S && S.phase === 'showdown' && S.reveal && S.reveal.length > 1 ? S.reveal : null;
+  const table = $('table'), mineEl = $('mine');
+  if (!list) {
+    if (revealNo !== -1) { revealNo = -1; $('win').classList.remove('hold'); table.classList.remove('revealing'); mineEl.classList.remove('revealing'); set($('reveal'), ''); document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl')); }
+    return;
+  }
+  if (revealNo !== S.no) { revealNo = S.no; revealAt = Date.now() + (prevS ? S.revealLead : 0); }
+  const step = Math.floor((Date.now() - revealAt) / S.revealMs);
+  $('win').classList.toggle('hold', step < list.length - 1);
+  if (step < 0) return;
+  const k = Math.min(step, list.length - 1), cur = list[k], best = new Set(cur.best.map(String));
+  table.classList.add('revealing');
+  mineEl.classList.toggle('revealing', cur.i === S.me);
+  document.querySelectorAll('#board .card[data-c]').forEach(e => e.classList.toggle('hl', best.has(e.dataset.c)));
+  document.querySelectorAll('.seat').forEach(seat => {
+    const on = +seat.dataset.k === cur.i;
+    seat.classList.toggle('hl', on);
+    seat.querySelectorAll('.card').forEach(e => e.classList.toggle('hl', on && best.has(e.dataset.c)));
+  });
+  mineEl.querySelectorAll('.card').forEach(e => e.classList.toggle('hl', cur.i === S.me && best.has(e.dataset.c)));
+  const last = k === list.length - 1, who = S.players[cur.i];
+  set($('reveal'), `<span>${last ? '🏆 ' : ''}${esc(who ? who.name : '')} · <em>${esc(cur.hand)}</em><small>${k + 1}/${list.length}</small></span>`);
+}
+setInterval(() => { if (S && S.phase === 'showdown') drawReveal(); }, 150);
 
 $('snd').classList.toggle('off', muted);
 $('snd').onclick = () => { muted = !muted; localStorage.setItem('mute', muted ? '1' : '0'); $('snd').classList.toggle('off', muted); play('chips', 3); };
