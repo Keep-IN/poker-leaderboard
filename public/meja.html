@@ -221,6 +221,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
 .bubble.me{background:var(--gold)}.bubble.me::after{background:var(--gold)}
 .bubble.out{animation:fade .4s ease both}
 .bubble.emo{font-size:26px;font-style:normal;padding:2px 8px}
+.chatnote{display:inline-block;margin-top:6px;font-size:10px;color:var(--dim);text-transform:none;letter-spacing:.02em}
 /* bubble host: di bawah bandar, ekornya menunjuk ke atas */
 .bubble.host{transform:translate(-50%,0);border-color:var(--gold)}
 .bubble.host::after{bottom:auto;top:-8px;border:2px solid var(--gold);border-right:0;border-bottom:0}
@@ -341,7 +342,7 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
     <button id="chatFab" type="button" hidden aria-label="Kirim chat (Enter)" title="Kirim chat (Enter)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></button></div><div id="ctl"></div></div>
 </div>
 <div id="toast"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
+<script src="/vendor/supabase-2.118.0.js"></script>
 <script>
 const $ = id => document.getElementById(id), RK = '23456789TJQKA';
 const SU = ['♠︎', '♥︎', '♦︎', '♣︎'];
@@ -455,7 +456,8 @@ async function enter() {
   if (r.token) { tok = r.token; localStorage.setItem(tokKey, tok); }
   else watch = true;
   isHost = !!r.host;
-  if (r.rt) { try { localStorage.setItem('meja:rt', JSON.stringify(r.rt)); } catch {} chatStart(r.rt); }
+  if (r.rt) { try { localStorage.setItem('meja:rt', JSON.stringify(r.rt)); } catch {} }
+  chatStart(r.rt);
   if (r.s) apply(r.v, r.s);
   connect();
 }
@@ -601,6 +603,7 @@ function render() {
   if (S.turn >= 0 && phase !== 'over') msg += ' · <span id="tl"></span>';
   if (P && P.sitOut && !P.place && phase !== 'over') h += `<div class="row"><button class="btn green" onclick="act('sitin')">Main lagi</button></div>`;
   stAt = Date.now() + S.startIn;
+  if (chatNote && (P || isHost) && phase !== 'over') msg += `<br><span class="chatnote">${esc(chatNote)}</span>`;
   curMsg = msg; drawMine();
   if (h !== lastCtl) { $('ctl').innerHTML = h; lastCtl = h; } // kontrol yang sama tidak dibongkar (slider yang sedang digeser tetap utuh)
   $('ctl').classList.remove('wait');
@@ -708,17 +711,34 @@ async function chatSend(raw) {
   catch { toast('Pesan gagal terkirim'); }
 }
 // Dipanggil setelah masuk meja. rt = { url, key } dari server; sesi login dibaca dari localStorage oleh supabase-js.
+// Status sambungan ditulis ke chatNote supaya kalau chat tidak muncul, alasannya kelihatan di layar.
+let chatNote = '', chatTries = 0, sbClient = null;
+function noteChat(t) { chatNote = t; if (S) render(); }
 async function chatStart(rt) {
-  if (chan || !rt || !window.supabase || !match) return;
+  if (chan || !match) return;
+  if (!rt || !rt.url || !rt.key) return noteChat('Chat belum aktif: server belum mengirim alamat chat. Refresh halaman.');
+  if (!window.supabase) return noteChat('Chat belum aktif: modul chat gagal dimuat. Refresh halaman.');
   try {
-    const sb = window.supabase.createClient(rt.url, rt.key);
-    const { data } = await sb.auth.getSession();
-    if (!data.session) return;
-    await sb.realtime.setAuth(data.session.access_token);
-    chan = sb.channel('meja:' + match, { config: { private: true, broadcast: { self: false } } })
+    sbClient = sbClient || window.supabase.createClient(rt.url, rt.key);
+    const { data } = await sbClient.auth.getSession();
+    if (!data.session) return noteChat('Chat belum aktif: sesi login tidak ditemukan. Buka beranda BTP Poker League sekali, lalu masuk meja lagi.');
+    await sbClient.realtime.setAuth(data.session.access_token);
+    noteChat('Menyambungkan chat…');
+    chan = sbClient.channel('meja:' + match, { config: { private: true, broadcast: { self: false } } })
       .on('broadcast', { event: 'chat' }, ({ payload }) => chatRecv(payload))
-      .subscribe(st => { chatOk = st === 'SUBSCRIBED'; syncChatBtn(); });
-  } catch (e) { console.warn('chat tidak tersedia', e); }
+      .subscribe((st, err) => {
+        chatOk = st === 'SUBSCRIBED';
+        if (chatOk) { chatTries = 0; noteChat(''); }
+        else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') {
+          console.warn('chat:', st, err);
+          const why = err && err.message ? err.message : st;
+          const c = chan; chan = null; sbClient.removeChannel(c);
+          if (++chatTries <= 3) { noteChat('Chat terputus, mencoba lagi…'); setTimeout(() => chatStart(rt), 3000 * chatTries); }
+          else noteChat('Chat gagal tersambung (' + why + '). Kirim screenshot ini ke admin.');
+        }
+        syncChatBtn();
+      });
+  } catch (e) { console.warn('chat tidak tersedia', e); noteChat('Chat gagal dimulai (' + (e && e.message || e) + ').'); }
 }
 // Tombol chat di kanan panel bawah membuka kolom ketik; setelah pesan terkirim kolomnya ditutup lagi.
 function syncChatBtn() {
