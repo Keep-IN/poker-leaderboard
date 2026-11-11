@@ -54,6 +54,25 @@ export function bestFive(cs) {
   walk(0, [])
   return pick
 }
+// Peluang menang tiap tangan yang kartunya diketahui (dipakai untuk host): kartu meja yang belum dibuka dihitung semua
+// kemungkinannya (turn/river) atau diacak (preflop). Seri dihitung sebagai bagian pot. Hasil: 0..1 per tangan.
+const COMBO7 = []
+for (let a = 0; a < 7; a++) for (let b = a + 1; b < 7; b++) COMBO7.push([0, 1, 2, 3, 4, 5, 6].filter(i => i !== a && i !== b))
+const best7 = cs => { let m = 0; for (const h of COMBO7) { const v = score5(h.map(i => cs[i])); if (v > m) m = v } return m }
+export function equities(hands, board, iters = 1200) {
+  const used = new Set([...board, ...hands.flat()]), rest = [...Array(52).keys()].filter(c => !used.has(c))
+  const need = 5 - board.length, share = hands.map(() => 0)
+  const run = extra => {
+    const b = board.concat(extra), sc = hands.map(h => best7(h.concat(b))), top = Math.max(...sc), w = sc.filter(v => v === top).length
+    sc.forEach((v, i) => { if (v === top) share[i] += 1 / w })
+  }
+  let n = 0
+  if (need > 2) for (; n < iters; n++) { const d = rest.slice(); for (let i = 0; i < need; i++) { const j = i + randomInt(d.length - i); [d[i], d[j]] = [d[j], d[i]] } run(d.slice(0, need)) }
+  else if (need === 2) for (let i = 0; i < rest.length; i++) for (let j = i + 1; j < rest.length; j++) { run([rest[i], rest[j]]); n++ }
+  else if (need === 1) for (const c of rest) { run([c]); n++ }
+  else { run([]); n = 1 }
+  return share.map(v => v / n)
+}
 // Jeda tambahan sebelum hand berikutnya: tiap kombinasi pemain disorot bergantian di layar.
 export const REVEAL_MS = env('REVEAL_MS', 1500), REVEAL_LEAD_MS = 900
 
@@ -231,6 +250,19 @@ export class Table {
   }
 
   sitIn(i) { this.players[i].sitOut = false; this.players[i].afk = 0 }
+
+  // Peluang menang semua pemain yang masih di hand, untuk host (yang hanya menerima angkanya, bukan kartunya).
+  // Kunci berubah hanya saat kartu meja atau pemain yang tersisa berubah, supaya hasilnya bisa disimpan sementara.
+  oddsKey() {
+    if (!this.betting) return null
+    return [this.handNo, this.board.join('.'), this.players.map((q, i) => q.inHand && !q.folded ? i : '').join(',')].join('|')
+  }
+  odds() {
+    const live = this.players.map((q, i) => ({ q, i })).filter(({ q }) => q.inHand && !q.folded)
+    if (!this.betting || live.length < 2) return live.map(({ i }) => ({ i, p: 1 }))
+    const e = equities(live.map(({ q }) => q.cards), this.board)
+    return live.map(({ i }, k) => ({ i, p: e[k] }))
+  }
 
   // Pemain yang membuka kartu di showdown, dari kombinasi terlemah sampai terkuat (seri: urutan kursi).
   showdownOrder() {

@@ -1,6 +1,6 @@
 // Tes mesin turnamen: `node api/_lib/poker.test.js` (mencetak "semua tes lulus").
 import assert from 'node:assert'
-import { AFK_HANDS, LEVELS, REVEAL_MS, TURN_MS, Table, best, bestFive, handName } from './poker.js'
+import { AFK_HANDS, LEVELS, REVEAL_MS, TURN_MS, Table, best, bestFive, equities, handName } from './poker.js'
 
 const C = s => s.split(' ').map(x => 'shdc'.indexOf(x[1]) * 13 + '23456789TJQKA'.indexOf(x[0]))
 const S = s => best(C(s))
@@ -12,6 +12,12 @@ assert(S('Ah Ad Kc 4s 5h 9d 2c') > S('Ah Ad Qc 4s 5h 9d 2c'))  // kicker
 assert.equal(handName(C('Ah Ad'), C('Ac Ks Kh')), 'Full House')
 assert.deepEqual(bestFive(C('Ah Ad 2c 7d Ac Ks Kh')).sort(), C('Ah Ad Ac Ks Kh').sort()) // pilih 5 kartu terbaik dari 7
 assert.equal(best(bestFive(C('9h 8h 2c 3d 7h 6h 5h'))), S('9h 8h 7h 6h 5h 2c 3d'))
+{ // peluang menang (host): AA vs KK preflop ~82%, turn/river dihitung pasti
+  const [a, k] = equities([C('As Ah'), C('Ks Kh')], [], 4000)
+  assert(a > .77 && a < .87 && Math.abs(a + k - 1) < 1e-9, 'AA vs KK ' + a)
+  assert.deepEqual(equities([C('Ac Kc'), C('Qd Qc')], C('Ad Qs 7h 2s')), [0, 1])
+  assert.deepEqual(equities([C('As Kd'), C('Ah Kc')], C('2c 7d 9h Js 3c')), [.5, .5])
+}
 
 // ---- alat uji: waktu dikendalikan manual, kursi diurutkan P0, P1, ... supaya bisa diprediksi ----
 const cfg = (o = {}) => ({ sb: 10, start_chips: 1000, level_minutes: 10, ...o })

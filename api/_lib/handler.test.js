@@ -51,6 +51,7 @@ assert(![a.token, b.token, c.token].includes(hst.token))
 assert.equal((await post({ token: hst.token, type: 'check' })).gone, true) // host tidak bisa beraksi
 const hv = await get({ token: hst.token })
 assert(hv.s.hostView && hv.s.me === -1)
+assert(hv.s.players.every(q => q.cards.every(c => c === -1)) && !JSON.stringify(hv).includes('"best"'))
 assert(!a.host)
 const w = await get({ watch: '1' })
 assert.equal(w.s.me, -1)
@@ -70,9 +71,13 @@ offset += 16000
 const tok = { [a.token]: 'A', [b.token]: 'B', [c.token]: 'C' }
 let s = (await get({ token: a.token })).s
 assert.equal(s.phase, 'preflop')
-// pemain hanya melihat kartunya sendiri; host juga tidak melihat kartu tertutup siapa pun
+// pemain hanya melihat kartunya sendiri; host juga tidak melihat kartu tertutup siapa pun, hanya peluang menang
 assert.deepEqual(s.players.filter((_, k) => k !== s.me).map(q => q.cards), [[-1, -1], [-1, -1]])
-assert((await get({ token: hst.token })).s.players.every(q => q.cards.every(c => c === -1)))
+const hs = (await get({ token: hst.token })).s
+assert(hs.players.every(q => q.cards.every(c => c === -1)))
+assert.equal(hs.odds.length, 3)
+assert(Math.abs(hs.odds.reduce((x, o) => x + o.p, 0) - 1) < 1e-9)
+assert.equal(s.odds, undefined) // pemain tidak menerima peluang orang lain
 
 // tiap giliran: pemain yang sedang giliran all-in; ulangi sampai turnamen selesai
 let guard = 0

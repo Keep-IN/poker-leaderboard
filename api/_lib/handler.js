@@ -59,6 +59,21 @@ async function ensureTable(db, match) {
   await db.create(match, JSON.parse(JSON.stringify(t)), dueOf(t))
 }
 
+// Tampilan host: seperti penonton (kartu tertutup) ditambah peluang menang semua pemain yang masih di hand.
+// Peluang dihitung di server supaya kartu pemain tidak pernah dikirim ke host; hasilnya disimpan per keadaan kartu.
+const oddsCache = new Map()
+function hostView(match, t) {
+  const s = t.view(null, true), key = t.oddsKey()
+  if (!key) return s
+  const ck = match + '|' + key
+  if (!oddsCache.has(ck)) {
+    if (oddsCache.size > 200) oddsCache.clear()
+    oddsCache.set(ck, t.odds())
+  }
+  s.odds = oddsCache.get(ck)
+  return s
+}
+
 async function getState(db, match, token, v, watch) {
   if (v !== undefined && v !== '') {
     const m = await db.meta(match)
@@ -74,7 +89,7 @@ async function getState(db, match, token, v, watch) {
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
   if (r.status === 'finished') return finalView(db, match, token)
   if (r.status) return ended(r.status)
-  if (token && token === r.t.hostToken) return { v: r.ver, s: r.t.view(null, true) }
+  if (token && token === r.t.hostToken) return { v: r.ver, s: hostView(match, r.t) }
   const p = r.t.find(token)
   if (!p && !watch) return { gone: true }
   return { v: r.ver, s: r.t.view(p ?? null) }
@@ -105,7 +120,7 @@ async function join(db, match, accessToken) {
   })
   if (r.missing) return { error: 'Meja hanya bisa dibuka setelah match online dimulai' }
   if (r.status) return r.status === 'finished' ? { watch: true, ...(host && { host: true }) } : ended(r.status)
-  return { ...r.out, v: r.ver, s: r.out.host ? r.t.view(null, true) : r.t.view(r.t.find(r.out.token) ?? null) }
+  return { ...r.out, v: r.ver, s: r.out.host ? hostView(match, r.t) : r.t.view(r.t.find(r.out.token) ?? null) }
 }
 
 async function act(db, match, b) {
