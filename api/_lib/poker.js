@@ -241,7 +241,8 @@ export class Table {
 
   // State untuk satu pemain (atau penonton kalau me = null): kartu lawan disembunyikan sampai showdown;
   // token, uid, dan dek tidak pernah ikut.
-  view(me) {
+  // hostView: host match (tidak ikut main) melihat kartu semua pemain yang masih di hand, untuk peluang menang.
+  view(me, hostView = false) {
     const i = me ? this.players.indexOf(me) : -1, N = this.players
     const hand = q => (q === me ? q.inHand && !q.folded : q.show && !q.folded) && this.board.length > 2 ? handName(q.cards, this.board) : ''
     const lvl = this.level(), nextSb = LEVELS[Math.min(LEVELS.length - 1, lvl + 1)]
@@ -262,10 +263,11 @@ export class Table {
       players: N.map(q => ({
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,
         online: this.online(q), won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
-        cards: q === me || q.show ? q.cards : q.inHand && !q.folded ? [-1, -1] : [],
+        cards: q === me || q.show || (hostView && q.inHand && !q.folded) ? q.cards : q.inHand && !q.folded ? [-1, -1] : [],
       })),
     }
     if (i >= 0 && this.turn === i) v.ctl = this.ctl(i)
+    if (hostView) v.hostView = true
     return v
   }
 }

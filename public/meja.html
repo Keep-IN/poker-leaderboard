@@ -268,6 +268,20 @@ body.watching #panel{display:block}
 body.watching #chatFab{top:50%;transform:translateY(-50%)}
 body.watching #chatFab:active{transform:translate(2px,calc(-50% + 2px))}
 body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height:0;margin-bottom:8px}
+/* peluang menang: milik sendiri di kiri bawah meja (di atas panel), semua pemain untuk host di kanan atas */
+#odds{position:absolute;left:14px;bottom:6px;z-index:4;display:flex;align-items:center;gap:8px;padding:5px 10px;border:1.5px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2);box-shadow:2px 2px 0 #0006}
+#odds b{font-size:15px;letter-spacing:0;color:var(--hn)}
+#odds .bar{width:54px;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+#odds .bar i{display:block;height:100%;background:var(--gold);transition:width .4s ease}
+#hostOdds{position:absolute;right:10px;top:4px;z-index:4;min-width:150px;max-width:46%;padding:6px 8px;border:1.5px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--fg);box-shadow:2px 2px 0 #0006}
+#hostOdds .t{margin-bottom:4px;color:var(--fg2);text-transform:uppercase;letter-spacing:.08em}
+#hostOdds .r{display:grid;grid-template-columns:minmax(0,1fr) 34px 38px;align-items:center;gap:6px;padding:1px 0}
+#hostOdds .n{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#hostOdds .bar{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+#hostOdds .bar i{display:block;height:100%;background:var(--gold)}
+#hostOdds .p{text-align:right;font-weight:700}
+#hostOdds .r.top .p{color:var(--hn)}
+@media(max-width:520px){#hostOdds{min-width:0;max-width:52%;font-size:9px;top:2px;right:6px}#odds{left:8px;bottom:4px}}
 @media(min-width:700px){
   :root{--sw:124px}
   #top{min-height:86px}
@@ -408,6 +422,8 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
     <div id="felt"></div><div id="seats"></div>
     <div id="center"><div id="reveal" aria-live="polite"></div><div id="board"></div><div id="pot"></div><div id="win"></div></div>
     <div id="bubbles" aria-live="polite"></div>
+    <div id="odds" hidden></div>
+    <div id="hostOdds" hidden></div>
   </div>
   <div id="panel">
     <form id="chat" hidden autocomplete="off">
@@ -547,7 +563,8 @@ async function enter() {
 function apply(v, s) {
   if (v < ver) return; // balasan lama yang datang terlambat
   ver = v; S = s; endAt = Date.now() + s.left;
-  $('join').hidden = true; $('game').hidden = false; render();
+  if (s.hostView) isHost = true; // token host tersimpan: tetap dikenali sebagai host setelah refresh
+  $('join').hidden = true; $('game').hidden = false; render(); scheduleOdds();
 }
 async function poll() {
   clearTimeout(pollT);
@@ -872,6 +889,66 @@ addEventListener('keydown', e => {
 });
 $('chat').onsubmit = e => { e.preventDefault(); const v = $('chatIn').value; closeChat(); chatSend(v); };
 setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
+
+// ---- peluang menang ----
+// Pemain: kartu sendiri + kartu meja melawan sejumlah lawan yang masih main dengan kartu acak dari sisa dek
+// (kartu lawan tidak diketahui). Host: semua kartu pemain diketahui, jadi hanya kartu meja yang belum dibuka diacak/dihitung.
+// Seri dihitung sebagai bagian pot (1/jumlah pemenang).
+const HANDS7 = [];
+for (let a = 0; a < 7; a++) for (let b = a + 1; b < 7; b++) HANDS7.push([...Array(7).keys()].filter(i => i !== a && i !== b));
+function score5(cs) {
+  const r = cs.map(c => c % 13 + 2).sort((x, y) => y - x), flush = cs.every(c => (c / 13 | 0) === (cs[0] / 13 | 0)), cnt = {};
+  r.forEach(x => cnt[x] = (cnt[x] || 0) + 1);
+  const g = Object.keys(cnt).map(Number).sort((x, y) => cnt[y] - cnt[x] || y - x), shape = g.map(x => cnt[x]).join('');
+  const hi = g.length === 5 ? (r[0] - r[4] === 4 ? r[0] : r[0] === 14 && r[1] === 5 ? 5 : 0) : 0;
+  const [c, tb] = hi && flush ? [8, [hi]] : shape === '41' ? [7, g] : shape === '32' ? [6, g] : flush ? [5, g]
+    : hi ? [4, [hi]] : shape === '311' ? [3, g] : shape === '221' ? [2, g] : shape === '2111' ? [1, g] : [0, g];
+  return tb.concat([0, 0, 0, 0, 0]).slice(0, 5).reduce((x, y) => x * 15 + y, c);
+}
+const best7 = cs => { let m = 0; for (const h of HANDS7) { const v = score5(h.map(i => cs[i])); if (v > m) m = v; } return m; };
+const rnd = n => Math.random() * n | 0;
+function draw(deck, k) { for (let i = 0; i < k; i++) { const j = i + rnd(deck.length - i); [deck[i], deck[j]] = [deck[j], deck[i]]; } return deck.slice(0, k); }
+// hands: daftar 2 kartu (null = tidak diketahui, diacak); hasil: bagian pot rata-rata tiap tangan, 0..1
+function equity(hands, board, iters) {
+  const used = new Set([...board, ...hands.flat().filter(c => c != null && c >= 0)]);
+  const rest = [...Array(52).keys()].filter(c => !used.has(c)), need = 5 - board.length, share = hands.map(() => 0);
+  const unknown = hands.filter(h => !h).length, sims = unknown || need > 2 ? iters : 0;
+  const run = extra => {
+    let k = 0;
+    const full = hands.map(h => h || [extra[need + 2 * k], extra[need + 2 * k++ + 1]]);
+    const b = board.concat(extra.slice(0, need)), sc = full.map(h => best7(h.concat(b))), top = Math.max(...sc);
+    const win = sc.filter(v => v === top).length;
+    sc.forEach((v, i) => { if (v === top) share[i] += 1 / win; });
+  };
+  let n = 0;
+  if (sims) for (; n < sims; n++) run(draw(rest.slice(), need + 2 * unknown));
+  else if (need === 0) { run([]); n = 1; }
+  else if (need === 1) for (const c of rest) { run([c]); n++; }
+  else for (let i = 0; i < rest.length; i++) for (let j = i + 1; j < rest.length; j++) { run([rest[i], rest[j]]); n++; }
+  return share.map(v => v / n);
+}
+let oddsKey = '', oddsT = 0;
+const pct = x => (x >= .995 && x < 1 ? '>99' : x > 0 && x < .005 ? '<1' : Math.round(x * 100)) + '%';
+function scheduleOdds() { clearTimeout(oddsT); oddsT = setTimeout(drawOdds, 30); }
+function drawOdds() {
+  const betting = S && ['preflop', 'flop', 'turn', 'river'].includes(S.phase);
+  const live = betting ? S.players.map((p, k) => ({ p, k })).filter(({ p }) => p.inHand && !p.folded) : [];
+  const P = S && S.players[S.me], mine = betting && P && P.inHand && !P.folded && P.cards.length === 2 && P.cards[0] >= 0;
+  const host = betting && isHost && S.me < 0 && live.length > 1 && live.every(({ p }) => p.cards.length === 2 && p.cards[0] >= 0);
+  $('odds').hidden = !mine; $('hostOdds').hidden = !host;
+  const key = [S && S.no, S && S.board.join(), live.map(({ k }) => k).join(), mine && P.cards.join(), host].join('|');
+  if (key === oddsKey || (!mine && !host)) { if (!mine && !host) oddsKey = ''; return; }
+  oddsKey = key;
+  if (mine) {
+    const opp = live.length - 1, e = opp ? equity([P.cards, ...Array(opp).fill(null)], S.board, Math.max(1000, Math.round(6000 / (opp + 1))))[0] : 1;
+    set($('odds'), `Peluang menang <b>${pct(e)}</b><span class="bar"><i style="width:${e * 100}%"></i></span><span>vs ${opp} lawan</span>`);
+  }
+  if (host) {
+    const e = equity(live.map(({ p }) => p.cards), S.board, 3000), top = Math.max(...e);
+    set($('hostOdds'), '<div class="t">Peluang menang</div>' + live.map(({ p }, i) => ({ p, e: e[i] })).sort((a, b) => b.e - a.e)
+      .map(({ p, e: x }) => `<div class="r${x === top ? ' top' : ''}"><span class="n">${esc(p.name)}</span><span class="bar"><i style="width:${x * 100}%"></i></span><span class="p">${pct(x)}</span></div>`).join(''));
+  }
+}
 
 // ---- layar tetap menyala selama meja dibuka (Screen Wake Lock). Browser melepasnya saat tab disembunyikan,
 // jadi diminta lagi saat tab terlihat lagi; sebagian browser (Safari) baru mengizinkan setelah ada sentuhan. ----

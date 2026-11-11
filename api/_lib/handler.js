@@ -74,6 +74,7 @@ async function getState(db, match, token, v, watch) {
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
   if (r.status === 'finished') return finalView(db, match, token)
   if (r.status) return ended(r.status)
+  if (token && token === r.t.hostToken) return { v: r.ver, s: r.t.view(null, true) }
   const p = r.t.find(token)
   if (!p && !watch) return { gone: true }
   return { v: r.ver, s: r.t.view(p ?? null) }
@@ -92,18 +93,19 @@ async function join(db, match, accessToken) {
   const uid = await db.user(String(accessToken || ''))
   if (!uid) return { error: 'Sesi login habis, buka ulang dari halaman match', auth: true }
   await ensureTable(db, match)
+  // Host match (tidak ikut main) mendapat token sendiri: boleh chat dan melihat kartu semua pemain untuk peluang menang.
+  const host = (await db.seats(match))?.match.dealer_id === uid
   const r = await mutate(db, match, t => {
     const p = t.players.find(q => q.uid === uid)
+    if (!p && host) { if (!t.hostToken) t.hostToken = randomUUID(); return { token: t.hostToken, host: true } }
     if (!p) return { watch: true }
     if (!p.token) p.token = randomUUID() // satu token per pemain, dipakai juga kalau buka dari perangkat lain
     p.seen = t.now
     return { token: p.token }
   })
   if (r.missing) return { error: 'Meja hanya bisa dibuka setelah match online dimulai' }
-  if (r.status) return r.status === 'finished' ? { watch: true } : ended(r.status)
-  // Penonton yang ternyata host match boleh ikut chat (bubble-nya muncul di dekat bandar).
-  const host = r.out.watch ? (await db.seats(match))?.match.dealer_id === uid : false
-  return { ...r.out, ...(host && { host: true }), v: r.ver, s: r.t.view(r.t.find(r.out.token) ?? null) }
+  if (r.status) return r.status === 'finished' ? { watch: true, ...(host && { host: true }) } : ended(r.status)
+  return { ...r.out, v: r.ver, s: r.out.host ? r.t.view(null, true) : r.t.view(r.t.find(r.out.token) ?? null) }
 }
 
 async function act(db, match, b) {
