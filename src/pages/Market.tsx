@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import ConfirmSheet from '../components/ConfirmSheet'
 import { Button, Card, EmptyState, ErrorText, PageLoader, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { CARD_ICONS, KIND_LABELS, type SkillCard } from '../lib/cards'
+import { CARD_ICONS, KIND_LABELS, kindRank, type SkillCard } from '../lib/cards'
 import { useCoins } from '../lib/coins'
 import { errorMessage, supabase } from '../lib/supabase'
 
@@ -11,8 +11,8 @@ function useCatalog() {
   const [cards, setCards] = useState<SkillCard[] | null>(null)
   const load = useCallback(async () => {
     const { data } = await supabase.from('skill_cards').select('*').order('sort')
-    // kartu cursed (wildcard) selalu paling atas
-    setCards(((data as SkillCard[]) ?? []).sort((x, y) => Number(y.kind === 'wildcard') - Number(x.kind === 'wildcard')))
+    // kartu cursed (wildcard) selalu paling atas, lalu angelic
+    setCards(((data as SkillCard[]) ?? []).sort((x, y) => kindRank(x.kind) - kindRank(y.kind)))
   }, [])
   useEffect(() => {
     load()
@@ -124,25 +124,26 @@ export default function Market() {
 
 export function CardTile({ card: c, children, dim }: { card: Pick<SkillCard, 'code' | 'name' | 'kind' | 'description'>; children?: React.ReactNode; dim?: boolean }) {
   const kind = KIND_LABELS[c.kind] ?? KIND_LABELS.passive
-  const cursed = c.kind === 'wildcard'
+  const cursed = c.kind === 'wildcard', angel = c.kind === 'angelic'
   return (
-    <Card className={cx('relative overflow-hidden', cursed && 'cursed-card', dim && 'opacity-60')}>
-      <div className={cx('pointer-events-none absolute -top-4 -right-2 text-[90px] leading-none', cursed ? 'opacity-[0.12]' : 'opacity-[0.07]')}>
-        {cursed ? '☠️' : CARD_ICONS[c.code] ?? '🃏'}
+    <Card className={cx('relative overflow-hidden', cursed && 'cursed-card', angel && 'angel-card', dim && 'opacity-60')}>
+      <div className={cx('pointer-events-none absolute -top-4 -right-2 text-[90px] leading-none', cursed || angel ? 'opacity-[0.12]' : 'opacity-[0.07]')}>
+        {cursed ? '☠️' : angel ? '🪽' : CARD_ICONS[c.code] ?? '🃏'}
       </div>
       {cursed && <span className="cursed-label">☠ Cursed · Overpowered</span>}
+      {angel && <span className="angel-label">✦ Angelic · Holy ✦</span>}
       <div className="relative flex items-start gap-3">
-        <span className={cx('flex size-12 shrink-0 items-center justify-center rounded-xl text-2xl', cursed ? 'cursed-icon' : 'bg-brand-400/15')}>
+        <span className={cx('flex size-12 shrink-0 items-center justify-center rounded-xl text-2xl', cursed ? 'cursed-icon' : angel ? 'angel-icon' : 'bg-brand-400/15')}>
           {CARD_ICONS[c.code] ?? '🃏'}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className={cx('font-bold', cursed && 'cursed-name')}>{c.name}</p>
+            <p className={cx('font-bold', cursed && 'cursed-name', angel && 'angel-name')}>{c.name}</p>
             <span className={cx('rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', kind.tone)}>
               {kind.icon} {kind.label}
             </span>
           </div>
-          <p className={cx('mt-1 text-sm', cursed ? 'text-[#ffb3c0]' : 'text-slate-400')}>{c.description}</p>
+          <p className={cx('mt-1 text-sm', cursed ? 'text-[#ffb3c0]' : angel ? 'text-[#6b5a22]' : 'text-slate-400')}>{c.description}</p>
         </div>
       </div>
       <div className="relative">{children}</div>
@@ -190,6 +191,7 @@ function DealerListing({ card, onSaved }: { card: SkillCard; onSaved: () => void
         </Button>
       </div>
       {card.kind === 'wildcard' && !onSale && <p className="mt-2 text-xs text-[#ff8da0]">☠ Tersembunyi dari player sampai kamu centang "Dijual di market".</p>}
+      {card.kind === 'angelic' && !onSale && <p className="mt-2 text-xs font-medium text-[#9a7408]">✦ Tersembunyi dari player sampai kamu centang "Dijual di market".</p>}
       {msg && <p className="mt-1 text-right text-xs text-slate-400">{msg}</p>}
     </CardTile>
   )

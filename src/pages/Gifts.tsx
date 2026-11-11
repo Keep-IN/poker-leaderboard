@@ -185,7 +185,7 @@ export default function Gifts() {
               <option value="">Tanpa kartu</option>
               {cards.map((c) => (
                 <option key={c.code} value={c.code}>
-                  {CARD_ICONS[c.code] ?? '🃏'} {c.name}{c.kind === 'wildcard' ? ' ☠' : ''}
+                  {CARD_ICONS[c.code] ?? '🃏'} {c.name}{c.kind === 'wildcard' ? ' ☠' : c.kind === 'angelic' ? ' ✦' : ''}
                 </option>
               ))}
             </select>

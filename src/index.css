@@ -190,3 +190,62 @@ body {
 .gift-bounce{animation:giftBounce 1.6s ease-in-out infinite;transform-origin:50% 90%}
 @keyframes giftBounce{0%,60%,100%{transform:none}70%{transform:rotate(-12deg) scale(1.15)}80%{transform:rotate(10deg) scale(1.15)}90%{transform:rotate(-4deg)}}
 @media(prefers-reduced-motion:reduce){.gift-bounce{animation:none}}
+
+/* ---- kartu Angelic (Revive Card): putih suci bersinar, kebalikan cursed ---- */
+.angel-card {
+  color: #3b3320;
+  background:
+    radial-gradient(120% 80% at 50% -10%, #ffffff, transparent 60%),
+    radial-gradient(80% 70% at 100% 100%, #ffe9a066, transparent 60%),
+    linear-gradient(170deg, #fffef8, #fff4cf 75%, #f5e3a8) !important;
+  border: 1.5px solid #f3dc8a !important;
+  box-shadow: 0 0 0 1px #fff inset, 0 0 22px #fff3b0aa, 0 0 48px #ffe9a055;
+  animation: angel-glow 3s ease-in-out infinite;
+}
+.angel-card::before {
+  content: '';
+  position: absolute;
+  inset: -60%;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg at 50% 0%, #fffbe633 0 4deg, transparent 4deg 16deg);
+  animation: pod-spin 24s linear infinite;
+}
+.angel-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, #ffffffcc 48%, transparent 66%);
+  background-size: 250% 100%;
+  animation: angel-sheen 3.6s ease-in-out infinite;
+  mix-blend-mode: soft-light;
+}
+.angel-card > :not(.absolute) { position: relative; z-index: 1; }
+.angel-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 2px 10px;
+  border: 1px solid #e9c85a;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #9a7408;
+  background: #fffdf3;
+  box-shadow: 0 0 10px #fff1a8;
+}
+.angel-icon { background: radial-gradient(circle, #ffffff, #fff1c2); box-shadow: 0 0 16px #ffe9a0, inset 0 0 0 1px #f3dc8a; }
+.angel-name { color: #5a4a1c; text-shadow: 0 0 10px #fff3b0; }
+@keyframes angel-glow {
+  0%, 100% { box-shadow: 0 0 0 1px #fff inset, 0 0 16px #fff3b088, 0 0 40px #ffe9a044; }
+  50% { box-shadow: 0 0 0 1px #fff inset, 0 0 30px #fff6c8, 0 0 70px #ffe9a088; }
+}
+@keyframes angel-sheen { 0%, 100% { background-position: 120% 0; } 50% { background-position: -20% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .angel-card, .angel-card::before, .angel-card::after { animation: none; }
+}
+/* teks abu-abu bawaan terlalu pucat di atas kartu putih */
+.angel-card .text-slate-400, .angel-card .text-slate-500 { color: #7a6526; }
+.angel-card .text-slate-300, .angel-card .text-slate-200 { color: #5a4a1c; }
+.angel-card input[type='number'] { background: #ffffffcc; border-color: #e9c85a; color: #3b3320; }

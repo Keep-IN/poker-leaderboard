@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Card, EmptyState, PageLoader, SectionTitle } from '../components/ui'
-import { useMyCards, type OwnedCard } from '../lib/cards'
+import { kindRank, useMyCards, type OwnedCard } from '../lib/cards'
 import { formatDate } from '../lib/format'
 import { CardTile } from './Market'
 
@@ -13,6 +13,7 @@ const howToUse: Record<string, string> = {
   duel_me: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih lawan duel. Jalan di hand berikutnya.',
   get_out: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih korban. Jalan setelah hand selesai.',
   go_big: 'Pakai di meja online lewat 🎒 saat hand berjalan (pemain minimal 3). Lawan yang fold kena denda 50% chip.',
+  revive: 'Pakai di meja online lewat 🎒 (pemain tersisa minimal 3), pilih pemain yang tersingkir, termasuk dirimu sendiri.',
   card_reroll: 'Pakai di meja online lewat 🎒 saat hand berjalan: 2 kartu tanganmu ditukar dengan kartu baru.',
 }
 
@@ -25,7 +26,7 @@ export default function Inventory() {
   const used = cards.filter((c) => c.status === 'used')
   // kartu yang sama digabung: tampil satu kali dengan jumlahnya
   const groups = [...owned.reduce((m, c) => m.set(c.card_code, [...(m.get(c.card_code) ?? []), c]), new Map<string, OwnedCard[]>()).values()]
-    .sort((x, y) => Number(y[0].card?.kind === 'wildcard') - Number(x[0].card?.kind === 'wildcard')) // kartu cursed paling atas
+    .sort((x, y) => kindRank(x[0].card?.kind) - kindRank(y[0].card?.kind)) // kartu cursed paling atas, lalu angelic
 
   return (
     <div className="space-y-5">

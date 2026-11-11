@@ -432,6 +432,40 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.deepEqual(t.board, deck.slice(-3).reverse(), 'flop tetap kartu yang sama')
 }
 
+{ // Revive Card: pemain tersingkir hidup lagi dengan chip awal di hand berikutnya; peringkat disusun ulang
+  const fin = u => { while (u.betting) ok(u, u.turn, u.ctl(u.turn).call ? 'call' : 'check') }
+  // tersingkir di antara hand (seperti bust): chip ke `forfeited` supaya total chip tetap tercatat
+  const kill = (u, k) => { const q = u.players[k]; u.forfeited += q.chips; q.chips = 0; q.place = u.players.length - u.out.length; u.out.push(q.uid) }
+  const t = mk([1000, 1000, 1000, 1000]); begin(t); fin(t)
+  kill(t, 2); kill(t, 3)
+  assert.equal(typeof t.useCard(0, 'revive', 1), 'string', 'yang masih bertahan tidak bisa')
+  assert.equal(typeof t.useCard(0, 'revive', 3), 'string', 'pemain tersisa 2: tidak bisa')
+  // dipakai oleh pemain yang tersingkir untuk dirinya sendiri, di tengah hand
+  const u = mk([1000, 1000, 1000, 1000]); begin(u); fin(u); kill(u, 3); nxt(u)
+  assert(u.betting && !u.players[3].inHand)
+  assert.equal(typeof u.useCard(1, 'revive', 0), 'string')
+  assert.equal(u.useCard(3, 'revive', 3, 'card-r'), undefined)
+  assert.equal(u.ann.code, 'revive'); assert.equal(u.ann.extra, '1000')
+  assert.equal(u.view(u.players[0]).reviveNext, 3)
+  assert.equal(typeof u.useCard(0, 'revive', 3), 'string', 'satu revive menunggu')
+  assert(!u.players[3].inHand, 'baru ikut hand berikutnya')
+  fin(u); nxt(u)
+  assert.equal(u.players[3].place, 0); assert(u.players[3].inHand); assert.equal(u.players[3].revived, 1)
+  assert.deepEqual(u.out, []); assert.equal(u.minted, 1000)
+  // peringkat disusun ulang
+  const w = mk([1000, 1000, 1000, 1000, 1000]); begin(w); fin(w); kill(w, 3); kill(w, 4)
+  assert.deepEqual([w.players[3].place, w.players[4].place], [5, 4])
+  assert.equal(w.useCard(0, 'revive', 3), undefined); nxt(w)
+  assert.deepEqual([w.players[3].place, w.players[4].place], [0, 5])
+  // batal kalau sebelum dijalankan pemain jadi tinggal 2: kartu dikembalikan
+  const x = mk([1000, 1000, 1000, 1000]); begin(x); fin(x); kill(x, 3); nxt(x)
+  assert.equal(x.useCard(0, 'revive', 3, 'card-x'), undefined)
+  fin(x); kill(x, 2); nxt(x)
+  assert.deepEqual(x.refunds, [{ uid: 'u0', card: 'card-x' }]); assert.equal(x.players[3].chips, 0)
+  // meja lama tanpa startChips: dihitung dari chip yang ada (termasuk yang di pot)
+  const y = mk([1500, 1500, 1500]); delete y.startChips; begin(y); assert.equal(y.startChipsOf(), 1500)
+}
+
 { // fuzz: aksi acak dan timeout, state selalu dimuat ulang dari JSON; chip tetap, urutan tersingkir konsisten, selalu selesai
   for (let round = 0; round < 300; round++) {
     const n = 3 + (round % 6), R = k => Math.random() * k | 0
@@ -444,7 +478,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
       if (t.turn >= 0) {
         const i = t.turn, c = t.ctl(i), r = Math.random()
         if (r < .03) { // boleh gagal (fold/sudah pakai/target salah): tidak mengubah apa-apa
-          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll'][R(10)]
+          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive'][R(11)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
         if (r < .05) run(t, TURN_MS)
@@ -453,7 +487,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
         else ok(t, i, 'raise', c.minTo + R(c.maxTo - c.minTo + 1))
       } else if (t.due) run(t, Math.max(0, t.due.at - t.now))
       assert(t.players.every(p => p.chips >= 0))
-      if (!t.betting) assert.equal(t.players.reduce((s, p) => s + p.chips, 0) + t.forfeited, total)
+      if (!t.betting) assert.equal(t.players.reduce((s, p) => s + p.chips, 0) + t.forfeited, total + (t.minted || 0))
       if (t.turn >= 0) { const p = t.players[t.turn]; assert(p.inHand && !p.folded && !p.allIn && p.chips > 0, 'giliran jatuh ke pemain yang salah') }
     }
     assert.equal(t.phase, 'over', 'turnamen macet')

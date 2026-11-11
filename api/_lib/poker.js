@@ -100,6 +100,9 @@ export const SKILLS = {
   go_big: { name: 'Go Big or Go Home!', icon: '🔥', open: true, big: true },
   // Card Reroll: 2 kartu tangan dikembalikan ke bandar, diganti 2 kartu baru dari dek.
   card_reroll: { name: 'Card Reroll', icon: '🔄', open: true },
+  // Angelic: Revive Card menghidupkan pemain yang sudah tersingkir (boleh dirinya sendiri) dengan chip awal match.
+  // Langsung diumumkan; pemain itu ikut lagi mulai hand berikutnya. Tidak bisa dipakai kalau pemain tersisa tinggal 2.
+  revive: { name: 'Revive Card', icon: '😇', angel: true },
 }
 /** Jeda pengumuman wildcard sebelum hand berikutnya dibagi. */
 export const WILD_MS = env('WILD_MS', 5000)
@@ -169,6 +172,7 @@ export class Table {
     ;[t.sb, t.bb] = t.blinds()
     t.started = true
     t.lobby = true
+    t.startChips = cfg.start_chips
     return t
   }
   static from(o) { return Object.assign(new Table(), o) }
@@ -196,6 +200,7 @@ export class Table {
   startHand() {
     if (this.betting || this.phase === 'over') return
     if (this.wild && this.wildStage()) return // jeda pengumuman wildcard dulu
+    this.applyRevive()
     let el = this.alive()
     if (el.length < 2) return this.end()
     this.duel = null
@@ -372,6 +377,16 @@ export class Table {
   canUseCard(i, code, j) {
     const p = this.players[i], sk = SKILLS[code]
     if (!sk) return 'Kartu ini tidak bisa dipakai di meja'
+    if (sk.angel) {
+      if (this.phase === 'over' || !p) return 'Match sudah selesai'
+      if (this.lobby || !this.handNo) return 'Revive baru bisa dipakai setelah ada pemain yang tersingkir'
+      if (this.alive().length <= 2) return 'Revive tidak bisa dipakai kalau pemain tersisa tinggal 2'
+      if (this.revive) return 'Sudah ada pemain yang menunggu dihidupkan, tunggu hand berikutnya'
+      const q = this.players[j]
+      if (!Number.isInteger(j) || !q) return 'Pilih pemain yang mau dihidupkan'
+      if (!q.place || q.chips > 0) return `${q.name} masih bertahan`
+      return
+    }
     if (sk.wild) {
       if (this.phase === 'over' || !p || p.place || !p.chips) return 'Kamu sudah tidak ikut turnamen ini'
       if (this.lobby || !this.handNo) return 'Wildcard baru bisa dipakai setelah match berjalan'
@@ -409,6 +424,12 @@ export class Table {
     if (err) return err
     const p = this.players[i]
     if (SKILLS[code].luck) { this.luck = { i, code }; return }
+    if (SKILLS[code].angel) {
+      this.revive = { by: p.uid, target: this.players[j].uid, card }
+      this.announce(i, code, j, String(this.startChipsOf()))
+      if (!this.betting && this.due?.kind === 'next') this.defer('next', Math.max(this.due.at - this.now, WILD_MS)) // beri waktu pengumumannya
+      return
+    }
     if (SKILLS[code].wild) {
       this.wild = { by: p.uid, target: this.players[j].uid, code, card, shown: false }
       if (!this.betting) this.defer('next', Math.max(0, Math.min(this.due ? this.due.at - this.now : 0, 1500))) // di antara hand: segera
@@ -423,6 +444,31 @@ export class Table {
       this.rr = (this.rr || 0) + 1
     }
     if (code === 'fold_player') this.forceFold(j)
+  }
+  /** Chip awal match (meja lama tidak menyimpannya: chip di meja + yang hangus dibagi jumlah pemain). */
+  startChipsOf() {
+    if (!this.startChips) { // selama hand berjalan sebagian chip ada di pot (p.total)
+      const onTable = this.players.reduce((s, p) => s + p.chips + (this.betting ? p.total : 0), 0)
+      this.startChips = Math.round((onTable + (this.forfeited || 0) - (this.minted || 0)) / this.players.length)
+    }
+    return this.startChips
+  }
+  // Revive yang menunggu: pemain itu kembali dengan chip awal sebelum hand berikutnya dibagi. Peringkat pemain yang
+  // tersingkir sesudahnya disusun ulang dari urutan `out`. Batal (kartu dikembalikan) kalau pemain tersisa tinggal 2.
+  applyRevive() {
+    const r = this.revive
+    if (!r) return
+    this.revive = null
+    const q = this.players.find(p => p.uid === r.target)
+    if (!q || !q.place || q.chips > 0 || this.alive().length <= 2) {
+      if (r.card) this.refunds = [...(this.refunds || []), { uid: r.by, card: r.card }]
+      return
+    }
+    const n = this.players.length, chips = this.startChipsOf()
+    this.out = this.out.filter(u => u !== q.uid)
+    this.out.forEach((u, k) => { const x = this.players.find(p => p.uid === u); if (x) x.place = n - k })
+    Object.assign(q, { chips, place: 0, killed: false, afkOut: false, afk: 0, sitOut: false, revived: (q.revived || 0) + 1 })
+    this.minted = (this.minted || 0) + chips
   }
   // Pengumuman di tengah meja: siapa memakai kartu apa ke siapa (extra = keterangan hasil).
   announce(i, code, j, extra = '') {
@@ -553,7 +599,7 @@ export class Table {
       afkLimit: AFK_HANDS, total: N.length, alive: N.filter(q => !q.place || q.place === 1).length,
       players: N.map(q => ({
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,
-        online: this.online(q), ready: !!q.ready, killed: !!q.killed, won: q.won, fined: q.fined || 0, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
+        online: this.online(q), ready: !!q.ready, killed: !!q.killed, revived: q.revived || 0, won: q.won, fined: q.fined || 0, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
         // skill card yang dipakai hand ini: pemiliknya selalu tahu, pemain lain baru tahu saat kartu dibuka (showdown)
         skills: seen(q) ? q.skills || [] : [], target: q.target >= 0 && (q === me || (seen(q) && !(q.skills || []).some(c => SKILLS[c]?.secret))) ? q.target : -1, saved: q.saved || 0,
         forced: !!q.forced, peek: peek(q),
@@ -567,6 +613,7 @@ export class Table {
     // pengumuman kartu Attack/Wildcard di tengah meja (beberapa detik)
     if (this.ann && this.now - this.ann.at < WILD_MS + 1500) v.ann = this.ann
     if (this.duel) v.duel = this.duel
+    if (this.revive) v.reviveNext = this.players.findIndex(p => p.uid === this.revive.target)
     if (this.big >= 0 && this.betting) v.big = this.big // Go Big or Go Home! aktif: fold kena denda
     if (i >= 0 && this.turn === i && this.bigFine(i)) v.fine = this.bigFine(i)
     if (i >= 0) v.luckBusy = !!this.luck && this.luck.i !== i // pemain lain sudah memasang kartu Luck
