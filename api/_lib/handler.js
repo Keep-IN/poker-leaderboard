@@ -25,6 +25,21 @@ const canon = v => Array.isArray(v) ? v.map(canon)
 const key = v => JSON.stringify(canon(v))
 const ended = status => ({ ended: true, status })
 
+// Bingkai podium (3 besar all time) di kursi meja: daftar disimpan sementara 5 menit per instance server.
+let podium = { at: 0, ranks: new Map() }
+async function podiumRanks(db) {
+  if (!db.podium || Date.now() - podium.at < 5 * 60000) return podium.ranks
+  try { podium = { at: Date.now(), ranks: new Map((await db.podium()).map(r => [r.player_id, r.rank])) } } catch { podium.at = Date.now() }
+  return podium.ranks
+}
+// Tambahkan peringkat podium ke tiap kursi (tanpa membocorkan uid).
+async function withPodium(db, t, res) {
+  if (!res || !res.s || !t) return res
+  const ranks = await podiumRanks(db)
+  res.s.players.forEach((q, k) => { const r = ranks.get(t.players[k]?.uid); if (r) q.podium = r })
+  return res
+}
+
 // Jalankan fn pada state terbaru lalu simpan kalau berubah. Optimistic locking: kalau request lain menulis lebih dulu,
 // ulangi dengan state baru (fn hanya boleh mengubah t). Event yang sudah jatuh tempo dijalankan dulu (t.tick).
 async function mutate(db, match, fn) {
@@ -89,10 +104,10 @@ async function getState(db, match, token, v, watch) {
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
   if (r.status === 'finished') return finalView(db, match, token)
   if (r.status) return ended(r.status)
-  if (token && token === r.t.hostToken) return { v: r.ver, s: hostView(match, r.t) }
+  if (token && token === r.t.hostToken) return withPodium(db, r.t, { v: r.ver, s: hostView(match, r.t) })
   const p = r.t.find(token)
   if (!p && !watch) return { gone: true }
-  return { v: r.ver, s: r.t.view(p ?? null) }
+  return withPodium(db, r.t, { v: r.ver, s: r.t.view(p ?? null) })
 }
 
 // Turnamen selesai: match sudah 'finished', state terakhir tetap bisa dilihat.
@@ -120,10 +135,36 @@ async function join(db, match, accessToken) {
   })
   if (r.missing) return { error: 'Meja hanya bisa dibuka setelah match online dimulai' }
   if (r.status) return r.status === 'finished' ? { watch: true, ...(host && { host: true }) } : ended(r.status)
-  return { ...r.out, v: r.ver, s: r.out.host ? hostView(match, r.t) : r.t.view(r.t.find(r.out.token) ?? null) }
+  return withPodium(db, r.t, { ...r.out, v: r.ver, s: r.out.host ? hostView(match, r.t) : r.t.view(r.t.find(r.out.token) ?? null) })
+}
+
+// Pakai skill card dari inventory: cek dulu di meja (masih di hand, belum pakai kartu), lalu tandai kartu terpakai
+// di database (memastikan kartu milik pemain ini), baru efeknya dipasang di meja.
+async function playCard(db, match, b) {
+  const token = String(b.token || ''), cardId = String(b.card || '')
+  if (!UUID_RE.test(cardId)) return { error: 'Kartu tidak valid' }
+  const peek = await db.load(match)
+  if (!peek || peek.status !== 'ongoing') return ended(peek?.status ?? 'ended')
+  const t0 = Table.from(peek.state), p0 = t0.find(token)
+  if (!p0) return { error: 'Sesi meja tidak ditemukan, buka ulang dari halaman match', gone: true }
+  t0.now = Date.now(); t0.tick()
+  const code = String(b.code || '')
+  const pre = t0.canUseCard(t0.players.indexOf(p0), code)
+  if (pre) return { error: pre }
+  let used
+  try { used = await db.useCard(match, p0.uid, cardId) } catch (e) { return { error: String(e.message).replace(/^.*?: /, '') } }
+  const r = await mutate(db, match, t => {
+    const p = t.find(token)
+    const err = p ? t.useCard(t.players.indexOf(p), used) : 'Sesi meja tidak ditemukan'
+    return err ? { error: err } : { ok: true, used }
+  })
+  if (r.status) return ended(r.status)
+  const p = r.t?.find(token)
+  return p ? withPodium(db, r.t, { ...r.out, v: r.ver, s: r.t.view(p) }) : r.out
 }
 
 async function act(db, match, b) {
+  if (b.type === 'card') return playCard(db, match, b)
   const token = String(b.token || '')
   const r = await mutate(db, match, t => {
     const p = t.find(token)
@@ -137,7 +178,7 @@ async function act(db, match, b) {
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
   if (r.status) return ended(r.status)
   const p = r.t.find(token)
-  return p ? { ...r.out, v: r.ver, s: r.t.view(p) } : r.out
+  return p ? withPodium(db, r.t, { ...r.out, v: r.ver, s: r.t.view(p) }) : r.out
 }
 
 export async function api(db, { method, query = {}, body = {} }) {

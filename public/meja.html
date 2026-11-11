@@ -268,6 +268,23 @@ body.watching #panel{display:block}
 body.watching #chatFab{top:50%;transform:translateY(-50%)}
 body.watching #chatFab:active{transform:translate(2px,calc(-50% + 2px))}
 body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height:0;margin-bottom:8px}
+/* bingkai podium all time di kursi (emas/perak/perunggu) */
+.seat.pod1 .plate{border-color:#f2c14e;box-shadow:0 0 0 2px #f2c14e88,3px 3px 0 #000b}
+.seat.pod2 .plate{border-color:#c9d1dc;box-shadow:0 0 0 2px #c9d1dc88,3px 3px 0 #000b}
+.seat.pod3 .plate{border-color:#c98a52;box-shadow:0 0 0 2px #c98a5288,3px 3px 0 #000b}
+/* skill card yang dipakai: lencana kecil di pojok kiri atas kotak nama */
+.skills{position:absolute;left:-10px;top:-12px;z-index:3;padding:1px 4px;border-radius:999px;background:#04122b;border:1.5px solid var(--gold);font-size:12px;line-height:16px;box-shadow:1px 1px 0 #000}
+/* inventory skill card di meja */
+#bagSheet{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;background:#0009}
+#bagSheet .in{width:min(440px,100%);max-height:70vh;overflow:auto;padding:16px 16px calc(16px + env(safe-area-inset-bottom));background:var(--grain),var(--panel);border-top:3px double #307fe2aa;color:var(--fg)}
+#bagSheet h3{margin:0 0 4px;font-size:20px;font-style:italic}
+#bagSheet .note{margin:0 0 12px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2)}
+#bagSheet .it{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+#bagSheet .it b{display:block;font-size:15px}
+#bagSheet .it small{display:block;color:var(--fg2);font-size:12px}
+#bagSheet .it .ic{font-size:26px}
+#bagSheet .it .btn{flex:none;padding:8px 14px;box-shadow:none}
+#bagSheet .close{margin-top:12px;width:100%}
 /* peluang menang milik sendiri: kiri bawah meja, tepat di atas panel */
 #odds{position:absolute;left:14px;bottom:6px;z-index:4;padding:4px 10px;border:1.5px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2);box-shadow:2px 2px 0 #0006}
 #odds b{margin-left:4px;font-size:15px;letter-spacing:0;color:var(--hn)}
@@ -319,6 +336,8 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 #chat .btn:disabled{opacity:.45}
 #chatFab{position:absolute;right:0;top:48px;width:36px;height:36px;padding:0;border-radius:50%;border:2px solid var(--ink);background:var(--gold);color:var(--ink);display:grid;place-items:center;cursor:pointer;z-index:2;box-shadow:2px 2px 0 #000b}
 #chatFab svg{width:18px;height:18px;fill:currentColor}
+#bag{position:absolute;right:44px;top:48px;width:36px;height:36px;padding:0;border-radius:50%;border:2px solid var(--ink);background:var(--paper);font-size:17px;line-height:1;display:grid;place-items:center;cursor:pointer;z-index:2;box-shadow:2px 2px 0 #000b}
+#bag:active{transform:translate(2px,2px);box-shadow:none}
 #chatFab:active{transform:translate(2px,2px);box-shadow:none}
 #chatX{padding:8px 12px;font-size:16px;line-height:1}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-delay:0s!important}}
@@ -432,6 +451,7 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
       <svg class="open" viewBox="0 0 24 24" aria-hidden="true"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3"/></svg>
       <svg class="off" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10.5 7 10.5 7a17.6 17.6 0 0 1-3.2 3.9"/><path d="M6.6 6.6C3.3 8.6 1.5 12 1.5 12S5.5 19 12 19c1.6 0 3-.4 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
     </button>
+    <button id="bag" type="button" hidden aria-label="Skill card" title="Skill card">🎒</button>
     <button id="chatFab" type="button" hidden aria-label="Kirim chat (Enter)" title="Kirim chat (Enter)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></button></div><div id="ctl"></div></div>
 </div>
 <div id="toast"></div>
@@ -524,7 +544,10 @@ const tagOf = (p, betting) => p.place > 1 ? ['', '#' + p.place + (p.afkOut ? ' A
   : p.sitOut ? ['red', p.afk ? `AFK ${p.afk}/${S.afkLimit}` : 'istirahat'] : !p.online ? ['', 'offline']
   : p.allIn && p.inHand && betting ? ['red', 'all-in'] : p.last ? [/^(bet|raise)/.test(p.last) ? 'red' : '', p.last]
   : p.inHand && p.folded ? ['', 'fold'] : !p.chips && !p.inHand ? ['', 'habis'] : null;
-const row3 = (p, mine, betting) => p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
+// Skill card yang dipakai hand ini (pemiliknya selalu tahu; lawan baru tahu saat kartu dibuka).
+const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'] };
+const skillBadges = p => (p.skills || []).length ? `<span class="skills" title="${p.skills.map(c => (SKILL_ICONS[c] || ['', c])[1]).join(', ')}">${p.skills.map(c => (SKILL_ICONS[c] || ['🃏'])[0]).join('')}</span>` : '';
+const row3 = (p, mine, betting) => p.saved ? `<span class="tag grn">🛡️ +${p.saved}</span>` : p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
   : (t => t ? `<span class="tag ${t[0]}">${t[1]}</span>` : '')(tagOf(p, betting));
 
 const toast = (m, good) => { const t = $('toast'); t.textContent = m; t.classList.toggle('good', !!good); t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2500); };
@@ -743,10 +766,10 @@ function render() {
     seatPos[k] = { x, y };
     const dim = p.place > 1 || p.sitOut || !p.online || (betting && (!p.inHand || p.folded));
     const cs = k === me ? '' : p.cards.map((c, j) => card(c, anims.has('r' + k + '.' + j) ? 'r' + k + '.' + j : 'c' + k + '.' + j)).join('');
-    seats += `<div data-k="${k}" class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}" style="left:${x}%;top:${y}%">
+    seats += `<div data-k="${k}" class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}${p.podium ? ' pod' + p.podium : ''}" style="left:${x}%;top:${y}%">
       <div class="cards">${cs}</div>
-      <div class="plate">${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}
-        <div class="nm">${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
+      <div class="plate">${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}${skillBadges(p)}
+        <div class="nm">${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : p.podium === 1 ? '<span class="crown" title="#1 all time">👑</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
         ${k === S.turn ? '<div class="tm"><b></b></div>' : ''}</div>${narrow && p.bet ? `<div class="sbet">${chip1(p.bet)}${p.bet}</div>` : ''}</div>`;
     if (p.bet) { sumBets += p.bet; if (!narrow) bets += `<div class="bet" style="left:${x + (50 - x) * .45}%;top:${y + (50 - y) * .45}%">${chips(p.bet)}<span>${p.bet}</span></div>`; }
   });
@@ -759,6 +782,7 @@ function render() {
     : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}</em></span>`).join(''));
 
   drawBubbles(); syncChatBtn(); drawReveal();
+  $('bag').hidden = !(me >= 0 && phase !== 'over' && !(P && P.place));
   aim();
   if (deals) flick(deals);
   const win = ps.some(p => p.won);
@@ -886,6 +910,49 @@ addEventListener('keydown', e => {
 });
 $('chat').onsubmit = e => { e.preventDefault(); const v = $('chatIn').value; closeChat(); chatSend(v); };
 setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
+
+// ---- skill card dari inventory (dibaca lewat Supabase dengan sesi login pemain; RLS hanya memberi kartu miliknya) ----
+const USABLE = { defend_me: { icon: '🛡️', name: 'Defend Me', desc: 'Kalah di hand ini? Setengah chip yang kamu taruhkan kembali.' } };
+let bagCards = [];
+async function sb() {
+  if (sbClient) return sbClient;
+  let rt = null; try { rt = JSON.parse(localStorage.getItem('meja:rt')); } catch {}
+  if (!rt || !window.supabase) return null;
+  sbClient = window.supabase.createClient(rt.url, rt.key);
+  return sbClient;
+}
+async function loadBag() {
+  const c = await sb(); if (!c) return [];
+  const { data } = await c.from('player_cards').select('id, card_code').eq('status', 'owned').in('card_code', Object.keys(USABLE));
+  bagCards = data || [];
+  return bagCards;
+}
+function canPlayCard() {
+  const P = S && S.players[S.me];
+  return P && ['preflop', 'flop', 'turn', 'river'].includes(S.phase) && P.inHand && !P.folded && !(P.skills || []).length;
+}
+async function openBag() {
+  const el = document.createElement('div'); el.id = 'bagSheet';
+  el.innerHTML = '<div class="in"><h3>🎒 Skill card</h3><p class="note">Maks 1 kartu per hand · 3 per match</p><div id="bagList">Memuat…</div><button class="btn ghost close" type="button">Tutup</button></div>';
+  el.onclick = e => { if (e.target === el || e.target.classList.contains('close')) el.remove(); };
+  document.body.appendChild(el);
+  const cards = await loadBag();
+  const groups = {}; cards.forEach(c => (groups[c.card_code] = groups[c.card_code] || []).push(c));
+  const ok = canPlayCard(), P = S && S.players[S.me];
+  const why = !P ? '' : (P.skills || []).length ? 'Kamu sudah pakai kartu di hand ini.' : !ok ? 'Bisa dipakai saat kamu ikut hand yang sedang berjalan.' : '';
+  $('bagList').innerHTML = Object.keys(groups).length
+    ? (why ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it"><span class="ic">${USABLE[code].icon}</span>
+        <span style="flex:1"><b>${USABLE[code].name} ×${list.length}</b><small>${USABLE[code].desc}</small></span>
+        <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${ok ? '' : 'disabled'}>Pakai</button></div>`).join('')
+    : '<p class="note">Belum ada skill card yang bisa dipakai di meja. Beli di Market.</p>';
+  $('bagList').querySelectorAll('button[data-id]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    const r = await api('card', { card: b.dataset.id, code: b.dataset.code });
+    if (r && r.ok) { toast(USABLE[b.dataset.code].icon + ' ' + USABLE[b.dataset.code].name + ' aktif untuk hand ini', true); el.remove(); }
+    else b.disabled = false;
+  });
+}
+$('bag').onclick = openBag;
 
 // ---- peluang menang (hanya milik sendiri) ----
 // Kartu sendiri + kartu meja melawan sejumlah lawan yang masih main dengan kartu acak dari sisa dek (kartu lawan tidak

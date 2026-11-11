@@ -162,6 +162,50 @@ create index if not exists bounties_match_idx on public.bounties (match_id);
 
 alter table public.point_adjustments add column if not exists bounty_id uuid references public.bounties (id) on delete cascade;
 
+-- Koin: mata uang terpisah dari poin untuk membeli skill card. Poin (leaderboard) tidak pernah dipakai belanja.
+-- Saldo = jumlah buku besar ini. (player, reason, ref) unik supaya tiap hadiah hanya sekali.
+create table if not exists public.coin_ledger (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  amount      int  not null,
+  reason      text not null check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase')),
+  ref         text not null,
+  created_at  timestamptz not null default now(),
+  unique (player_id, reason, ref)
+);
+create index if not exists coin_ledger_player_idx on public.coin_ledger (player_id);
+
+-- Katalog skill card. Dealer mengatur harga, stok, dan apakah dijual. Baris katalog ditambah per tahap
+-- (kartu yang belum ada mekanismenya di meja tidak dimasukkan).
+create table if not exists public.skill_cards (
+  code        text primary key,
+  name        text not null,
+  kind        text not null check (kind in ('passive', 'attack', 'luck', 'defend')),
+  description text not null,
+  price       int  not null check (price between 1 and 10000),
+  stock       int  not null default 0 check (stock >= 0),
+  on_sale     boolean not null default false,
+  sort        int  not null default 0
+);
+insert into public.skill_cards (code, name, kind, description, price, stock, on_sale, sort) values
+  ('double_down', 'Double Down', 'passive', 'Poin dari match online ini jadi 2× lipat. Aktifkan di halaman match sebelum match dimulai.', 70, 10, true, 1),
+  ('defend_me', 'Defend Me', 'defend', 'Kalau kalah di hand ini, setengah chip yang kamu taruhkan kembali.', 40, 10, true, 2)
+on conflict (code) do update set name = excluded.name, kind = excluded.kind, description = excluded.description, sort = excluded.sort;
+
+-- Kartu milik player. owned = di inventory, armed = Double Down dipasang ke match, used = sudah terpakai.
+create table if not exists public.player_cards (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  card_code   text not null references public.skill_cards (code),
+  status      text not null default 'owned' check (status in ('owned', 'armed', 'used')),
+  price       int  not null,
+  bought_at   timestamptz not null default now(),
+  match_id    uuid references public.matches (id) on delete set null,
+  used_at     timestamptz
+);
+create index if not exists player_cards_player_idx on public.player_cards (player_id);
+create index if not exists player_cards_match_idx on public.player_cards (match_id);
+
 alter table public.point_adjustments drop constraint if exists point_adjustments_reason_check;
 alter table public.point_adjustments add constraint point_adjustments_reason_check
   check (reason in ('create_match', 'duel_stake', 'duel_payout', 'mission_reward', 'bounty_reward'));
@@ -199,6 +243,9 @@ alter table public.point_adjustments enable row level security;
 alter table public.duels enable row level security;
 alter table public.missions enable row level security;
 alter table public.bounties enable row level security;
+alter table public.coin_ledger enable row level security;
+alter table public.skill_cards enable row level security;
+alter table public.player_cards enable row level security;
 
 drop policy if exists "profiles readable"      on public.profiles;
 drop policy if exists "matches readable"       on public.matches;
@@ -207,6 +254,9 @@ drop policy if exists "point_adjustments readable" on public.point_adjustments;
 drop policy if exists "duels readable" on public.duels;
 drop policy if exists "missions readable" on public.missions;
 drop policy if exists "bounties readable" on public.bounties;
+drop policy if exists "coin ledger own" on public.coin_ledger;
+drop policy if exists "skill cards readable" on public.skill_cards;
+drop policy if exists "player cards own" on public.player_cards;
 
 create policy "profiles readable"      on public.profiles      for select to authenticated using (true);
 create policy "matches readable"       on public.matches       for select to authenticated using (true);
@@ -215,6 +265,11 @@ create policy "point_adjustments readable" on public.point_adjustments for selec
 create policy "duels readable" on public.duels for select to authenticated using (true);
 create policy "missions readable" on public.missions for select to authenticated using (true);
 create policy "bounties readable" on public.bounties for select to authenticated using (true);
+-- koin dan inventory hanya terlihat oleh pemiliknya
+create policy "coin ledger own" on public.coin_ledger for select to authenticated using (player_id = auth.uid());
+create policy "skill cards readable" on public.skill_cards for select to authenticated using (true);
+create policy "player cards own" on public.player_cards for select to authenticated using (player_id = auth.uid());
+grant select on public.bounties, public.coin_ledger, public.skill_cards, public.player_cards to authenticated;
 
 -- ---------- Helpers ----------------------------------------------------
 
@@ -402,6 +457,8 @@ begin
     raise exception 'Player hanya bisa dikeluarkan sebelum match dimulai';
   end if;
   delete from public.match_players where match_id = p_match and player_id = p_player;
+  update public.player_cards set status = 'owned', match_id = null
+   where match_id = p_match and player_id = p_player and status = 'armed';
 end;
 $$;
 
@@ -535,6 +592,7 @@ begin
      set status = 'winner', eliminated_at = null
    where match_id = p_match and player_id = p_player;
   perform public.set_placements(p_match);
+  perform public.match_finished(p_match);
   update public.matches
      set status = 'finished', winner_id = p_player, finished_at = now()
    where id = p_match;
@@ -558,6 +616,8 @@ begin
   update public.matches set status = 'cancelled', finished_at = now() where id = p_match;
   -- Kembalikan poin yang dipakai player untuk membuat match ini.
   delete from public.point_adjustments where match_id = p_match and reason = 'create_match';
+  -- Double Down yang sudah dipasang kembali ke inventory.
+  update public.player_cards set status = 'owned', match_id = null where match_id = p_match and status = 'armed';
 end;
 $$;
 
@@ -608,6 +668,8 @@ begin
     raise exception 'Tidak bisa keluar setelah match dimulai';
   end if;
   delete from public.match_players where match_id = p_match and player_id = auth.uid();
+  update public.player_cards set status = 'owned', match_id = null
+   where match_id = p_match and player_id = auth.uid() and status = 'armed';
 end;
 $$;
 
@@ -1040,6 +1102,7 @@ begin
        set status = 'winner', eliminated_at = null
      where match_id = p_match and player_id = p_winner;
     perform public.set_placements(p_match);
+    perform public.match_finished(p_match);
     update public.matches
        set status = 'finished', winner_id = p_winner, finished_at = now()
      where id = p_match;
@@ -1112,6 +1175,304 @@ begin
     raise exception 'Bounty tidak ditemukan atau sudah selesai';
   end if;
 end;
+$$;
+
+-- ---------- Koin -------------------------------------------------------
+
+create or replace function public.coin_balance(p_player uuid)
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(sum(amount), 0)::int from public.coin_ledger where player_id = p_player;
+$$;
+
+-- Koin dari hasil match: ikut sampai selesai +10, juara +15, runner-up 1 +8, runner-up 2 +4 (tambahan).
+create or replace function public.match_coins(p_placement int)
+returns int
+language sql
+immutable
+as $$
+  select 10 + case p_placement when 1 then 15 when 2 then 8 when 3 then 4 else 0 end;
+$$;
+
+-- Dipanggil saat match selesai (setelah peringkat dihitung): Double Down menggandakan poin, lalu koin dibagikan.
+create or replace function public.match_finished(p_match uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.match_players mp set points = mp.points * 2
+   where mp.match_id = p_match
+     and exists (select 1 from public.player_cards c
+                  where c.match_id = p_match and c.player_id = mp.player_id and c.card_code = 'double_down' and c.status = 'armed');
+  update public.player_cards set status = 'used', used_at = now()
+   where match_id = p_match and card_code = 'double_down' and status = 'armed';
+  insert into public.coin_ledger (player_id, amount, reason, ref)
+  select player_id, public.match_coins(placement), 'match', p_match::text
+    from public.match_players where match_id = p_match and placement is not null
+  on conflict (player_id, reason, ref) do nothing;
+end;
+$$;
+
+-- Hadiah koin yang bisa diklaim player saat ini:
+--   launch     sekali: bonus peluncuran (peringkat all-time 1/2/3/4-10/lainnya = 150/120/100/75/50)
+--   milestone  sekali per tingkat total poin 50/100/250/500 = 30/50/80/120
+--   salary     sekali per bulan: peringkat leaderboard bulan lalu 1/2/3/4-10 = 100/70/50/30, main ≥1 match = 20
+create or replace function public.claimable_coins(p_player uuid)
+returns table (reason text, ref text, amount int, label text)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  all_rank int;
+  total int := public.points_balance(p_player);
+  m_start timestamptz := date_trunc('month', now() at time zone 'Asia/Jakarta') at time zone 'Asia/Jakarta';
+  p_start timestamptz := date_trunc('month', (now() at time zone 'Asia/Jakarta') - interval '1 month') at time zone 'Asia/Jakarta';
+  p_ref text := to_char((now() at time zone 'Asia/Jakarta') - interval '1 month', 'YYYY-MM');
+  m_rank int;
+  played int;
+begin
+  if not exists (select 1 from public.profiles where id = p_player and role = 'player') then
+    return;
+  end if;
+
+  if not exists (select 1 from public.coin_ledger c where c.player_id = p_player and c.reason = 'launch') then
+    select r.rk into all_rank from (
+      select x.player_id, rank() over (order by x.points desc) as rk from public.get_leaderboard(null, null) x
+    ) r where r.player_id = p_player;
+    reason := 'launch'; ref := 'launch';
+    amount := case when all_rank = 1 then 150 when all_rank = 2 then 120 when all_rank = 3 then 100 when all_rank <= 10 then 75 else 50 end;
+    label := case when all_rank <= 10 then 'Bonus peluncuran (peringkat all time #' || all_rank || ')' else 'Bonus peluncuran' end;
+    return next;
+  end if;
+
+  for i in 1..4 loop
+    if total >= (array[50, 100, 250, 500])[i]
+       and not exists (select 1 from public.coin_ledger c where c.player_id = p_player and c.reason = 'milestone' and c.ref = (array[50, 100, 250, 500])[i]::text) then
+      reason := 'milestone'; ref := (array[50, 100, 250, 500])[i]::text; amount := (array[30, 50, 80, 120])[i];
+      label := 'Pencapaian ' || ref || ' total poin';
+      return next;
+    end if;
+  end loop;
+
+  if not exists (select 1 from public.coin_ledger c where c.player_id = p_player and c.reason = 'salary' and c.ref = p_ref) then
+    select r.rk into m_rank from (
+      select x.player_id, rank() over (order by x.points desc) as rk from public.get_leaderboard(p_start, m_start) x
+    ) r where r.player_id = p_player;
+    select count(*) into played from public.match_players mp join public.matches x on x.id = mp.match_id
+     where mp.player_id = p_player and x.status = 'finished' and x.finished_at >= p_start and x.finished_at < m_start;
+    if m_rank is not null or played > 0 then
+      reason := 'salary'; ref := p_ref;
+      amount := case when m_rank = 1 then 100 when m_rank = 2 then 70 when m_rank = 3 then 50 when m_rank <= 10 then 30 else 20 end;
+      label := 'Gaji bulanan ' || to_char(p_start at time zone 'Asia/Jakarta', 'MM/YYYY') || coalesce(' (peringkat #' || m_rank || ')', '');
+      return next;
+    end if;
+  end if;
+end;
+$$;
+
+create or replace function public.get_claimable_coins()
+returns table (reason text, ref text, amount int, label text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select * from public.claimable_coins(auth.uid());
+$$;
+
+create or replace function public.claim_coins()
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  got int;
+begin
+  perform 1 from public.profiles where id = auth.uid() for update;
+  with ins as (
+    insert into public.coin_ledger (player_id, amount, reason, ref)
+    select auth.uid(), c.amount, c.reason, c.ref from public.claimable_coins(auth.uid()) c
+    on conflict (player_id, reason, ref) do nothing
+    returning amount
+  )
+  select coalesce(sum(amount), 0) into got from ins;
+  return got;
+end;
+$$;
+
+create or replace function public.get_my_coins()
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.coin_balance(auth.uid());
+$$;
+
+-- ---------- Skill card --------------------------------------------------
+
+create or replace function public.buy_card(p_code text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  card public.skill_cards;
+  new_id uuid;
+begin
+  if public.current_role_name() is distinct from 'player' then
+    raise exception 'Hanya player yang bisa membeli skill card';
+  end if;
+  perform 1 from public.profiles where id = auth.uid() for update;
+  select * into card from public.skill_cards where code = p_code for update;
+  if not found or not card.on_sale then
+    raise exception 'Kartu ini sedang tidak dijual';
+  end if;
+  if card.stock < 1 then
+    raise exception 'Stok kartu habis';
+  end if;
+  if public.coin_balance(auth.uid()) < card.price then
+    raise exception 'Koin kamu belum cukup (butuh % koin)', card.price;
+  end if;
+  update public.skill_cards set stock = stock - 1 where code = p_code;
+  insert into public.player_cards (player_id, card_code, price) values (auth.uid(), p_code, card.price) returning id into new_id;
+  insert into public.coin_ledger (player_id, amount, reason, ref) values (auth.uid(), -card.price, 'purchase', new_id::text);
+  return new_id;
+end;
+$$;
+
+create or replace function public.set_card_listing(p_code text, p_price int, p_stock int, p_on_sale boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa mengatur market';
+  end if;
+  if p_price is null or p_price < 1 or p_price > 10000 then
+    raise exception 'Harga harus 1 sampai 10.000 koin';
+  end if;
+  if p_stock is null or p_stock < 0 or p_stock > 1000 then
+    raise exception 'Stok harus 0 sampai 1.000';
+  end if;
+  update public.skill_cards set price = p_price, stock = p_stock, on_sale = coalesce(p_on_sale, false) where code = p_code;
+  if not found then
+    raise exception 'Kartu tidak ditemukan';
+  end if;
+end;
+$$;
+
+-- Double Down: dipasang ke match online yang belum dimulai dan sudah diikuti. Satu per match.
+create or replace function public.arm_double_down(p_card uuid, p_match uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.matches where id = p_match and mode = 'online' and status = 'open') then
+    raise exception 'Double Down hanya bisa dipasang ke match online yang belum dimulai';
+  end if;
+  if not exists (select 1 from public.match_players where match_id = p_match and player_id = auth.uid()) then
+    raise exception 'Join match ini dulu sebelum memasang Double Down';
+  end if;
+  if exists (select 1 from public.player_cards where match_id = p_match and player_id = auth.uid() and card_code = 'double_down' and status = 'armed') then
+    raise exception 'Double Down sudah terpasang di match ini';
+  end if;
+  update public.player_cards set status = 'armed', match_id = p_match
+   where id = p_card and player_id = auth.uid() and card_code = 'double_down' and status = 'owned';
+  if not found then
+    raise exception 'Kartu Double Down tidak ada di inventory kamu';
+  end if;
+end;
+$$;
+
+create or replace function public.disarm_double_down(p_match uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.player_cards set status = 'owned', match_id = null
+   where match_id = p_match and player_id = auth.uid() and card_code = 'double_down' and status = 'armed'
+     and exists (select 1 from public.matches where id = p_match and status = 'open');
+  if not found then
+    raise exception 'Double Down hanya bisa dilepas sebelum match dimulai';
+  end if;
+end;
+$$;
+
+-- Dipakai server meja (secret key): tandai kartu milik player sebagai terpakai di match ini.
+-- Maksimal 3 kartu per player per match. Mengembalikan kode kartu.
+create or replace function public.meja_use_card(p_match uuid, p_player uuid, p_card uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  code text;
+begin
+  if not exists (select 1 from public.matches where id = p_match and mode = 'online' and status = 'ongoing') then
+    raise exception 'match_not_ongoing';
+  end if;
+  if (select count(*) from public.player_cards where match_id = p_match and player_id = p_player and status = 'used') >= 3 then
+    raise exception 'Maksimal 3 skill card per match';
+  end if;
+  update public.player_cards set status = 'used', used_at = now(), match_id = p_match
+   where id = p_card and player_id = p_player and status = 'owned' and card_code in ('defend_me')
+  returning card_code into code;
+  if code is null then
+    raise exception 'Kartu tidak ada di inventory atau tidak bisa dipakai di meja';
+  end if;
+  return code;
+end;
+$$;
+
+create or replace function public.update_my_name(p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_name is null or char_length(trim(p_name)) not between 1 and 40 then
+    raise exception 'Nama harus 1 sampai 40 huruf';
+  end if;
+  update public.profiles set name = trim(p_name) where id = auth.uid();
+end;
+$$;
+
+-- Tiga besar leaderboard all time (untuk bingkai podium di meja online; dibaca server meja).
+create or replace function public.meja_podium()
+returns table (player_id uuid, rank int)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with events as (
+    select mp.player_id, mp.points from public.match_players mp join public.matches m on m.id = mp.match_id where m.status = 'finished'
+    union all
+    select a.player_id, a.amount from public.point_adjustments a
+  ), totals as (
+    select player_id, sum(points) as pts from events group by player_id having sum(points) > 0
+  )
+  select player_id, rank() over (order by pts desc)::int from totals order by pts desc limit 3;
 $$;
 
 -- ---------- Leaderboard ------------------------------------------------
@@ -1200,6 +1561,13 @@ grant execute on function public.meja_create(uuid, jsonb, timestamptz) to servic
 grant execute on function public.meja_save(uuid, int, jsonb, timestamptz, uuid[], uuid) to service_role;
 revoke all on function public.award_missions(uuid) from public, anon, authenticated;
 revoke all on function public.claim_bounties(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.coin_balance(uuid) from public, anon, authenticated;
+revoke all on function public.match_finished(uuid) from public, anon, authenticated;
+revoke all on function public.claimable_coins(uuid) from public, anon, authenticated;
+revoke all on function public.meja_use_card(uuid, uuid, uuid) from public, anon, authenticated;
+revoke all on function public.meja_podium() from public, anon, authenticated;
+grant execute on function public.meja_use_card(uuid, uuid, uuid) to service_role;
+grant execute on function public.meja_podium() to service_role;
 
 do $$
 declare
@@ -1232,6 +1600,15 @@ begin
     'public.get_my_missions()',
     'public.create_bounty(uuid, int)',
     'public.cancel_bounty(uuid)',
+    'public.get_claimable_coins()',
+    'public.claim_coins()',
+    'public.get_my_coins()',
+    'public.match_coins(int)',
+    'public.buy_card(text)',
+    'public.set_card_listing(text, int, int, boolean)',
+    'public.arm_double_down(uuid, uuid)',
+    'public.disarm_double_down(uuid)',
+    'public.update_my_name(text)',
     'public.current_role_name()'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
@@ -1262,6 +1639,10 @@ begin
   end;
   begin
     alter publication supabase_realtime add table public.bounties;
+  exception when duplicate_object then null;
+  end;
+  begin
+    alter publication supabase_realtime add table public.skill_cards;
   exception when duplicate_object then null;
   end;
 end;

@@ -137,6 +137,28 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert(t.winner)
 }
 
+{ // Defend Me: yang kalah mendapat kembali setengah kerugiannya dari pemenang; total chip tetap; 1 kartu per hand
+  const t = mk([1000, 1000, 1000]); rig(t, 'As Ah Kd Kc 2c 7d 9h 9s 4d Jc 3h'); begin(t)
+  assert.equal(t.useCard(1, 'defend_me'), undefined)
+  assert.equal(typeof t.useCard(1, 'defend_me'), 'string') // sudah pakai kartu di hand ini
+  assert.equal(typeof t.useCard(0, 'reveal'), 'string')    // kartu yang belum ada mekanismenya
+  assert.deepEqual(t.view(t.players[0]).players[1].skills, []) // lawan belum tahu sebelum showdown
+  assert.deepEqual(t.view(t.players[1]).players[1].skills, ['defend_me'])
+  ok(t, 0, 'raise', 1000); ok(t, 1, 'call'); ok(t, 2, 'fold'); drain(t)
+  // P0 (AA) menang 2000+20 dari P1 (KK) dan blind P2; P1 rugi 1000 -> kembali 500
+  assert.deepEqual(stacks(t), [1520, 500, 980])
+  assert.equal(t.players[1].saved, 500)
+  assert.equal(t.players[1].place, 0, 'tidak tersingkir karena setengah chip selamat')
+  assert.deepEqual(t.view(t.players[0]).players[1].skills, ['defend_me']) // dibuka saat showdown
+  // pemain yang menang dengan Defend Me tidak mendapat apa-apa tambahan
+  const u = mk([1000, 1000]); rig(u, 'As Ah Kd Kc 2c 7d 9h 9s 4d'); begin(u)
+  u.useCard(0, 'defend_me'); ok(u, 0, 'raise', 1000); ok(u, 1, 'call'); drain(u)
+  assert.deepEqual(stacks(u), [2000, 0])
+  // tidak bisa dipakai setelah fold atau di luar hand
+  const w = mk([1000, 1000, 1000]); begin(w); ok(w, 0, 'fold')
+  assert.equal(typeof w.useCard(0, 'defend_me'), 'string')
+}
+
 { // dua pemain tersingkir di hand yang sama: stack awal hand lebih besar = peringkat lebih baik
   const t = mk([200, 300, 2000]); rig(t, '2c 7d 3c 8d As Ah Kh 9d 4c 5s Jd'); begin(t)
   ok(t, 0, 'raise', 200); ok(t, 1, 'raise', 300); ok(t, 2, 'call'); drain(t)
@@ -206,6 +228,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
       t = reload(t, t.now + R(4000))
       if (t.turn >= 0) {
         const i = t.turn, c = t.ctl(i), r = Math.random()
+        if (r < .03) t.useCard(R(t.players.length), 'defend_me') // boleh gagal (fold/sudah pakai): tidak mengubah apa-apa
         if (r < .05) run(t, TURN_MS)
         else if (r < .2) ok(t, i, 'fold')
         else if (r < .6 || !c.raise) ok(t, i, c.call ? 'call' : 'check')

@@ -17,6 +17,15 @@ function fakeDb() {
     async seats() { await yieldTurn(); return { match: m, players } },
     async meta() { await yieldTurn(); return row && { ver: row.ver, due_at: row.due_at, status: m.status } },
     async load() { await yieldTurn(); return row && { state: structuredClone(row.state), ver: row.ver, status: m.status } },
+    async podium() { return [{ player_id: 'uB', rank: 1 }] },
+    cards: { c1: { owner: 'uA', code: 'defend_me', used: false } },
+    async useCard(_, player, card) {
+      await yieldTurn()
+      const c = this.cards[card]
+      if (!c || c.owner !== player || c.used) throw new Error('Kartu tidak ada di inventory atau tidak bisa dipakai di meja')
+      c.used = true
+      return c.code
+    },
     async create(_, state, due) { await yieldTurn(); if (row) return null; row = { state, ver: 1, due_at: due }; return 1 },
     async save(_, ver, state, due, out, winner) {
       await yieldTurn()
@@ -63,6 +72,9 @@ assert.equal(s1.s.hostView, undefined)
 assert.deepEqual(await get({ token: a.token, v: String(s1.v) }), { same: true, v: s1.v })
 assert((await get({ token: 'ngawur' })).gone)
 
+// bingkai podium: B peringkat 1 all time (tanpa uid di respons)
+assert.equal(s1.s.players.find(q => q.name === 'Bela').podium, 1)
+assert(!JSON.stringify(s1).includes('"uB"'))
 // mulai: majukan jam ke hand pertama (meja menunggu 15 detik)
 const realNow = Date.now
 let offset = 0
@@ -71,6 +83,15 @@ offset += 16000
 const tok = { [a.token]: 'A', [b.token]: 'B', [c.token]: 'C' }
 let s = (await get({ token: a.token })).s
 assert.equal(s.phase, 'preflop')
+// skill card: kartu orang lain / kartu tidak dikenal ditolak; kartu sendiri terpakai sekali
+const CARD = '99999999-2222-3333-4444-555555555555'
+db.cards[CARD] = db.cards.c1
+assert((await post({ token: b.token, type: 'card', card: CARD, code: 'defend_me' })).error)
+assert((await post({ token: a.token, type: 'card', card: CARD, code: 'reveal' })).error)
+const used = await post({ token: a.token, type: 'card', card: CARD, code: 'defend_me' })
+assert(used.ok && used.s.players[used.s.me].skills.includes('defend_me'), JSON.stringify(used.error))
+assert((await post({ token: a.token, type: 'card', card: CARD, code: 'defend_me' })).error)
+s = (await get({ token: a.token })).s
 // pemain hanya melihat kartunya sendiri; host juga tidak melihat kartu tertutup siapa pun, hanya peluang menang
 assert.deepEqual(s.players.filter((_, k) => k !== s.me).map(q => q.cards), [[-1, -1], [-1, -1]])
 const hs = (await get({ token: hst.token })).s

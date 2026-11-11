@@ -15,6 +15,7 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
 ### 👤 Akun
 - Daftar cukup dengan **nama, email, dan password**, lalu langsung bisa login.
 - Ada dua jenis akun: **Player** dan **Dealer**.
+- Ketuk avatar di Beranda atau 👤 di header untuk membuka **Profil**: gelar podium, saldo koin, riwayat koin, pencapaian, statistik, dan pengaturan (ganti nama, ganti password, tema).
 
 ### 🎟️ Player bisa jadi host
 - Player bisa **membuat match sendiri dengan biaya 1 poin**. Sebelum match dibuat, ada **halaman konfirmasi** yang menampilkan biaya dan sisa poin.
@@ -56,6 +57,26 @@ Detailnya:
 - Bounty langsung hilang setelah diklaim. Satu match bisa mengklaim beberapa bounty sekaligus kalau ada beberapa buruan di dalamnya.
 - Daftar bounty muncul di **Beranda player** (player yang jadi buruan dapat peringatan khusus), dan buruan ditandai 🎯 di halaman match.
 - Reward masuk ke **poin bulan ini dan total poin**. Dealer bisa membatalkan bounty atau mengirimnya ke grup WA.
+
+### 🪙 Koin
+- **Koin** adalah mata uang terpisah dari poin. Koin hanya untuk membeli skill card dan **tidak mengurangi poin leaderboard**.
+- Cara dapat koin:
+  - **Ikut match** (offline/online): +10, juara +15, runner-up +8, peringkat 3 +4. Otomatis masuk saat match selesai.
+  - **Gaji bulanan** dari leaderboard bulan lalu: #1 100, #2 70, #3 50, #4–10 30, sisanya yang main minimal 1 match 20.
+  - **Bonus peluncuran** sekali berdasarkan peringkat all time: 150 / 120 / 100 / 75 (#4–10) / 50.
+  - **Pencapaian total poin**: 50 → 30 koin, 100 → 50, 250 → 80, 500 → 120.
+- Gaji, bonus, dan pencapaian **diklaim** lewat tombol Klaim di Beranda atau Profil.
+
+### 🛒 Market & 🎒 Inventory
+- Player membeli **skill card** di Market pakai koin. Dealer mengatur kartu mana yang dijual, harga, dan stoknya.
+- Kartu yang dibeli masuk ke **Inventory** (tombol di Beranda player).
+- Kartu yang tersedia sekarang:
+  - ⚡ **Double Down** (passive): pasang di halaman match **online** yang sudah kamu join, sebelum match dimulai. Poin match itu jadi **2× lipat**. Satu per match. Kalau match batal atau kamu keluar, kartunya kembali.
+  - 🛡️ **Defend Me** (defend): dipakai di meja online lewat tombol 🎒 saat hand berjalan. Kalau kamu kalah di hand itu, **setengah chip yang hilang dikembalikan** (diambil dari pemenang hand). Kartu yang dipakai terlihat oleh semua pemain sebelum showdown.
+- Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match.
+
+### 👑 Podium all time
+- Tiga besar leaderboard all time mendapat **bingkai avatar** (emas berkilau + 👑, perak, perunggu) dan **gelar**: Raja Meja, Tangan Dingin, Penantang. Bingkai tampil di semua tempat avatar muncul, termasuk kursi di meja online.
 
 ### 🎩 Beranda Dealer
 - Jumlah **match yang sudah di-host**.
@@ -208,6 +229,8 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Buat & batalkan misi                    |   –    |   ✅   |
 | Pasang & batalkan bounty                |   –    |   ✅   |
 | Klaim bounty (menang match)             |   ✅   |   –    |
+| Kumpulkan koin, beli & pakai skill card |   ✅   |   –    |
+| Atur kartu di Market (harga, stok, dijual) |   –    |   ✅   |
 
 Semua akun baru otomatis menjadi **Player**. Akun dijadikan **Dealer** oleh admin melalui Supabase (Table Editor → tabel `profiles` → ubah kolom `role` menjadi `dealer`).
 

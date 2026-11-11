@@ -71,3 +71,15 @@ body {
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
 }
+
+/* kilau pelan di bingkai emas podium #1 */
+@keyframes podium-shine {
+  0%, 100% { box-shadow: 0 0 8px #f2c14e88; }
+  50% { box-shadow: 0 0 16px #f2c14ecc; }
+}
+.podium-gold {
+  animation: podium-shine 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .podium-gold { animation: none; }
+}

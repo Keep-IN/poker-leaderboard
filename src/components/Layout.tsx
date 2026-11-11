@@ -1,27 +1,31 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import { PodiumContext, usePodiumMap } from '../lib/coins'
 import { useTheme, type ThemePref } from '../lib/theme'
 import { cx } from './ui'
 
 const tabs = [
   { to: '/', label: 'Beranda', icon: HomeIcon },
   { to: '/matches', label: 'Match', icon: CardsIcon },
+  { to: '/market', label: 'Market', icon: ShopIcon },
   { to: '/players', label: 'Pemain', icon: PeopleIcon },
   { to: '/leaderboard', label: 'Leaderboard', icon: TrophyIcon },
 ]
 
 export default function Layout() {
   const { profile, signOut } = useAuth()
+  const podium = usePodiumMap()
 
   return (
+    <PodiumContext.Provider value={podium}>
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col md:max-w-5xl">
       <header className="safe-top sticky top-0 z-20 border-b border-ink/5 bg-surface-900/85 backdrop-blur">
-        <div className="flex h-14 items-center justify-between gap-4 px-4 md:h-16 md:px-6">
-          <div className="flex shrink-0 items-center gap-2">
+        <div className="flex h-14 items-center justify-between gap-2 px-4 md:h-16 md:gap-4 md:px-6">
+          <div className="flex min-w-0 items-center gap-2">
             <span className="text-xl text-brand-400">♠</span>
-            <span className="font-bold tracking-tight">BTP Poker League</span>
+            <span className="truncate font-bold tracking-tight">BTP Poker League</span>
             {profile?.role === 'dealer' && (
-              <span className="rounded-md bg-brand-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-300">
+              <span className="shrink-0 rounded-md bg-brand-400/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-300">
                 Dealer
               </span>
             )}
@@ -44,7 +48,12 @@ export default function Layout() {
               </NavLink>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+            {profile && (
+              <Link to="/profile" aria-label="Profil saya" className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-300 hover:bg-ink/5 hover:text-slate-100">
+                👤<span className="ml-1 hidden sm:inline">Profil</span>
+              </Link>
+            )}
             <ThemeButton />
             <button onClick={signOut} className="rounded-lg px-2 py-1 text-sm text-slate-400 hover:text-slate-100">
               Keluar
@@ -58,7 +67,7 @@ export default function Layout() {
       </main>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-20 md:hidden border-t border-ink/5 bg-surface-950/90 backdrop-blur">
-        <div className="mx-auto grid max-w-lg grid-cols-4">
+        <div className="mx-auto grid max-w-lg grid-cols-5">
           {tabs.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -78,6 +87,7 @@ export default function Layout() {
         </div>
       </nav>
     </div>
+    </PodiumContext.Provider>
   )
 }
 
@@ -111,6 +121,14 @@ function ThemeButton() {
         )}
       </svg>
     </button>
+  )
+}
+
+function ShopIcon({ className = 'size-6' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 9h16l-1.2 10.2a2 2 0 0 1-2 1.8H7.2a2 2 0 0 1-2-1.8zM8 9V7a4 4 0 0 1 8 0v2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   )
 }
 

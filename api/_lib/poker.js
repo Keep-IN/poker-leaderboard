@@ -73,6 +73,8 @@ export function equities(hands, board, iters = 1200) {
   else { run([]); n = 1 }
   return share.map(v => v / n)
 }
+/** Skill card yang mekanismenya ada di meja (kode sama dengan tabel skill_cards). */
+export const SKILLS = { defend_me: { name: 'Defend Me', icon: '🛡️' } }
 // Jeda tambahan sebelum hand berikutnya: tiap kombinasi pemain disorot bergantian di layar.
 export const REVEAL_MS = env('REVEAL_MS', 1500), REVEAL_LEAD_MS = 900
 
@@ -133,7 +135,7 @@ export class Table {
     if (el.length < 2) return this.end()
     if (this.startedAt === null) this.startedAt = this.now
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0 })
     this.handNo++
     this.deck = this.newDeck(); this.board = []; this.phase = 'preflop'; this.bet = this.bb; this.minRaise = this.bb
     this.dealer = this.after(this.dealer, p => p.inHand)
@@ -219,6 +221,7 @@ export class Table {
       ws.forEach((p, j) => { const g = share + (j < rem ? 1 : 0); p.chips += g; p.won += g }) // sisa chip ganjil ke pemenang pertama sesudah dealer
       prev = L
     })
+    this.defend()
     for (const p of this.players) { p.bet = 0; if (!p.folded) p.last = '' }
     this.phase = 'showdown'; this.turn = -1; this.hands++
     // hitung hand AFK: masih istirahat di akhir hand = AFK; beraksi atau menekan "Main lagi" = mulai dari 0
@@ -250,6 +253,39 @@ export class Table {
   }
 
   sitIn(i) { this.players[i].sitOut = false; this.players[i].afk = 0 }
+
+  // ---- skill card di meja ----
+  // Satu kartu per pemain per hand, hanya selama hand berjalan dan pemain belum fold.
+  canUseCard(i, code) {
+    const p = this.players[i]
+    if (!SKILLS[code]) return 'Kartu ini tidak bisa dipakai di meja'
+    if (!this.betting) return 'Skill card hanya bisa dipakai selama hand berjalan'
+    if (!p.inHand || p.folded) return 'Kamu sudah tidak ikut hand ini'
+    if ((p.skills || []).length) return 'Maksimal 1 skill card per hand'
+  }
+  useCard(i, code) {
+    const err = this.canUseCard(i, code)
+    if (err) return err
+    const p = this.players[i]
+    p.skills = [...(p.skills || []), code]
+  }
+  // Defend Me: pemain yang rugi di hand ini mendapat kembali setengah kerugiannya, diambil dari pemain yang untung
+  // (sebanding dengan keuntungannya), jadi jumlah chip di meja tetap.
+  defend() {
+    const net = p => p.won - p.total
+    const losers = this.players.filter(p => (p.skills || []).includes('defend_me') && net(p) < 0)
+    if (!losers.length) return
+    const gainers = this.players.filter(p => net(p) > 0)
+    const pool = gainers.reduce((s, p) => s + net(p), 0)
+    if (!pool) return
+    const refund = losers.map(p => Math.floor(-net(p) / 2)), R = refund.reduce((s, x) => s + x, 0)
+    let taken = 0
+    gainers.forEach((p, k) => {
+      const cut = k === gainers.length - 1 ? R - taken : Math.floor(R * net(p) / pool)
+      p.chips -= cut; p.won -= cut; taken += cut
+    })
+    losers.forEach((p, k) => { p.chips += refund[k]; p.saved = refund[k]; if (!p.chips) p.allIn = true })
+  }
 
   // Peluang menang semua pemain yang masih di hand, untuk host (yang hanya menerima angkanya, bukan kartunya).
   // Kunci berubah hanya saat kartu meja atau pemain yang tersisa berubah, supaya hasilnya bisa disimpan sementara.
@@ -295,6 +331,8 @@ export class Table {
       players: N.map(q => ({
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,
         online: this.online(q), won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
+        // skill card yang dipakai hand ini: pemiliknya selalu tahu, pemain lain baru tahu saat kartu dibuka (showdown)
+        skills: q === me || !this.betting ? q.skills || [] : [], saved: q.saved || 0,
         cards: q === me || q.show ? q.cards : q.inHand && !q.folded ? [-1, -1] : [],
       })),
     }

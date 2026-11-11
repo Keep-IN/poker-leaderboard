@@ -6,6 +6,7 @@ import { DealerMissions, PlayerMissions } from '../components/MissionSections'
 import { ACTIVE_DUEL_STATUSES, DUEL_SELECT, type Duel, type DuelStatus } from '../lib/duels'
 import { Avatar, Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { useCoins } from '../lib/coins'
 import { formatDate, winRate } from '../lib/format'
 import { MATCH_CREATION_COST, supabase, type MatchMode, type MatchStatus, type PlayerStatus, type Profile } from '../lib/supabase'
 
@@ -46,6 +47,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
   return (
     <div className="space-y-5">
       <Greeting profile={profile} subtitle="Statistik kamu" />
+      <CoinStrip />
       <PlayerStats playerId={profile.id} isMe>
         <PlayerDuelSections me={profile.id} />
         <PlayerMissions me={profile.id} />
@@ -406,10 +408,48 @@ function DealerHome({ profile }: { profile: Profile }) {
   )
 }
 
+/** Saldo koin, klaim koin, dan pintasan ke Inventory & Market di Beranda player. */
+function CoinStrip() {
+  const { balance, claimable, claim } = useCoins()
+  const [busy, setBusy] = useState(false)
+  const total = claimable.reduce((s, c) => s + c.amount, 0)
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        <Link to="/profile" className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-3 py-2.5 text-center">
+          <p className="text-lg font-extrabold text-amber-300">🪙 {balance ?? '…'}</p>
+          <p className="text-[11px] text-slate-400">koin</p>
+        </Link>
+        <Link to="/inventory" className="flex flex-col items-center justify-center rounded-2xl border border-ink/10 bg-surface-800/80 px-3 py-2.5 text-sm font-semibold hover:bg-surface-700/80">
+          🎒<span className="text-[11px] font-medium text-slate-400">Inventory</span>
+        </Link>
+        <Link to="/market" className="flex flex-col items-center justify-center rounded-2xl border border-ink/10 bg-surface-800/80 px-3 py-2.5 text-sm font-semibold hover:bg-surface-700/80">
+          🛒<span className="text-[11px] font-medium text-slate-400">Market</span>
+        </Link>
+      </div>
+      {total > 0 && (
+        <button
+          onClick={async () => { setBusy(true); await claim(); setBusy(false) }}
+          disabled={busy}
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-amber-400/50 bg-amber-500/15 px-4 py-3 text-left transition hover:bg-amber-500/25 disabled:opacity-60"
+        >
+          <span className="min-w-0 text-sm">
+            <span className="block font-semibold">🎁 Ada {total} koin siap diklaim</span>
+            <span className="block truncate text-xs text-slate-400">{claimable.map((c) => c.label).join(' · ')}</span>
+          </span>
+          <span className="shrink-0 rounded-xl bg-amber-400 px-3 py-1.5 text-sm font-bold text-[#04122b]">{busy ? '…' : 'Klaim'}</span>
+        </button>
+      )}
+    </div>
+  )
+}
+
 function Greeting({ profile, subtitle }: { profile: Profile; subtitle: string }) {
   return (
     <div className="flex items-center gap-3">
-      <Avatar name={profile.name} id={profile.id} size="lg" />
+      <Link to="/profile" aria-label="Buka profil" className="rounded-full transition active:scale-95">
+        <Avatar name={profile.name} id={profile.id} size="lg" />
+      </Link>
       <div className="min-w-0">
         <p className="text-sm text-slate-400">{subtitle}</p>
         <h1 className="truncate text-2xl font-bold">Halo, {profile.name.split(' ')[0]}!</h1>

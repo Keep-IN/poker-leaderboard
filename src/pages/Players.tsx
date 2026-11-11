@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Avatar, Card, Chevron, EmptyState, PageLoader, cx } from '../components/ui'
+import { Avatar, Button, Card, Chevron, EmptyState, PageLoader, SectionTitle, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { LEDGER_LABELS, MILESTONES, PODIUM_TITLES, useCoins, usePodiumRank, type LedgerRow } from '../lib/coins'
 import { formatDate, winRate } from '../lib/format'
-import { supabase, type Role } from '../lib/supabase'
+import { errorMessage, supabase, type Role } from '../lib/supabase'
+import { useTheme } from '../lib/theme'
 import { PlayerStats } from './Home'
 
 interface PlayerStatRow {
@@ -153,27 +155,38 @@ interface PublicProfile {
   created_at: string
 }
 
-export function PlayerProfile() {
-  const { id = '' } = useParams()
+export function PlayerProfile({ self }: { self?: boolean }) {
+  const params = useParams()
   const { profile: me } = useAuth()
+  const id = self ? me?.id ?? '' : params.id ?? ''
   const [player, setPlayer] = useState<PublicProfile | null | undefined>(undefined)
+  const [total, setTotal] = useState<number | null>(null)
+  const rank = usePodiumRank(id)
 
   useEffect(() => {
+    if (!id) return
     supabase
       .from('profiles')
       .select('id, name, role, created_at')
       .eq('id', id)
       .maybeSingle()
       .then(({ data }) => setPlayer((data as PublicProfile | null) ?? null))
+    supabase.rpc('get_player_stats').then(({ data }) => {
+      const row = ((data as PlayerStatRow[]) ?? []).find((r) => r.player_id === id)
+      setTotal(row ? Number(row.points) : 0)
+    })
   }, [id])
 
   if (player === undefined) return <PageLoader />
+  const isMe = player?.id === me?.id
 
   return (
     <div className="space-y-5">
-      <Link to="/players" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
-        ‹ Semua pemain
-      </Link>
+      {!self && (
+        <Link to="/players" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-slate-200">
+          ‹ Semua pemain
+        </Link>
+      )}
 
       {player === null ? (
         <Card>
@@ -184,16 +197,21 @@ export function PlayerProfile() {
           <div className="flex items-center gap-4">
             <Avatar name={player.name} id={player.id} size="xl" />
             <div className="min-w-0">
+              {rank > 0 && (
+                <p className={cx('text-xs font-bold uppercase tracking-wider', rank === 1 ? 'text-[#d9a521]' : rank === 2 ? 'text-slate-300' : 'text-[#c98a52]')}>
+                  {rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'} {PODIUM_TITLES[rank]} · #{rank} all time
+                </p>
+              )}
               <h1 className="truncate text-2xl font-bold">
                 {player.name}
-                {player.id === me?.id && <span className="ml-2 text-sm font-medium text-brand-300">(kamu)</span>}
+                {isMe && !self && <span className="ml-2 text-sm font-medium text-brand-300">(kamu)</span>}
               </h1>
               <p className="text-sm text-slate-400">
                 {player.role === 'dealer' ? 'Dealer · ' : ''}Bergabung {formatDate(player.created_at)}
               </p>
             </div>
           </div>
-          {me?.role === 'player' && player.role === 'player' && player.id !== me.id && (
+          {me?.role === 'player' && player.role === 'player' && !isMe && (
             <Link
               to={`/duel/${player.id}`}
               className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-brand-400/50 md:w-fit md:px-8 text-sm font-bold text-brand-300 transition hover:bg-brand-400/10 active:scale-[0.98]"
@@ -201,9 +219,172 @@ export function PlayerProfile() {
               ⚔️ Ajak {player.name.split(' ')[0]} duel
             </Link>
           )}
-          <PlayerStats playerId={player.id} isMe={player.id === me?.id} />
+          {isMe && player.role === 'player' && <MyCoins />}
+          {player.role === 'player' && total !== null && <Achievements total={total} />}
+          {player.role === 'player' && <PlayerStats playerId={player.id} isMe={isMe} />}
+          {isMe && <Settings name={player.name} onRenamed={(name) => setPlayer({ ...player, name })} />}
         </>
       )}
     </div>
+  )
+}
+
+function Achievements({ total }: { total: number }) {
+  return (
+    <section>
+      <SectionTitle>🏅 Pencapaian total poin</SectionTitle>
+      <div className="grid grid-cols-4 gap-2">
+        {MILESTONES.map((m) => {
+          const on = total >= m.points
+          return (
+            <div key={m.points} className={cx('rounded-xl border p-2 text-center', on ? 'border-brand-400/50 bg-brand-400/10' : 'border-ink/10 opacity-50')}>
+              <p className="text-lg">{on ? '🏅' : '🔒'}</p>
+              <p className="text-sm font-bold">{m.points}</p>
+              <p className="text-[10px] text-slate-400">poin · +{m.coins} 🪙</p>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function MyCoins() {
+  const { balance, claimable, claim } = useCoins()
+  const [ledger, setLedger] = useState<LedgerRow[]>([])
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    supabase.from('coin_ledger').select('*').order('created_at', { ascending: false }).limit(20).then(({ data }) => setLedger((data as LedgerRow[]) ?? []))
+  }, [balance])
+
+  async function doClaim() {
+    setBusy(true)
+    const { got, error } = await claim()
+    setBusy(false)
+    setMsg(error ? errorMessage(error) : `+${got} koin masuk!`)
+  }
+
+  return (
+    <section className="space-y-2">
+      <SectionTitle>🪙 Koin</SectionTitle>
+      <Card className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-3xl font-extrabold text-amber-300">{balance ?? '…'}</p>
+          <p className="text-xs text-slate-400">koin · untuk beli skill card</p>
+        </div>
+        <div className="flex gap-2">
+          <Link to="/inventory" className="rounded-xl border border-ink/10 px-3 py-2 text-sm font-semibold hover:bg-ink/5">
+            🎒 Inventory
+          </Link>
+          <Link to="/market" className="rounded-xl border border-ink/10 px-3 py-2 text-sm font-semibold hover:bg-ink/5">
+            🛒 Market
+          </Link>
+        </div>
+      </Card>
+      {claimable.length > 0 && (
+        <Card className="border-amber-400/40 bg-amber-500/10">
+          <p className="font-semibold">Ada koin yang bisa diklaim!</p>
+          <ul className="mt-1 space-y-0.5 text-sm text-slate-300">
+            {claimable.map((c) => (
+              <li key={c.reason + c.ref}>
+                • {c.label} <span className="font-bold text-amber-300">+{c.amount}</span>
+              </li>
+            ))}
+          </ul>
+          <Button className="mt-3 w-full" loading={busy} onClick={doClaim}>
+            🪙 Klaim {claimable.reduce((s, c) => s + c.amount, 0)} koin
+          </Button>
+        </Card>
+      )}
+      {msg && <p className="text-center text-sm text-emerald-300">{msg}</p>}
+      {ledger.length > 0 && (
+        <Card className="divide-y divide-ink/5 p-0">
+          {ledger.map((l) => (
+            <div key={l.id} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+              <span className="text-slate-300">
+                {LEDGER_LABELS[l.reason]}
+                <span className="ml-2 text-xs text-slate-500">{formatDate(l.created_at)}</span>
+              </span>
+              <span className={cx('font-bold', l.amount > 0 ? 'text-amber-300' : 'text-red-300')}>
+                {l.amount > 0 ? '+' : ''}
+                {l.amount}
+              </span>
+            </div>
+          ))}
+        </Card>
+      )}
+    </section>
+  )
+}
+
+function Settings({ name, onRenamed }: { name: string; onRenamed: (name: string) => void }) {
+  const { pref, choose } = useTheme()
+  const [newName, setNewName] = useState(name)
+  const [password, setPassword] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState('')
+
+  async function rename(e: FormEvent) {
+    e.preventDefault()
+    setBusy('name')
+    const { error } = await supabase.rpc('update_my_name', { p_name: newName.trim() })
+    setBusy('')
+    setMsg(error ? errorMessage(error) : 'Nama diperbarui.')
+    if (!error) onRenamed(newName.trim())
+  }
+
+  async function changePassword(e: FormEvent) {
+    e.preventDefault()
+    if (password.length < 6) return setMsg('Password minimal 6 karakter.')
+    setBusy('pw')
+    const { error } = await supabase.auth.updateUser({ password })
+    setBusy('')
+    setPassword('')
+    setMsg(error ? errorMessage(error) : 'Password diganti.')
+  }
+
+  const field = 'h-11 min-w-0 flex-1 rounded-xl border border-ink/10 bg-surface-950/60 px-3 text-base outline-none focus:border-brand-400/70'
+  return (
+    <section className="space-y-2">
+      <SectionTitle>⚙️ Pengaturan</SectionTitle>
+      <Card className="space-y-4">
+        <form onSubmit={rename} className="space-y-1.5">
+          <span className="block text-sm font-medium text-slate-300">Nama tampilan</span>
+          <div className="flex gap-2">
+            <input value={newName} onChange={(e) => setNewName(e.target.value)} maxLength={40} className={field} />
+            <Button type="submit" loading={busy === 'name'} disabled={!newName.trim() || newName.trim() === name}>
+              Simpan
+            </Button>
+          </div>
+        </form>
+        <form onSubmit={changePassword} className="space-y-1.5">
+          <span className="block text-sm font-medium text-slate-300">Ganti password</span>
+          <div className="flex gap-2">
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="Password baru (min. 6)" className={field} />
+            <Button type="submit" loading={busy === 'pw'} disabled={!password}>
+              Ganti
+            </Button>
+          </div>
+        </form>
+        <div className="space-y-1.5">
+          <span className="block text-sm font-medium text-slate-300">Tema</span>
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-950/60 p-1">
+            {(['system', 'light', 'dark'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => choose(t)}
+                className={cx('min-h-9 rounded-lg text-sm font-semibold transition', pref === t ? 'bg-brand-400 text-on-accent' : 'text-slate-400 hover:text-slate-200')}
+              >
+                {t === 'system' ? 'Ikut sistem' : t === 'light' ? 'Terang' : 'Gelap'}
+              </button>
+            ))}
+          </div>
+        </div>
+        {msg && <p className="text-sm text-slate-300">{msg}</p>}
+      </Card>
+    </section>
   )
 }

@@ -4,6 +4,7 @@ import ConfirmSheet, { type Confirmation } from '../components/ConfirmSheet'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { BOUNTY_SELECT, type Bounty } from '../lib/bounties'
+import { useMyCards } from '../lib/cards'
 import { formatDateTime } from '../lib/format'
 import { matchMessage, shareToWhatsApp } from '../lib/share'
 import {
@@ -186,6 +187,8 @@ export default function MatchRoom() {
             : 'Kamu host match ini, jadi kamu yang mengatur jalannya match dan tidak ikut main.'}
         </p>
       )}
+
+      {online && match.status === 'open' && me && profile.role === 'player' && <DoubleDownPicker matchId={id} />}
 
       {/* Online table */}
       {online && match.status === 'ongoing' && (
@@ -450,5 +453,46 @@ function SmallButton({
     >
       {children}
     </Button>
+  )
+}
+
+/** Pasang/lepas Double Down untuk match online ini (sebelum dimulai). Tidak tampil kalau tidak punya kartunya. */
+function DoubleDownPicker({ matchId }: { matchId: string }) {
+  const { cards, reload } = useMyCards()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  if (!cards) return null
+  const armed = cards.find((c) => c.card_code === 'double_down' && c.status === 'armed' && c.match_id === matchId)
+  const spare = cards.find((c) => c.card_code === 'double_down' && c.status === 'owned')
+  if (!armed && !spare) return null
+
+  async function run(fn: string, args: Record<string, unknown>) {
+    setBusy(true)
+    setError('')
+    const { error } = await supabase.rpc(fn, args)
+    if (error) setError(errorMessage(error))
+    await reload()
+    setBusy(false)
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-3">
+        <div className="min-w-0 text-sm">
+          <p className="font-semibold">⚡ Double Down {armed ? 'terpasang' : 'tersedia'}</p>
+          <p className="text-xs text-slate-400">{armed ? 'Poin kamu dari match ini jadi 2× lipat.' : 'Pasang sebelum match dimulai: poin dari match ini jadi 2×.'}</p>
+        </div>
+        {armed ? (
+          <Button variant="ghost" className="min-h-9 shrink-0 px-3 text-xs" loading={busy} onClick={() => run('disarm_double_down', { p_match: matchId })}>
+            Lepas
+          </Button>
+        ) : (
+          <Button className="min-h-9 shrink-0 px-3 text-xs" loading={busy} onClick={() => run('arm_double_down', { p_card: spare!.id, p_match: matchId })}>
+            Pasang
+          </Button>
+        )}
+      </div>
+      <ErrorText>{error}</ErrorText>
+    </div>
   )
 }
