@@ -239,10 +239,29 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
 #toast.on{opacity:1}
 #toast.good{background:#2f7a5c}
 
-@media(max-width:420px){ /* HP sempit: kursi dan kartu board sedikit lebih kecil supaya meja 9 orang tidak saling menimpa */
-  :root{--sw:84px}
-  .card{width:38px;height:54px}.card b{font-size:15px}.card i{top:19px;font-size:12px}.card::after{font-size:26px}
+@media(max-width:520px){ /* HP: kursi, kartu, dan taruhan lebih ringkas supaya meja 8 orang tidak saling menimpa */
+  :root{--sw:72px}
+  .card{width:32px;height:46px;border-radius:4px}.card b{top:2px;left:4px;font-size:13px}.card i{top:16px;left:4px;font-size:10px}.card::after{font-size:21px;right:3px}
+  #board{gap:3px}
+  .seat .cards{gap:1px;margin-bottom:-6px}
+  .seat .card{width:17px;height:24px;border-radius:2px}.seat .card b{top:1px;left:2px;font-size:9px}.seat .card i{top:11px;left:2px;font-size:7px}
+  .seat .card.back{border-width:1.5px}
+  .plate{padding:3px 5px 4px;box-shadow:2px 2px 0 #000b}
+  .nm{font-size:11.5px}.ch{font-size:11px}
+  .r3{min-height:12px;margin-top:1px;font-size:9.5px;line-height:12px}.tag{font-size:8px;line-height:11px;padding:0 3px}
+  .dealer{right:-9px;top:-9px;width:18px;height:18px;font-size:10px;line-height:14px}
+  #pot .stk{display:none} /* di HP cukup angka pot, tumpukan chip makan tempat */
+  #pot .num{font-size:20px}
+  #mine .card{width:54px;height:78px}#mine .card b{font-size:21px}#mine .card i{top:27px;font-size:16px}#mine .card::after{font-size:38px}
 }
+/* taruhan versi ringkas di HP: pil kecil menempel di bawah kursi, bukan tumpukan chip di tengah meja */
+.sbet{display:flex;align-items:center;gap:3px;margin-top:3px;padding:1px 6px 1px 2px;border-radius:999px;background:#04122bcc;color:#fff;font:700 10.5px var(--mono);white-space:nowrap}
+.sbet .chip{width:13px;height:13px;margin:0;border-width:1px}
+.sbet .chip::after{inset:2.5px}
+/* penonton & host: tanpa kartu sendiri dan tombol aksi, panel bawah dipersempit supaya meja lebih tinggi */
+body.watching #mine,body.watching #eye{display:none}
+body.watching #me{min-height:52px}
+body.watching #ctl{min-height:0}
 @media(min-width:700px){
   :root{--sw:124px}
   #top{min-height:86px}
@@ -480,6 +499,7 @@ const card = (c, key = '') => {
     : `<div class="card${[1, 2].includes(c / 13 | 0) ? ' r' : ''}${cls}"${st} data-c="${c}" data-s="${SU[c / 13 | 0]}"><b>${RK[c % 13].replace('T', '10')}</b><i>${SU[c / 13 | 0]}</i></div>`;
 };
 // tumpukan chip per denominasi (maks 6 keping per tumpukan supaya tidak melebar)
+const chip1 = n => { const d = DEN.find(([v]) => n >= v) || DEN[DEN.length - 1]; return `<i class="chip" style="--c:${d[1]}"></i>`; }; // satu keping, warna denominasi terbesar
 const chips = n => { let h = ''; for (const [d, c] of DEN) { const k = Math.min(n / d | 0, 6); n %= d; if (k) h += `<span class="stk">${`<i class="chip" style="--c:${c}"></i>`.repeat(k)}</span>`; } return h; };
 const tagOf = (p, betting) => p.place > 1 ? ['', '#' + p.place + (p.afkOut ? ' AFK' : ' keluar')] : p.place === 1 ? ['grn', 'juara']
   : p.sitOut ? ['red', p.afk ? `AFK ${p.afk}/${S.afkLimit}` : 'istirahat'] : !p.online ? ['', 'offline']
@@ -693,7 +713,9 @@ function render() {
 
   // ---- kursi melingkar; aku selalu di bawah, urutan giliran searah jarum jam ----
   const W = $('table').clientWidth, H = $('table').clientHeight, sw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sw'));
-  const rx = 50 - (sw / 2 + 4) * 100 / W, ry = 50 - (92 / 2 + 4) * 100 / H;
+  const narrow = W < 520, seatH = narrow ? 76 : 92;
+  const rx = 50 - (sw / 2 + 4) * 100 / W, ry = 50 - (seatH / 2 + 4) * 100 / H;
+  document.body.classList.toggle('watching', me < 0);
   let seats = '', bets = '', sumBets = 0;
   seatPos = [];
   ps.forEach((p, k) => {
@@ -705,8 +727,8 @@ function render() {
       <div class="cards">${cs}</div>
       <div class="plate">${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}
         <div class="nm">${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
-        ${k === S.turn ? '<div class="tm"><b></b></div>' : ''}</div></div>`;
-    if (p.bet) { sumBets += p.bet; bets += `<div class="bet" style="left:${x + (50 - x) * .45}%;top:${y + (50 - y) * .45}%">${chips(p.bet)}<span>${p.bet}</span></div>`; }
+        ${k === S.turn ? '<div class="tm"><b></b></div>' : ''}</div>${narrow && p.bet ? `<div class="sbet">${chip1(p.bet)}${p.bet}</div>` : ''}</div>`;
+    if (p.bet) { sumBets += p.bet; if (!narrow) bets += `<div class="bet" style="left:${x + (50 - x) * .45}%;top:${y + (50 - y) * .45}%">${chips(p.bet)}<span>${p.bet}</span></div>`; }
   });
   set($('seats'), seats + bets);
 
@@ -844,6 +866,17 @@ addEventListener('keydown', e => {
 });
 $('chat').onsubmit = e => { e.preventDefault(); const v = $('chatIn').value; closeChat(); chatSend(v); };
 setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
+
+// ---- layar tetap menyala selama meja dibuka (Screen Wake Lock). Browser melepasnya saat tab disembunyikan,
+// jadi diminta lagi saat tab terlihat lagi; sebagian browser (Safari) baru mengizinkan setelah ada sentuhan. ----
+let wake = null;
+async function keepAwake() {
+  if (wake || document.hidden || !('wakeLock' in navigator) || (S && S.phase === 'over')) return;
+  try { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } catch {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+addEventListener('pointerdown', keepAwake, { passive: true });
+keepAwake();
 
 // ---- showdown: sorot kombinasi tiap pemain bergantian, dari yang terlemah sampai pemenang ----
 // S.reveal = [{ i, best, hand }] urut terlemah dulu. Mulai setelah kartu lawan selesai dibuka, tiap pemain
