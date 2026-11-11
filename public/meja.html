@@ -262,6 +262,12 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
 body.watching #mine,body.watching #eye{display:none}
 body.watching #me{min-height:52px}
 body.watching #ctl{min-height:0}
+/* panel penonton pendek: tombol chat di tengah tinggi panel, panel satu kolom, kotak chat ikut menambah tinggi panel
+   (bukan menimpa) supaya tidak terpotong di bawah layar */
+body.watching #panel{display:block}
+body.watching #chatFab{top:50%;transform:translateY(-50%)}
+body.watching #chatFab:active{transform:translate(2px,calc(-50% + 2px))}
+body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height:0;margin-bottom:8px}
 @media(min-width:700px){
   :root{--sw:124px}
   #top{min-height:86px}
