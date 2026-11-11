@@ -74,7 +74,13 @@ export function equities(hands, board, iters = 1200) {
   return share.map(v => v / n)
 }
 /** Skill card yang mekanismenya ada di meja (kode sama dengan tabel skill_cards). */
-export const SKILLS = { defend_me: { name: 'Defend Me', icon: '🛡️' } }
+// target: kartu yang perlu memilih lawan. open: langsung terlihat semua pemain (Fold Player jelas terasa korbannya);
+// kartu lain baru terlihat pemain lain saat kartu dibuka di akhir hand.
+export const SKILLS = {
+  defend_me: { name: 'Defend Me', icon: '🛡️' },
+  reveal_card: { name: 'Reveal Card', icon: '👁️', target: true },
+  fold_player: { name: 'Fold Player', icon: '🚫', target: true, open: true },
+}
 // Jeda tambahan sebelum hand berikutnya: tiap kombinasi pemain disorot bergantian di layar.
 export const REVEAL_MS = env('REVEAL_MS', 1500), REVEAL_LEAD_MS = 900
 
@@ -135,7 +141,7 @@ export class Table {
     if (el.length < 2) return this.end()
     if (this.startedAt === null) this.startedAt = this.now
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0 })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, target: -1, forced: false })
     this.handNo++
     this.deck = this.newDeck(); this.board = []; this.phase = 'preflop'; this.bet = this.bb; this.minRaise = this.bb
     this.dealer = this.after(this.dealer, p => p.inHand)
@@ -256,18 +262,40 @@ export class Table {
 
   // ---- skill card di meja ----
   // Satu kartu per pemain per hand, hanya selama hand berjalan dan pemain belum fold.
-  canUseCard(i, code) {
-    const p = this.players[i]
-    if (!SKILLS[code]) return 'Kartu ini tidak bisa dipakai di meja'
+  // Kartu Attack butuh target j: lawan yang masih ikut hand. Fold Player hanya sebelum flop dan tidak ke pemain all-in.
+  canUseCard(i, code, j) {
+    const p = this.players[i], sk = SKILLS[code]
+    if (!sk) return 'Kartu ini tidak bisa dipakai di meja'
     if (!this.betting) return 'Skill card hanya bisa dipakai selama hand berjalan'
-    if (!p.inHand || p.folded) return 'Kamu sudah tidak ikut hand ini'
+    if (!p || !p.inHand || p.folded) return 'Kamu sudah tidak ikut hand ini'
     if ((p.skills || []).length) return 'Maksimal 1 skill card per hand'
+    if (!sk.target) return
+    const q = this.players[j]
+    if (!Number.isInteger(j) || !q || j === i) return 'Pilih lawan yang mau ditarget'
+    if (!q.inHand || q.folded) return `${q.name} sudah tidak ikut hand ini`
+    if (code === 'fold_player') {
+      if (this.phase !== 'preflop') return 'Fold Player hanya bisa dipakai sebelum flop'
+      if (q.allIn) return `${q.name} sudah all-in, tidak bisa dipaksa fold`
+    }
   }
-  useCard(i, code) {
-    const err = this.canUseCard(i, code)
+  useCard(i, code, j) {
+    const err = this.canUseCard(i, code, j)
     if (err) return err
     const p = this.players[i]
     p.skills = [...(p.skills || []), code]
+    if (SKILLS[code].target) p.target = j
+    if (code === 'fold_player') this.forceFold(j)
+  }
+  // Fold di luar giliran. Kalau korbannya sedang giliran, sama seperti dia fold sendiri; kalau bukan, giliran tetap
+  // di pemain yang sekarang, kecuali ronde taruhan jadi selesai karena dia keluar.
+  forceFold(j) {
+    const q = this.players[j]
+    q.folded = true; q.forced = true; q.last = 'fold'
+    if (j === this.turn) return this.step(j)
+    const con = this.players.filter(p => p.inHand && !p.folded)
+    if (con.length < 2) return this.finish(con)
+    const live = con.filter(p => !p.allIn)
+    if (live.every(p => p.acted && p.bet === this.bet) || (live.length < 2 && live.every(p => p.bet >= this.bet))) this.advance()
   }
   // Defend Me: pemain yang rugi di hand ini mendapat kembali setengah kerugiannya, diambil dari pemain yang untung
   // (sebanding dengan keuntungannya), jadi jumlah chip di meja tetap.
@@ -312,7 +340,10 @@ export class Table {
   // hostView: tampilan penonton untuk host match (tanda supaya halaman tahu ini host; kartu tetap tertutup).
   view(me, hostView = false) {
     const i = me ? this.players.indexOf(me) : -1, N = this.players
-    const hand = q => (q === me ? q.inHand && !q.folded : q.show && !q.folded) && this.board.length > 2 ? handName(q.cards, this.board) : ''
+    // Reveal Card: pemakainya melihat kartu targetnya sampai hand selesai
+    const peek = q => !!me && (me.skills || []).includes('reveal_card') && N[me.target] === q && q.inHand && !q.folded
+    const hand = q => (q === me ? q.inHand && !q.folded : (q.show || peek(q)) && !q.folded) && this.board.length > 2 ? handName(q.cards, this.board) : ''
+    const seen = q => q === me || !this.betting || (q.skills || []).some(c => SKILLS[c]?.open)
     const lvl = this.level(), nextSb = LEVELS[Math.min(LEVELS.length - 1, lvl + 1)]
     const [sb, bb] = this.betting || this.phase === 'showdown' ? [this.sb, this.bb] : this.blinds()
     const v = {
@@ -332,8 +363,9 @@ export class Table {
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,
         online: this.online(q), won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
         // skill card yang dipakai hand ini: pemiliknya selalu tahu, pemain lain baru tahu saat kartu dibuka (showdown)
-        skills: q === me || !this.betting ? q.skills || [] : [], saved: q.saved || 0,
-        cards: q === me || q.show ? q.cards : q.inHand && !q.folded ? [-1, -1] : [],
+        skills: seen(q) ? q.skills || [] : [], target: seen(q) && q.target >= 0 ? q.target : -1, saved: q.saved || 0,
+        forced: !!q.forced, peek: peek(q),
+        cards: q === me || q.show || peek(q) ? q.cards : q.inHand && !q.folded ? [-1, -1] : [],
       })),
     }
     if (i >= 0 && this.turn === i) v.ctl = this.ctl(i)

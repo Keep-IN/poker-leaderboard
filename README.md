@@ -73,6 +73,9 @@ Detailnya:
 - Kartu yang tersedia sekarang:
   - ⚡ **Double Down** (passive): pasang di halaman match **online** yang sudah kamu join, sebelum match dimulai. Poin match itu jadi **2× lipat**. Satu per match. Kalau match batal atau kamu keluar, kartunya kembali.
   - 🛡️ **Defend Me** (defend): dipakai di meja online lewat tombol 🎒 saat hand berjalan. Kalau kamu kalah di hand itu, **setengah chip yang hilang dikembalikan** (diambil dari pemenang hand). Kartu yang dipakai terlihat oleh semua pemain sebelum showdown.
+  - 👁️ **Reveal Card** (attack): pilih satu lawan di meja, lalu **2 kartunya terlihat olehmu** sampai hand selesai (beserta nama kombinasinya). Diam-diam: lawan baru tahu saat kartu dibuka di akhir hand.
+  - 🚫 **Fold Player** (attack): **paksa satu lawan fold**. Hanya bisa **sebelum flop** dan tidak bisa ke pemain yang sudah all-in. Chip yang sudah dia taruh tetap di pot. Langsung diumumkan ke semua pemain, dan korbannya ditandai "dipaksa fold".
+- Kartu Defend dan Reveal baru terlihat pemain lain saat kartu dibuka di akhir hand. Kalau kartu gagal dipakai (misalnya target keburu fold), kartunya kembali ke inventory.
 - Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match.
 
 ### 👑 Podium all time

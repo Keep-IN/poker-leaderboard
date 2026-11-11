@@ -148,16 +148,22 @@ async function playCard(db, match, b) {
   const t0 = Table.from(peek.state), p0 = t0.find(token)
   if (!p0) return { error: 'Sesi meja tidak ditemukan, buka ulang dari halaman match', gone: true }
   t0.now = Date.now(); t0.tick()
-  const code = String(b.code || '')
-  const pre = t0.canUseCard(t0.players.indexOf(p0), code)
+  const code = String(b.code || ''), target = b.target === undefined || b.target === null ? -1 : Number(b.target)
+  const pre = t0.canUseCard(t0.players.indexOf(p0), code, target)
   if (pre) return { error: pre }
   let used
   try { used = await db.useCard(match, p0.uid, cardId) } catch (e) { return { error: String(e.message).replace(/^.*?: /, '') } }
-  const r = await mutate(db, match, t => {
-    const p = t.find(token)
-    const err = p ? t.useCard(t.players.indexOf(p), used) : 'Sesi meja tidak ditemukan'
-    return err ? { error: err } : { ok: true, used }
-  })
+  let r
+  try {
+    r = await mutate(db, match, t => {
+      const p = t.find(token)
+      const err = p ? t.useCard(t.players.indexOf(p), used, target) : 'Sesi meja tidak ditemukan'
+      return err ? { error: err } : { ok: true, used }
+    })
+  } catch (e) { r = { error: e } }
+  // kartu sudah ditandai terpakai di database tapi tidak jadi dipakai (misalnya target keburu fold): kembalikan
+  if (r.error || r.status || r.out?.error) await db.refundCard(match, p0.uid, cardId).catch(() => {})
+  if (r.error) throw r.error
   if (r.status) return ended(r.status)
   const p = r.t?.find(token)
   return p ? withPodium(db, r.t, { ...r.out, v: r.ver, s: r.t.view(p) }) : r.out

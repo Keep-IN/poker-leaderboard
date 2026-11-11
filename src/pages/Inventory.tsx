@@ -7,6 +7,8 @@ import { CardTile } from './Market'
 const howToUse: Record<string, string> = {
   double_down: 'Pasang di halaman match online yang sudah kamu join, sebelum match dimulai.',
   defend_me: 'Pakai di meja poker online lewat tombol 🎒 saat hand berjalan.',
+  reveal_card: 'Pakai di meja online lewat tombol 🎒, lalu pilih lawan yang mau diintip.',
+  fold_player: 'Pakai di meja online lewat tombol 🎒 sebelum flop, lalu pilih lawan.',
 }
 
 export default function Inventory() {

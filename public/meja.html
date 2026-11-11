@@ -273,6 +273,12 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 .seat.pod2 .plate{border-color:#c9d1dc;box-shadow:0 0 0 2px #c9d1dc88,3px 3px 0 #000b}
 .seat.pod3 .plate{border-color:#c98a52;box-shadow:0 0 0 2px #c98a5288,3px 3px 0 #000b}
 /* skill card yang dipakai: lencana kecil di pojok kiri atas kotak nama */
+.skills small{margin-left:2px;font-family:var(--mono);font-size:9px;color:#a9defa}
+.seat.peek .cards{position:relative}
+.seat.peek .cards .card{outline:2px dashed #71c5eb;outline-offset:1px}
+.seat.peek .cards::after{content:'👁️';position:absolute;top:-10px;right:-8px;font-size:13px}
+#bagSheet .tg{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px 36px}
+#bagSheet .tg .btn{padding:6px 10px;font-size:13px;box-shadow:none}
 .skills{position:absolute;left:-10px;top:-12px;z-index:3;padding:1px 4px;border-radius:999px;background:#04122b;border:1.5px solid var(--gold);font-size:12px;line-height:16px;box-shadow:1px 1px 0 #000}
 /* inventory skill card di meja */
 #bagSheet{position:fixed;inset:0;z-index:20;display:flex;align-items:flex-end;justify-content:center;background:#0009}
@@ -542,11 +548,11 @@ const chip1 = n => { const d = DEN.find(([v]) => n >= v) || DEN[DEN.length - 1];
 const chips = n => { let h = ''; for (const [d, c] of DEN) { const k = Math.min(n / d | 0, 6); n %= d; if (k) h += `<span class="stk">${`<i class="chip" style="--c:${c}"></i>`.repeat(k)}</span>`; } return h; };
 const tagOf = (p, betting) => p.place > 1 ? ['', '#' + p.place + (p.afkOut ? ' AFK' : ' keluar')] : p.place === 1 ? ['grn', 'juara']
   : p.sitOut ? ['red', p.afk ? `AFK ${p.afk}/${S.afkLimit}` : 'istirahat'] : !p.online ? ['', 'offline']
-  : p.allIn && p.inHand && betting ? ['red', 'all-in'] : p.last ? [/^(bet|raise)/.test(p.last) ? 'red' : '', p.last]
+  : p.forced && p.folded && p.inHand ? ['red', 'dipaksa fold'] : p.allIn && p.inHand && betting ? ['red', 'all-in'] : p.last ? [/^(bet|raise)/.test(p.last) ? 'red' : '', p.last]
   : p.inHand && p.folded ? ['', 'fold'] : !p.chips && !p.inHand ? ['', 'habis'] : null;
 // Skill card yang dipakai hand ini (pemiliknya selalu tahu; lawan baru tahu saat kartu dibuka).
-const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'] };
-const skillBadges = p => (p.skills || []).length ? `<span class="skills" title="${p.skills.map(c => (SKILL_ICONS[c] || ['', c])[1]).join(', ')}">${p.skills.map(c => (SKILL_ICONS[c] || ['🃏'])[0]).join('')}</span>` : '';
+const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'], reveal_card: ['👁️', 'Reveal Card'], fold_player: ['🚫', 'Fold Player'] };
+const skillBadges = p => (p.skills || []).length ? `<span class="skills" title="${esc(p.skills.map(c => (SKILL_ICONS[c] || ['', c])[1] + (p.target >= 0 && S.players[p.target] ? ' → ' + S.players[p.target].name : '')).join(', '))}">${p.skills.map(c => (SKILL_ICONS[c] || ['🃏'])[0]).join('')}${p.target >= 0 && S.players[p.target] ? '<small>→' + esc(S.players[p.target].name.slice(0, 8)) + '</small>' : ''}</span>` : '';
 const row3 = (p, mine, betting) => p.saved ? `<span class="tag grn">🛡️ +${p.saved}</span>` : p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
   : (t => t ? `<span class="tag ${t[0]}">${t[1]}</span>` : '')(tagOf(p, betting));
 
@@ -719,6 +725,10 @@ function render() {
         if (d > 0) play(p.allIn && !q.allIn ? 'allin' : 'chips', Math.min(10, 2 + Math.ceil(d / 60)));
         if (p.last === 'check' && q.last !== 'check') play('knock');
         if (p.last === 'fold' && q.last !== 'fold') play('fold');
+        if (p.forced && !q.forced && S.no === prevS.no) { // Fold Player: umumkan siapa yang memaksa
+          const by = ps.find(x => (x.skills || []).includes('fold_player') && x.target === k);
+          toast(`🚫 ${by ? by.name : 'Seseorang'} memaksa ${k === me ? 'kamu' : p.name} fold`, k !== me);
+        }
       });
       if (S.no === prevS.no && S.board.length > prevS.board.length) play('sweep');
     }
@@ -766,7 +776,7 @@ function render() {
     seatPos[k] = { x, y };
     const dim = p.place > 1 || p.sitOut || !p.online || (betting && (!p.inHand || p.folded));
     const cs = k === me ? '' : p.cards.map((c, j) => card(c, anims.has('r' + k + '.' + j) ? 'r' + k + '.' + j : 'c' + k + '.' + j)).join('');
-    seats += `<div data-k="${k}" class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}${p.podium ? ' pod' + p.podium : ''}" style="left:${x}%;top:${y}%">
+    seats += `<div data-k="${k}" class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}${p.podium ? ' pod' + p.podium : ''}${p.peek ? ' peek' : ''}" style="left:${x}%;top:${y}%">
       <div class="cards">${cs}</div>
       <div class="plate">${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}${skillBadges(p)}
         <div class="nm">${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : p.podium === 1 ? '<span class="crown" title="#1 all time">👑</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
@@ -912,7 +922,13 @@ $('chat').onsubmit = e => { e.preventDefault(); const v = $('chatIn').value; clo
 setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
 
 // ---- skill card dari inventory (dibaca lewat Supabase dengan sesi login pemain; RLS hanya memberi kartu miliknya) ----
-const USABLE = { defend_me: { icon: '🛡️', name: 'Defend Me', desc: 'Kalah di hand ini? Setengah chip yang kamu taruhkan kembali.' } };
+const USABLE = {
+  defend_me: { icon: '🛡️', name: 'Defend Me', desc: 'Kalah di hand ini? Setengah chip yang kamu taruhkan kembali.' },
+  reveal_card: { icon: '👁️', name: 'Reveal Card', desc: 'Intip 2 kartu satu lawan sampai hand ini selesai. Diam-diam: lawan baru tahu saat kartu dibuka.', target: true },
+  fold_player: { icon: '🚫', name: 'Fold Player', desc: 'Paksa satu lawan fold. Hanya sebelum flop, tidak ke pemain all-in. Chip-nya tetap di pot.', target: true, preflop: true },
+};
+// lawan yang bisa ditarget kartu ini
+const targetsFor = code => S.players.map((q, k) => ({ q, k })).filter(({ q, k }) => k !== S.me && q.inHand && !q.folded && !(code === 'fold_player' && q.allIn));
 let bagCards = [];
 async function sb() {
   if (sbClient) return sbClient;
@@ -943,13 +959,26 @@ async function openBag() {
   $('bagList').innerHTML = Object.keys(groups).length
     ? (why ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it"><span class="ic">${USABLE[code].icon}</span>
         <span style="flex:1"><b>${USABLE[code].name} ×${list.length}</b><small>${USABLE[code].desc}</small></span>
-        <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${ok ? '' : 'disabled'}>Pakai</button></div>`).join('')
+        <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${ok && !(USABLE[code].preflop && S.phase !== 'preflop') ? '' : 'disabled'}>Pakai</button></div>
+        ${USABLE[code].preflop && ok && S.phase !== 'preflop' ? '<p class="note" style="padding-left:36px">Hanya sebelum flop</p>' : ''}<div class="tg" data-for="${code}" hidden></div>`).join('')
     : '<p class="note">Belum ada skill card yang bisa dipakai di meja. Beli di Market.</p>';
-  $('bagList').querySelectorAll('button[data-id]').forEach(b => b.onclick = async () => {
+  const play = async (b, code, target) => {
     b.disabled = true;
-    const r = await api('card', { card: b.dataset.id, code: b.dataset.code });
-    if (r && r.ok) { toast(USABLE[b.dataset.code].icon + ' ' + USABLE[b.dataset.code].name + ' aktif untuk hand ini', true); el.remove(); }
-    else b.disabled = false;
+    const r = await api('card', { card: b.dataset.id, code, target });
+    if (r && r.ok) {
+      const u = USABLE[code], who = target >= 0 && S.players[target] ? S.players[target].name : '';
+      toast(u.icon + ' ' + u.name + (who ? ' → ' + who : ' aktif untuk hand ini'), true); el.remove();
+    } else b.disabled = false;
+  };
+  $('bagList').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => {
+    const code = b.dataset.code;
+    if (!USABLE[code].target) return play(b, code);
+    // kartu Attack: pilih lawan dulu
+    const box = $('bagList').querySelector(`.tg[data-for="${code}"]`), ts = targetsFor(code);
+    box.hidden = !box.hidden;
+    box.innerHTML = ts.length ? '<p class="note" style="width:100%;margin:0">Pilih lawan:</p>' + ts.map(({ q, k }) => `<button class="btn" type="button" data-k="${k}">${esc(q.name)}</button>`).join('')
+      : '<p class="note" style="margin:0">Tidak ada lawan yang bisa ditarget.</p>';
+    box.querySelectorAll('button[data-k]').forEach(t => t.onclick = () => { t.disabled = true; play(b, code, +t.dataset.k); });
   });
 }
 $('bag').onclick = openBag;

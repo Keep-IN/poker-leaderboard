@@ -189,7 +189,9 @@ create table if not exists public.skill_cards (
 );
 insert into public.skill_cards (code, name, kind, description, price, stock, on_sale, sort) values
   ('double_down', 'Double Down', 'passive', 'Poin dari match online ini jadi 2× lipat. Aktifkan di halaman match sebelum match dimulai.', 70, 10, true, 1),
-  ('defend_me', 'Defend Me', 'defend', 'Kalau kalah di hand ini, setengah chip yang kamu taruhkan kembali.', 40, 10, true, 2)
+  ('defend_me', 'Defend Me', 'defend', 'Kalau kalah di hand ini, setengah chip yang kamu taruhkan kembali.', 40, 10, true, 2),
+  ('reveal_card', 'Reveal Card', 'attack', 'Intip 2 kartu satu lawan pilihanmu sampai hand ini selesai. Lawan baru tahu saat kartu dibuka.', 35, 10, true, 3),
+  ('fold_player', 'Fold Player', 'attack', 'Paksa satu lawan fold sebelum flop. Chip yang sudah dia taruh tetap di pot. Tidak bisa ke pemain all-in.', 130, 5, true, 4)
 on conflict (code) do update set name = excluded.name, kind = excluded.kind, description = excluded.description, sort = excluded.sort;
 
 -- Kartu milik player. owned = di inventory, armed = Double Down dipasang ke match, used = sudah terpakai.
@@ -1434,13 +1436,24 @@ begin
     raise exception 'Maksimal 3 skill card per match';
   end if;
   update public.player_cards set status = 'used', used_at = now(), match_id = p_match
-   where id = p_card and player_id = p_player and status = 'owned' and card_code in ('defend_me')
+   where id = p_card and player_id = p_player and status = 'owned' and card_code in ('defend_me', 'reveal_card', 'fold_player')
   returning card_code into code;
   if code is null then
     raise exception 'Kartu tidak ada di inventory atau tidak bisa dipakai di meja';
   end if;
   return code;
 end;
+$$;
+
+-- Kartu yang sudah ditandai terpakai tapi gagal dipakai di meja (misalnya target keburu fold) dikembalikan.
+create or replace function public.meja_refund_card(p_match uuid, p_player uuid, p_card uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.player_cards set status = 'owned', used_at = null, match_id = null
+   where id = p_card and player_id = p_player and match_id = p_match and status = 'used';
 $$;
 
 create or replace function public.update_my_name(p_name text)
@@ -1566,7 +1579,9 @@ revoke all on function public.match_finished(uuid) from public, anon, authentica
 revoke all on function public.claimable_coins(uuid) from public, anon, authenticated;
 revoke all on function public.meja_use_card(uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.meja_podium() from public, anon, authenticated;
+revoke all on function public.meja_refund_card(uuid, uuid, uuid) from public, anon, authenticated;
 grant execute on function public.meja_use_card(uuid, uuid, uuid) to service_role;
+grant execute on function public.meja_refund_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_podium() to service_role;
 
 do $$

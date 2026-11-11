@@ -26,6 +26,7 @@ function fakeDb() {
       c.used = true
       return c.code
     },
+    async refundCard(_, player, card) { const c = this.cards[card]; if (c && c.owner === player) c.used = false },
     async create(_, state, due) { await yieldTurn(); if (row) return null; row = { state, ver: 1, due_at: due }; return 1 },
     async save(_, ver, state, due, out, winner) {
       await yieldTurn()
@@ -91,6 +92,14 @@ assert((await post({ token: a.token, type: 'card', card: CARD, code: 'reveal' })
 const used = await post({ token: a.token, type: 'card', card: CARD, code: 'defend_me' })
 assert(used.ok && used.s.players[used.s.me].skills.includes('defend_me'), JSON.stringify(used.error))
 assert((await post({ token: a.token, type: 'card', card: CARD, code: 'defend_me' })).error)
+// kartu yang terpakai di database tapi gagal di meja dikembalikan (di sini: kode yang dikirim tidak cocok, target kosong)
+const RV = '99999999-2222-3333-4444-666666666666'
+db.cards[RV] = { owner: 'uB', code: 'reveal_card', used: false }
+assert((await post({ token: b.token, type: 'card', card: RV, code: 'defend_me' })).error)
+assert.equal(db.cards[RV].used, false, 'kartu dikembalikan')
+const sb = (await get({ token: b.token })).s, tgt = sb.players.findIndex((q, k) => k !== sb.me && q.inHand && !q.folded)
+const rv = await post({ token: b.token, type: 'card', card: RV, code: 'reveal_card', target: tgt })
+assert(rv.ok && rv.s.players[tgt].cards.every(c => c >= 0) && rv.s.players[tgt].peek, JSON.stringify(rv.error))
 s = (await get({ token: a.token })).s
 // pemain hanya melihat kartunya sendiri; host juga tidak melihat kartu tertutup siapa pun, hanya peluang menang
 assert.deepEqual(s.players.filter((_, k) => k !== s.me).map(q => q.cards), [[-1, -1], [-1, -1]])
