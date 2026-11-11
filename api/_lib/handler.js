@@ -93,7 +93,7 @@ async function join(db, match, accessToken) {
   const uid = await db.user(String(accessToken || ''))
   if (!uid) return { error: 'Sesi login habis, buka ulang dari halaman match', auth: true }
   await ensureTable(db, match)
-  // Host match (tidak ikut main) mendapat token sendiri: boleh chat dan melihat kartu semua pemain untuk peluang menang.
+  // Host match (tidak ikut main) mendapat token sendiri supaya tetap dikenali sebagai host (boleh chat) setelah refresh.
   const host = (await db.seats(match))?.match.dealer_id === uid
   const r = await mutate(db, match, t => {
     const p = t.players.find(q => q.uid === uid)

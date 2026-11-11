@@ -45,7 +45,7 @@ assert.equal((await post({ type: 'join', access_token: 'tokA' })).token, a.token
 const x = await post({ type: 'join', access_token: 'tokX' })
 assert(x.watch && !x.token && !x.host) // bukan pemain match: penonton
 const hst = await post({ type: 'join', access_token: 'tokH' })
-assert(hst.host && hst.token && hst.s.hostView) // host match: token sendiri, boleh chat & lihat kartu semua pemain
+assert(hst.host && hst.token && hst.s.hostView) // host match: token sendiri, boleh chat
 assert.equal((await post({ type: 'join', access_token: 'tokH' })).token, hst.token)
 assert(![a.token, b.token, c.token].includes(hst.token))
 assert.equal((await post({ token: hst.token, type: 'check' })).gone, true) // host tidak bisa beraksi
@@ -70,9 +70,9 @@ offset += 16000
 const tok = { [a.token]: 'A', [b.token]: 'B', [c.token]: 'C' }
 let s = (await get({ token: a.token })).s
 assert.equal(s.phase, 'preflop')
-// pemain hanya melihat kartunya sendiri; host melihat kartu semua pemain yang masih di hand
+// pemain hanya melihat kartunya sendiri; host juga tidak melihat kartu tertutup siapa pun
 assert.deepEqual(s.players.filter((_, k) => k !== s.me).map(q => q.cards), [[-1, -1], [-1, -1]])
-assert((await get({ token: hst.token })).s.players.every(q => q.cards.length === 2 && q.cards.every(c => c >= 0)))
+assert((await get({ token: hst.token })).s.players.every(q => q.cards.every(c => c === -1)))
 
 // tiap giliran: pemain yang sedang giliran all-in; ulangi sampai turnamen selesai
 let guard = 0
