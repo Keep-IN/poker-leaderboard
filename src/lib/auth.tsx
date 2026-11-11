@@ -48,6 +48,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshProfile: () => loadProfile(session?.user.id),
     signOut: async () => {
       await supabase.auth.signOut()
+      // kursi meja online tersimpan per device: hapus supaya akun berikutnya di device ini tidak memakai kursi akun ini
+      try {
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith('meja:') && k !== 'meja:rt')
+          .forEach((k) => localStorage.removeItem(k))
+      } catch {
+        /* storage tidak tersedia */
+      }
     },
   }
 

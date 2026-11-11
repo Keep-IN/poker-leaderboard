@@ -519,16 +519,20 @@ const later = (ms, k, ...a) => setTimeout(() => play(k, ...a), Math.max(0, ms));
 // ---- match dari URL (/meja.html?m=<id>); token meja disimpan per match ----
 const match = (new URLSearchParams(location.search).get('m') || '').toLowerCase();
 const tokKey = 'meja:' + match;
-let tok = localStorage.getItem(tokKey), watch = false, isHost = false, S, ver = -1, polls = 0, pollT, endAt = 0, raiseTo = 0, rkey = '', wasMine = false, lastCtl = '';
-$('back').href = $('leave').href = match ? '/matches/' + match : '/matches';
-// sesi login Supabase dari website utama (domain sama), dipakai sekali untuk mendapat token meja
-const accessToken = () => {
+// token meja disimpan bersama uid pemiliknya: kalau device dipakai login akun lain, token lama tidak dipakai lagi
+const jwtSub = t => { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub || null; } catch { return null; } };
+const session = () => {
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (/^sb-.*-auth-token$/.test(k)) try { return JSON.parse(localStorage.getItem(k)).access_token; } catch {}
+    if (/^sb-.*-auth-token$/.test(k)) try { const j = JSON.parse(localStorage.getItem(k)); return { at: j.access_token, uid: (j.user && j.user.id) || jwtSub(j.access_token) }; } catch {}
   }
   return null;
 };
+const savedTok = () => { try { const o = JSON.parse(localStorage.getItem(tokKey)); return o && o.uid && o.uid === (session() || {}).uid ? o.tok : null; } catch { return null; } };
+let tok = savedTok(), tokUid = tok ? session().uid : null, watch = false, isHost = false, S, ver = -1, polls = 0, pollT, endAt = 0, raiseTo = 0, rkey = '', wasMine = false, lastCtl = '';
+$('back').href = $('leave').href = match ? '/matches/' + match : '/matches';
+// sesi login Supabase dari website utama (domain sama), dipakai sekali untuk mendapat token meja
+const accessToken = () => (session() || {}).at || null;
 const status = (m, retry) => { $('status').textContent = m; $('game').hidden = true; $('join').hidden = false; if (retry) { clearTimeout(pollT); pollT = setTimeout(enter, 4000); } };
 const ENDED = { cancelled: 'Match ini dibatalkan host.', open: 'Match belum dimulai.', finished: 'Match sudah selesai.', ended: 'Match sudah berakhir.' };
 const anims = new Map(); // kunci kartu -> waktu mulai animasi (ms epoch, termasuk jeda antar kartu)
@@ -569,17 +573,17 @@ const act = async (type, amount) => { $('ctl').classList.add('wait'); const r = 
 async function enter() {
   clearTimeout(pollT);
   if (!/^[0-9a-f-]{36}$/.test(match)) return status('Link meja tidak valid.');
-  const at = accessToken();
+  const ses = session(), at = ses && ses.at;
+  tok = null; tokUid = null; watch = false; localStorage.removeItem(tokKey);
   if (!at) return status('Login dulu di BTP Poker League, lalu buka meja dari halaman match.');
-  tok = null; watch = false; localStorage.removeItem(tokKey);
   status('Menyiapkan meja…');
   const r = await api('join', { access_token: at });
   if (!r) return status('Koneksi ke server putus. Mencoba lagi…', true);
   if (r.auth) return status('Sesi login habis. Buka lagi BTP Poker League supaya login diperbarui, lalu masuk meja dari halaman match.');
   if (r.ended) return;
   if (r.error) return status(r.error, true);
-  if (r.token) { tok = r.token; localStorage.setItem(tokKey, tok); }
-  else watch = true;
+  if (r.token) { tok = r.token; tokUid = ses.uid; localStorage.setItem(tokKey, JSON.stringify({ tok, uid: ses.uid })); }
+  else { watch = true; watchUid = ses.uid; }
   isHost = !!r.host;
   if (r.rt) { try { localStorage.setItem('meja:rt', JSON.stringify(r.rt)); } catch {} }
   chatStart(r.rt);
@@ -608,7 +612,15 @@ async function poll() {
   pollT = setTimeout(poll, r ? 1000 : 2500);
 }
 function connect() { ver = -1; polls = 0; poll(); }
-document.addEventListener('visibilitychange', () => { if (!document.hidden && (tok || watch) && !(S && S.phase === 'over')) poll(); });
+// akun berganti (logout/login akun lain di tab website) selagi meja terbuka: masuk ulang sebagai akun yang sekarang
+const accountChanged = () => (tok || watch) && ((session() || {}).uid || null) !== (tok ? tokUid : watchUid);
+let watchUid = null;
+addEventListener('storage', e => { if (e.key && /^sb-.*-auth-token$/.test(e.key) && accountChanged()) location.reload(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  if (accountChanged()) return location.reload();
+  if ((tok || watch) && !(S && S.phase === 'over')) poll();
+});
 onresize = () => S && render();
 
 // ---- kartu sendiri: tombol mata menyembunyikannya (aman dari yang mengintip); tahan kartu untuk mengintip sebentar ----
