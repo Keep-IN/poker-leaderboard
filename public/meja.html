@@ -317,13 +317,16 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 #odds{position:absolute;left:14px;bottom:6px;z-index:4;padding:4px 10px;border:1.5px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--fg2);box-shadow:2px 2px 0 #0006}
 #odds b{margin-left:4px;font-size:15px;letter-spacing:0;color:var(--hn)}
 /* host: peluang menang semua pemain (dihitung server, tanpa kartu) di pojok kanan atas meja */
-#hostOdds{position:absolute;right:10px;top:4px;z-index:4;max-width:46%;padding:5px 9px;border:1.5px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--fg);box-shadow:2px 2px 0 #0006}
-#hostOdds .t{margin-bottom:3px;color:var(--fg2);text-transform:uppercase;letter-spacing:.08em}
-#hostOdds .r{display:flex;justify-content:space-between;gap:12px}
+#hostOdds{position:absolute;right:10px;top:4px;z-index:4;max-width:min(46%,190px);padding:3px 7px;border:1.5px solid var(--line);background:var(--panel);font-family:var(--mono);font-size:10px;line-height:1.3;letter-spacing:.02em;color:var(--fg);box-shadow:2px 2px 0 #0006}
+#hostOdds .t{display:flex;align-items:center;gap:6px;width:100%;padding:0;border:0;background:none;color:var(--fg2);font:inherit;font-size:9px;text-transform:uppercase;letter-spacing:.08em;cursor:pointer}
+#hostOdds .t i{margin-left:auto;font-style:normal;font-size:10px}
+#hostOdds .rows{margin-top:2px}
+#hostOdds.shut .rows{display:none}
+#hostOdds .r{display:flex;justify-content:space-between;gap:8px}
 #hostOdds .n{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-#hostOdds .p{font-weight:700}
+#hostOdds .p{font-weight:700;font-variant-numeric:tabular-nums}
 #hostOdds .r.top .p{color:var(--hn)}
-@media(max-width:520px){#odds{left:8px;bottom:4px}#hostOdds{max-width:52%;font-size:9px;top:2px;right:6px}}
+@media(max-width:520px){#odds{left:8px;bottom:4px}#hostOdds{max-width:min(50%,160px);font-size:9px;top:2px;right:6px}}
 @media(min-width:700px){
   :root{--sw:124px}
   #top{min-height:86px}
@@ -658,6 +661,7 @@ function drawMine() {
   $('eye').classList.toggle('on', hideCards);
   $('eye').setAttribute('aria-pressed', hideCards);
   $('eye').title = hideCards ? 'Tampilkan kartu' : 'Sembunyikan kartu';
+  scheduleOdds(); // peluang menang ikut tersembunyi/terlihat bersama kartu
 }
 $('eye').onclick = () => { hideCards = !hideCards; peek = false; localStorage.setItem('hide', hideCards ? '1' : '0'); drawMine(); };
 $('mine').addEventListener('pointerdown', e => { if (hideCards) { e.preventDefault(); peek = true; drawMine(); } });
@@ -1069,17 +1073,23 @@ function equity(hands, board, iters) {
   else for (let i = 0; i < rest.length; i++) for (let j = i + 1; j < rest.length; j++) { run([rest[i], rest[j]]); n++; }
   return share.map(v => v / n);
 }
-let oddsKey = '', oddsT = 0;
+let oddsKey = '', oddsT = 0, hostOddsOpen = localStorage.getItem('hostOdds') !== '0';
+$('hostOdds').addEventListener('click', e => {
+  if (!e.target.closest('.t')) return;
+  hostOddsOpen = !hostOddsOpen; localStorage.setItem('hostOdds', hostOddsOpen ? '1' : '0'); drawOdds();
+});
 const pct = x => (x >= .995 && x < 1 ? '>99' : x > 0 && x < .005 ? '<1' : Math.round(x * 100)) + '%';
 function scheduleOdds() { clearTimeout(oddsT); oddsT = setTimeout(drawOdds, 30); }
 function drawOdds() {
   const betting = S && ['preflop', 'flop', 'turn', 'river'].includes(S.phase);
   const ho = betting && S.odds && S.odds.length > 1 ? S.odds.slice().sort((a, b) => b.p - a.p) : null;
   $('hostOdds').hidden = !ho;
-  if (ho) set($('hostOdds'), '<div class="t">Peluang menang</div>' + ho.map((o, k) =>
-    `<div class="r${k === 0 ? ' top' : ''}"><span class="n">${esc(S.players[o.i].name)}</span><span class="p">${pct(o.p)}</span></div>`).join(''));
+  $('hostOdds').classList.toggle('shut', !hostOddsOpen);
+  if (ho) set($('hostOdds'), `<button class="t" type="button" aria-expanded="${hostOddsOpen}" title="${hostOddsOpen ? 'Sembunyikan' : 'Tampilkan'} peluang menang">Peluang menang<i>${hostOddsOpen ? '▾' : '▸'}</i></button><div class="rows">` + ho.map((o, k) =>
+    `<div class="r${k === 0 ? ' top' : ''}"><span class="n">${esc(S.players[o.i].name)}</span><span class="p">${pct(o.p)}</span></div>`).join('') + '</div>');
   const P = S && S.players[S.me], mine = betting && P && P.inHand && !P.folded && P.cards.length === 2 && P.cards[0] >= 0;
-  $('odds').hidden = !mine;
+  // kartu sedang disembunyikan (tombol mata): peluang ikut disembunyikan supaya tidak diintip orang di sebelah
+  $('odds').hidden = !mine || masked();
   if (!mine) { oddsKey = ''; return; }
   const opp = S.players.filter((q, k) => k !== S.me && q.inHand && !q.folded).length;
   const key = [S.no, S.board.join(), opp, P.cards.join()].join('|');
