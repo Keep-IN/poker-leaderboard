@@ -1,6 +1,6 @@
 // Tes mesin turnamen: `node api/_lib/poker.test.js` (mencetak "semua tes lulus").
 import assert from 'node:assert'
-import { AFK_HANDS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
+import { AFK_HANDS, COUNTDOWN_MS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
 
 const C = s => s.split(' ').map(x => 'shdc'.indexOf(x[1]) * 13 + '23456789TJQKA'.indexOf(x[0]))
 const S = s => best(C(s))
@@ -25,6 +25,7 @@ const mk = (chips, o) => {
   const t = Table.create(chips.map((_, i) => ({ uid: 'u' + i, name: 'P' + i })), cfg(o), 1e6)
   t.players.sort((a, b) => a.uid.localeCompare(b.uid))
   t.players.forEach((p, i) => { p.chips = chips[i]; p.token = 'tok' + i; p.seen = t.now })
+  t.players.forEach((_, i) => t.setReady(i, true)) // lobi: semua langsung Ready
   return t
 }
 const run = (t, ms) => { t.now += ms; t.players.forEach(p => { if (!p.off) p.seen = t.now }); t.tick() } // pemain yang tidak off terus "online"
@@ -37,10 +38,31 @@ const rig = (t, s) => { const seq = C(s); t.newDeck = () => seq.slice().reverse(
 const stacks = t => t.players.map(p => p.chips)
 const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t))); u.now = now; return u } // seperti fungsi serverless
 
-{ // meja baru: belum dibagi sampai jeda awal lewat, lalu blind level awal sesuai pilihan dealer
+{ // lobi: belum dibagi sampai semua Ready; Out keluar dari meja; lalu hitung mundur
+  const t = Table.create(['A', 'B', 'C', 'D'].map(x => ({ uid: x, name: x })), cfg(), 1e6)
+  assert.equal(t.view(null).lobby, true); assert.equal(t.due, null)
+  t.now += 600000; t.tick(); assert.equal(t.phase, 'waiting', 'tidak mulai sendiri tanpa Ready')
+  t.setReady(0, true); t.setReady(1, true)
+  assert.equal(t.view(null).countdown, false)
+  assert.equal(t.setReady(1, false), undefined); assert.equal(t.players[1].ready, false) // batal Ready
+  t.setReady(1, true); t.setReady(2, true)
+  const d = t.players.findIndex(p => !p.ready)
+  assert.equal(t.withdraw(d), undefined) // pemain terakhir Out: sisanya sudah Ready, hitung mundur jalan
+  assert.equal(t.players.length, 3)
+  assert.equal(t.view(null).countdown, true); assert(t.view(null).startIn > 0)
+  assert.equal(typeof t.setReady(0, false), 'string', 'terkunci saat hitung mundur')
+  assert.equal(typeof t.withdraw(0), 'string')
+  t.now += COUNTDOWN_MS; t.tick()
+  assert.equal(t.phase, 'preflop'); assert.equal(t.view(null).lobby, false)
+  assert.equal(typeof t.withdraw(0), 'string', 'sesudah mulai tidak bisa Out')
+  const two = Table.create([{ uid: 'a', name: 'a' }, { uid: 'b', name: 'b' }], cfg(), 0)
+  assert.equal(typeof two.withdraw(0), 'string', 'minimal 2 pemain')
+}
+
+{ // meja baru: blind level awal sesuai pilihan dealer
   const t = mk([1500, 1500, 1500], { sb: 25 })
   assert.equal(t.phase, 'waiting')
-  assert.equal(t.view(t.players[0]).startIn, 15000)
+  assert(t.view(t.players[0]).startIn > 0 && t.view(t.players[0]).countdown)
   begin(t)
   assert.equal(t.phase, 'preflop')
   assert.deepEqual([t.sb, t.bb], [25, 50])

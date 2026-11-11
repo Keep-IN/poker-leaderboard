@@ -353,6 +353,13 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 .bubble.host::after{bottom:auto;top:-8px;border:2px solid var(--gold);border-right:0;border-bottom:0}
 .bubble.host b{font-family:var(--mono);font-style:normal;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--red)}
 @keyframes pop{from{opacity:0;scale:.6}}
+/* lobi: hitung mundur 3-2-1 di tengah meja */
+#cd{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:8;pointer-events:none;font-family:var(--serif);font-style:italic;font-weight:700;font-size:96px;line-height:1;color:var(--gold);text-shadow:0 0 24px #71c5ebaa,3px 3px 0 #000}
+#cd b{display:block;animation:cdpop .9s ease-out both}
+#cd small{display:block;margin-top:6px;font-family:var(--mono);font-style:normal;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px #000}
+@keyframes cdpop{0%{opacity:0;transform:scale(1.8)}25%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:.25;transform:scale(.85)}}
+.lob{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.lob .btn{padding:6px 10px;font-size:11px;box-shadow:none}
 @keyframes fade{to{opacity:0;translate:0 -8px}}
 #panel{position:relative}
 /* chat menutupi area kartu sendiri (bukan menambah tinggi panel), jadi ukuran meja tidak berubah */
@@ -469,7 +476,7 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
   </div>
   <div id="table">
     <div id="felt"></div><div id="seats"></div>
-    <div id="center"><div id="reveal" aria-live="polite"></div><div id="board"></div><div id="pot"></div><div id="win"></div></div>
+    <div id="center"><div id="reveal" aria-live="polite"></div><div id="board"></div><div id="pot"></div><div id="win"></div><div id="cd" hidden></div></div>
     <div id="bubbles" aria-live="polite"></div>
     <div id="odds" hidden></div>
   </div>
@@ -576,7 +583,7 @@ const card = (c, key = '') => {
 // tumpukan chip per denominasi (maks 6 keping per tumpukan supaya tidak melebar)
 const chip1 = n => { const d = DEN.find(([v]) => n >= v) || DEN[DEN.length - 1]; return `<i class="chip" style="--c:${d[1]}"></i>`; }; // satu keping, warna denominasi terbesar
 const chips = n => { let h = ''; for (const [d, c] of DEN) { const k = Math.min(n / d | 0, 6); n %= d; if (k) h += `<span class="stk">${`<i class="chip" style="--c:${c}"></i>`.repeat(k)}</span>`; } return h; };
-const tagOf = (p, betting) => p.place > 1 ? ['', '#' + p.place + (p.afkOut ? ' AFK' : ' keluar')] : p.place === 1 ? ['grn', 'juara']
+const tagOf = (p, betting) => S.lobby ? (p.ready ? ['grn', '✓ ready'] : ['', 'belum']) : p.place > 1 ? ['', '#' + p.place + (p.afkOut ? ' AFK' : ' keluar')] : p.place === 1 ? ['grn', 'juara']
   : p.sitOut ? ['red', p.afk ? `AFK ${p.afk}/${S.afkLimit}` : 'istirahat'] : !p.online ? ['', 'offline']
   : p.forced && p.folded && p.inHand ? ['red', 'dipaksa fold'] : p.allIn && p.inHand && betting ? ['red', 'all-in'] : p.last ? [/^(bet|raise)/.test(p.last) ? 'red' : '', p.last]
   : p.inHand && p.folded ? ['', 'fold'] : !p.chips && !p.inHand ? ['', 'habis'] : null;
@@ -592,6 +599,20 @@ const toast = (m, good) => { const t = $('toast'); t.textContent = m; t.classLis
 const api = (type, o = {}) => fetch('/api/meja', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ match, token: tok, type, ...o }) })
   .then(r => r.json()).then(r => { if (r.s && (tok || watch)) apply(r.v, r.s); if (r.error) toast(r.error); if (r.gone) enter(); if (r.ended) status(ENDED[r.status] || ENDED.ended); return r; })
   .catch(() => { toast('Koneksi ke server putus'); return null; });
+// konfirmasi dua ketukan (tanpa dialog): ketuk sekali jadi "Yakin?", ketuk lagi dalam 4 detik untuk menjalankan
+function sure(btn, run) {
+  if (btn.dataset.sure) { btn.disabled = true; return run(); }
+  btn.dataset.sure = '1'; const t = btn.textContent; btn.textContent = 'Yakin? ketuk lagi';
+  setTimeout(() => { if (btn.isConnected) { delete btn.dataset.sure; btn.textContent = t; } }, 4000);
+}
+// Out di lobi: keluar dari match ini (sebelum hand pertama), lalu kembali ke halaman match
+async function leaveMatch() {
+  const r = await api('out');
+  if (!r || !r.left) return;
+  clearTimeout(pollT); tok = null; localStorage.removeItem(tokKey);
+  status('Kamu keluar dari match ini.');
+  setTimeout(() => { location.href = '/matches/' + match; }, 1500);
+}
 // tombol dikunci sampai server membalas: tap dua kali tidak jadi dua aksi
 const act = async (type, amount) => { $('ctl').classList.add('wait'); const r = await api(type, { amount }); if (!r || r.error) $('ctl').classList.remove('wait'); };
 
@@ -790,6 +811,19 @@ function render() {
     msg = !P ? 'Turnamen selesai' : P.place === 1 ? 'Selamat, kamu juara!' : `Kamu finis di posisi #${P.place}`;
     if (w) msg += ' · juara: ' + esc(w.name);
     h = `<div class="row"><a class="btn gold" href="/matches/${match}">Lihat hasil match</a></div>`;
+  } else if (S.lobby) { // lobi: semua pemain harus Ready dulu
+    const rn = ps.filter(p => p.ready).length;
+    if (S.countdown) msg = 'Semua pemain Ready · match dimulai!';
+    else if (!P) {
+      msg = (isHost ? 'Kamu host match ini · ' : '') + `menunggu semua pemain Ready (${rn}/${n})`;
+      const wait = ps.map((p, k) => ({ p, k })).filter(({ p }) => !p.ready);
+      if (isHost && wait.length) h = `<div class="sub">Pemain belum Ready (tidak buka meja?) bisa dikeluarkan dari match:</div><div class="lob">` +
+        wait.map(({ p, k }) => `<button class="btn ghost" type="button" data-kick="${k}" onclick="sure(this, () => api('kick', { seat: ${k} }))">Keluarkan ${esc(p.name)}</button>`).join('') + '</div>';
+    } else {
+      msg = P.ready ? `Kamu sudah Ready · menunggu pemain lain (${rn}/${n})` : `Tekan Ready kalau sudah siap (${rn}/${n} Ready) · Double Down bisa dipasang lewat 🎒 sebelum mulai`;
+      h = P.ready ? `<div class="row"><button class="btn ghost" onclick="act('unready')">Batal Ready</button></div>`
+        : `<div class="row"><button class="btn ghost" onclick="sure(this, leaveMatch)">Out</button><button class="btn green" onclick="act('ready')">Ready</button></div>`;
+    }
   } else if (!P) msg = isHost ? 'Kamu host match ini · menonton dan bisa chat' : 'Kamu menonton';
   else if (P.place) msg = P.afkOut ? `Kamu keluar karena AFK ${S.afkLimit} putaran · posisi #${P.place} · masih bisa menonton`
     : `Kamu tersingkir di posisi #${P.place} · masih bisa menonton`;
@@ -854,6 +888,10 @@ setInterval(() => {
   const lv = $('lv'), st = $('st');
   if (lv) lv.textContent = mmss(Math.max(0, lvAt - Date.now()));
   if (st) st.textContent = 'dalam ' + Math.max(0, Math.ceil((stAt - Date.now()) / 1000)) + ' dtk';
+  const cd = $('cd'), on = !!(S.lobby && S.countdown);
+  cd.hidden = !on;
+  if (on) { const sec = Math.min(3, Math.max(1, Math.ceil((stAt - Date.now()) / 1000))); if (cd.dataset.n !== String(sec)) { cd.dataset.n = sec; cd.innerHTML = `<b>${sec}</b><small>Match dimulai</small>`; play('tick'); } }
+  else cd.dataset.n = '';
   if (S.turn < 0) return;
   const left = Math.max(0, endAt - Date.now()), b = document.querySelector('.tm b'), t = $('tl');
   if (b) b.style.width = left / S.ms * 100 + '%';
@@ -967,6 +1005,7 @@ setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
 
 // ---- skill card dari inventory (dibaca lewat Supabase dengan sesi login pemain; RLS hanya memberi kartu miliknya) ----
 const USABLE = {
+  double_down: { icon: '⚡', name: 'Double Down', desc: 'Poin match ini jadi 2× lipat. Pasang sebelum hand pertama dibagi.', passive: true },
   defend_me: { icon: '🛡️', name: 'Defend Me', desc: 'Kalah di hand ini? Setengah chip yang kamu taruhkan kembali.' },
   reveal_card: { icon: '👁️', name: 'Reveal Card', desc: 'Intip 2 kartu satu lawan sampai hand ini selesai. Diam-diam: lawan baru tahu saat kartu dibuka.', target: true },
   fold_player: { icon: '🚫', name: 'Fold Player', desc: 'Paksa satu lawan fold. Hanya sebelum flop, tidak ke pemain all-in. Chip-nya tetap di pot.', target: true, preflop: true },
@@ -1003,20 +1042,28 @@ async function openBag() {
   el.onclick = e => { if (e.target === el || e.target.classList.contains('close')) el.remove(); };
   document.body.appendChild(el);
   const cards = await loadBag();
+  const c = await sb();
+  const dd = c ? ((await c.from('player_cards').select('id').eq('status', 'armed').eq('match_id', match).eq('card_code', 'double_down')).data || []).length > 0 : false;
   const groups = {}; cards.forEach(c => (groups[c.card_code] = groups[c.card_code] || []).push(c));
   const ok = canPlayCard(), P = S && S.players[S.me];
   // kartu Luck bisa dipasang kapan saja selama masih ikut turnamen (berlaku di hand berikutnya)
   const luckOk = !!P && S.phase !== 'over' && !P.place && P.chips > 0 && !S.luckNext && !S.luckBusy;
   const luckWhy = S.luckNext ? `${USABLE[S.luckNext].icon} ${USABLE[S.luckNext].name} sudah terpasang untuk hand berikutnya.` : S.luckBusy ? 'Pemain lain sudah memasang kartu Luck untuk hand berikutnya.' : '';
-  const can = code => USABLE[code].luck ? luckOk : ok && !(USABLE[code].preflop && S.phase !== 'preflop');
+  const ddOk = !!P && S.lobby && !S.countdown && !dd;
+  const can = code => USABLE[code].passive ? ddOk : USABLE[code].luck ? luckOk : ok && !(USABLE[code].preflop && S.phase !== 'preflop');
   const why = !P ? '' : (P.skills || []).length ? 'Kamu sudah pakai kartu di hand ini.' : !ok ? 'Bisa dipakai saat kamu ikut hand yang sedang berjalan.' : '';
-  $('bagList').innerHTML = Object.keys(groups).length
-    ? (why && Object.keys(groups).some(c => !USABLE[c].luck) ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it"><span class="ic">${USABLE[code].icon}</span>
+  const ddLine = dd ? `<div class="it"><span class="ic">⚡</span><span style="flex:1"><b>Double Down terpasang</b><small>Poin match ini jadi 2× lipat.</small></span>${S.lobby && !S.countdown ? '<button class="btn ghost" type="button" id="ddOff">Lepas</button>' : ''}</div>` : '';
+  $('bagList').innerHTML = ddLine + (Object.keys(groups).length
+    ? (why && Object.keys(groups).some(c => !USABLE[c].luck && !USABLE[c].passive) ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it"><span class="ic">${USABLE[code].icon}</span>
         <span style="flex:1"><b>${USABLE[code].name} ×${list.length}</b><small>${USABLE[code].desc}</small></span>
-        <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${can(code) ? '' : 'disabled'}>Pakai</button></div>
+        <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${can(code) ? '' : 'disabled'}>${USABLE[code].passive ? 'Pasang' : 'Pakai'}</button></div>
+        ${USABLE[code].passive && !dd && !(S.lobby && !S.countdown) ? '<p class="note" style="padding-left:36px">Hanya bisa dipasang sebelum hand pertama</p>' : ''}
         ${USABLE[code].luck && luckWhy ? `<p class="note" style="padding-left:36px">${luckWhy}</p>` : ''}
         ${USABLE[code].preflop && ok && S.phase !== 'preflop' ? '<p class="note" style="padding-left:36px">Hanya sebelum flop</p>' : ''}<div class="tg" data-for="${code}" hidden></div>`).join('')
-    : '<p class="note">Belum ada skill card yang bisa dipakai di meja. Beli di Market.</p>';
+    : dd ? '' : '<p class="note">Belum ada skill card yang bisa dipakai di meja. Beli di Market.</p>');
+  // Double Down dipasang/dilepas langsung ke database (bukan lewat meja): berlaku untuk poin match ini
+  const ddRpc = async (fn, args, okMsg) => { const { error } = await c.rpc(fn, args); if (error) { toast(error.message); return false; } toast(okMsg, true); el.remove(); return true; };
+  if ($('ddOff')) $('ddOff').onclick = () => ddRpc('disarm_double_down', { p_match: match }, '⚡ Double Down dilepas, kembali ke inventory');
   const play = async (b, code, target) => {
     b.disabled = true;
     const r = await api('card', { card: b.dataset.id, code, target });
@@ -1027,6 +1074,7 @@ async function openBag() {
   };
   $('bagList').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => {
     const code = b.dataset.code;
+    if (USABLE[code].passive) { b.disabled = true; return ddRpc('arm_double_down', { p_card: b.dataset.id, p_match: match }, '⚡ Double Down terpasang: poin match ini 2×').then(x => { if (!x) b.disabled = false; }); }
     if (!USABLE[code].target) return play(b, code);
     // kartu Attack: pilih lawan dulu
     const box = $('bagList').querySelector(`.tg[data-for="${code}"]`), ts = targetsFor(code);

@@ -35,6 +35,7 @@ export function supabaseDb(url, secret) {
     },
     create: (match, state, dueAt) => rpc('meja_create', { p_match: match, p_state: state, p_due: dueAt }),
     useCard: (match, player, card) => rpc('meja_use_card', { p_match: match, p_player: player, p_card: card }),
+    withdraw: (match, player) => rpc('meja_withdraw', { p_match: match, p_player: player }),
     refundCard: (match, player, card) => rpc('meja_refund_card', { p_match: match, p_player: player, p_card: card }),
     podium: () => rest('/rest/v1/rpc/meja_podium', { method: 'POST', body: '{}' }),
     save: (match, ver, state, dueAt, out, winner) =>

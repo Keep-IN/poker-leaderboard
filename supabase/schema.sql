@@ -1384,6 +1384,20 @@ end;
 $$;
 
 -- Double Down: dipasang ke match online yang belum dimulai dan sudah diikuti. Satu per match.
+-- Match online yang belum "benar-benar" mulai: masih open, atau sudah dimulai host tapi meja masih di lobi Ready
+-- (hand pertama belum dibagi).
+create or replace function public.online_not_dealt(p_match uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.matches m where m.id = p_match and m.mode = 'online'
+                   and (m.status = 'open' or (m.status = 'ongoing' and not exists (
+                     select 1 from public.online_tables t where t.match_id = m.id and coalesce((t.state ->> 'handNo')::int, 0) > 0))));
+$$;
+
 create or replace function public.arm_double_down(p_card uuid, p_match uuid)
 returns void
 language plpgsql
@@ -1391,8 +1405,8 @@ security definer
 set search_path = public
 as $$
 begin
-  if not exists (select 1 from public.matches where id = p_match and mode = 'online' and status = 'open') then
-    raise exception 'Double Down hanya bisa dipasang ke match online yang belum dimulai';
+  if not public.online_not_dealt(p_match) then
+    raise exception 'Double Down hanya bisa dipasang sebelum hand pertama dibagi';
   end if;
   if not exists (select 1 from public.match_players where match_id = p_match and player_id = auth.uid()) then
     raise exception 'Join match ini dulu sebelum memasang Double Down';
@@ -1417,9 +1431,9 @@ as $$
 begin
   update public.player_cards set status = 'owned', match_id = null
    where match_id = p_match and player_id = auth.uid() and card_code = 'double_down' and status = 'armed'
-     and exists (select 1 from public.matches where id = p_match and status = 'open');
+     and public.online_not_dealt(p_match);
   if not found then
-    raise exception 'Double Down hanya bisa dilepas sebelum match dimulai';
+    raise exception 'Double Down hanya bisa dilepas sebelum hand pertama dibagi';
   end if;
 end;
 $$;
@@ -1448,6 +1462,25 @@ begin
     raise exception 'Kartu tidak ada di inventory atau tidak bisa dipakai di meja';
   end if;
   return code;
+end;
+$$;
+
+-- Dipakai server meja: pemain menekan Out di lobi meja (match sudah dimulai host, hand pertama belum dibagi).
+-- Pemain keluar dari match; Double Down yang terpasang kembali ke inventory.
+create or replace function public.meja_withdraw(p_match uuid, p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform 1 from public.matches where id = p_match and mode = 'online' and status = 'ongoing' for update;
+  if not found or not public.online_not_dealt(p_match) then
+    raise exception 'Match sudah berjalan, tidak bisa keluar lagi';
+  end if;
+  update public.player_cards set status = 'owned', match_id = null
+   where match_id = p_match and player_id = p_player and status = 'armed';
+  delete from public.match_players where match_id = p_match and player_id = p_player;
 end;
 $$;
 
@@ -1586,6 +1619,9 @@ revoke all on function public.claimable_coins(uuid) from public, anon, authentic
 revoke all on function public.meja_use_card(uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.meja_podium() from public, anon, authenticated;
 revoke all on function public.meja_refund_card(uuid, uuid, uuid) from public, anon, authenticated;
+revoke all on function public.meja_withdraw(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.online_not_dealt(uuid) from public, anon, authenticated;
+grant execute on function public.meja_withdraw(uuid, uuid) to service_role;
 grant execute on function public.meja_use_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_refund_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_podium() to service_role;

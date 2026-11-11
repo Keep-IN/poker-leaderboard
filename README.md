@@ -71,7 +71,7 @@ Detailnya:
 - Player membeli **skill card** di Market pakai koin. Dealer mengatur kartu mana yang dijual, harga, dan stoknya.
 - Kartu yang dibeli masuk ke **Inventory** (tombol di Beranda player).
 - Kartu yang tersedia sekarang:
-  - ⚡ **Double Down** (passive): pasang di halaman match **online** yang sudah kamu join, sebelum match dimulai. Poin match itu jadi **2× lipat**. Satu per match. Kalau match batal atau kamu keluar, kartunya kembali.
+  - ⚡ **Double Down** (passive): pasang di halaman match **online** yang sudah kamu join sebelum match dimulai, atau lewat 🎒 di lobi meja sebelum hand pertama. Poin match itu jadi **2× lipat**. Satu per match. Kalau match batal atau kamu keluar, kartunya kembali.
   - 🛡️ **Defend Me** (defend): dipakai di meja online lewat tombol 🎒 saat hand berjalan. Kalau kamu kalah di hand itu, **setengah chip yang hilang dikembalikan** (diambil dari pemenang hand). Kartu yang dipakai terlihat oleh semua pemain sebelum showdown.
   - 👁️ **Reveal Card** (attack): pilih satu lawan di meja, lalu **2 kartunya terlihat olehmu** sampai hand selesai (beserta nama kombinasinya). Diam-diam: lawan baru tahu saat kartu dibuka di akhir hand.
   - 🚫 **Fold Player** (attack): **paksa satu lawan fold**. Hanya bisa **sebelum flop** dan tidak bisa ke pemain yang sudah all-in. Chip yang sudah dia taruh tetap di pot. Langsung diumumkan ke semua pemain, dan korbannya ditandai "dipaksa fold".
@@ -115,6 +115,7 @@ Detailnya:
 - Saat membuat match, host memilih **Offline** atau **Online**.
 - Untuk match online, host menentukan **maksimal player**, **blind awal** (10/20, 25/50, 50/100, …), **chip awal** tiap player, dan **blind naik tiap berapa menit**.
 - Setelah host menekan Mulai, pemain menekan **Masuk meja poker** di halaman match dan bermain Texas Hold'em langsung di website. Yang bukan pemain bisa **menonton** (kartu tertutup tidak terlihat).
+- **Lobi Ready**: setelah host menekan Mulai, meja belum langsung membagi kartu. Tiap pemain menekan **Ready** (bisa dibatalkan) atau **Out** (keluar dari match). Begitu **semua pemain Ready**, muncul hitung mundur **3-2-1** lalu hand pertama dibagi. Selama lobi, Double Down bisa dipasang lewat 🎒. Host bisa **mengeluarkan** pemain yang belum Ready (misalnya tidak membuka meja) supaya match tidak tertahan. Out dan dikeluarkan butuh minimal tersisa 2 pemain.
 - **Mode turnamen**: tidak ada beli chip lagi. Chip habis = tersingkir. Yang terakhir punya chip jadi juara.
 - Peringkat dan poin dicatat **otomatis** oleh meja, jadi host tidak perlu menekan Kalah/Menang.
 - Pemain yang tidak membuka meja atau diam terlalu lama tetap dibagi kartu, tapi otomatis check/fold. Pemain yang **AFK 4 putaran berturut-turut langsung dianggap keluar** (chip-nya hangus, peringkatnya di bawah pemain yang bust di putaran yang sama). Menekan **Main lagi** atau beraksi lagi mengulang hitungan AFK dari 0.

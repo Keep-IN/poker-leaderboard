@@ -3,11 +3,11 @@ import assert from 'node:assert'
 import { api } from './handler.js'
 
 const MATCH = '11111111-2222-3333-4444-555555555555'
-const users = { tokA: 'uA', tokB: 'uB', tokC: 'uC', tokX: 'uX', tokH: 'uH' }
+const users = { tokA: 'uA', tokB: 'uB', tokC: 'uC', tokX: 'uX', tokH: 'uH', tokD: 'uD', tokE: 'uE' }
 
 function fakeDb() {
   const m = { status: 'ongoing', mode: 'online', dealer_id: 'uH', online_config: { sb: 10, start_chips: 300, level_minutes: 10 } }
-  const players = [{ uid: 'uA', name: 'Andi' }, { uid: 'uB', name: 'Bela' }, { uid: 'uC', name: 'Citra' }]
+  const players = [{ uid: 'uA', name: 'Andi' }, { uid: 'uB', name: 'Bela' }, { uid: 'uC', name: 'Citra' }, { uid: 'uD', name: 'Dodi' }, { uid: 'uE', name: 'Eka' }]
   let row = null
   const results = { out: [], winner: null }
   const yieldTurn = () => new Promise(r => setImmediate(r)) // beri kesempatan request lain menyela (uji jalur tabrakan)
@@ -26,6 +26,8 @@ function fakeDb() {
       c.used = true
       return c.code
     },
+    withdrawn: [],
+    async withdraw(_, uid) { await yieldTurn(); this.withdrawn.push(uid); players.splice(players.findIndex(p => p.uid === uid), 1) },
     async refundCard(_, player, card) { const c = this.cards[card]; if (c && c.owner === player) c.used = false },
     async create(_, state, due) { await yieldTurn(); if (row) return null; row = { state, ver: 1, due_at: due }; return 1 },
     async save(_, ver, state, due, out, winner) {
@@ -50,7 +52,7 @@ assert((await post({ type: 'join', access_token: 'salah' })).auth)
 // tiga pemain bergabung bersamaan: meja dibuat sekali, tiap pemain dapat token sendiri
 const [a, b, c] = await Promise.all(['tokA', 'tokB', 'tokC'].map(t => post({ type: 'join', access_token: t })))
 assert(a.token && b.token && c.token && new Set([a.token, b.token, c.token]).size === 3)
-assert.equal(a.s.players.length, 3)
+assert.equal(a.s.players.length, 5)
 assert.equal((await post({ type: 'join', access_token: 'tokA' })).token, a.token) // perangkat lain: token sama
 const x = await post({ type: 'join', access_token: 'tokX' })
 assert(x.watch && !x.token && !x.host) // bukan pemain match: penonton
@@ -76,11 +78,29 @@ assert((await get({ token: 'ngawur' })).gone)
 // bingkai podium: B peringkat 1 all time (tanpa uid di respons)
 assert.equal(s1.s.players.find(q => q.name === 'Bela').podium, 1)
 assert(!JSON.stringify(s1).includes('"uB"'))
-// mulai: majukan jam ke hand pertama (meja menunggu 15 detik)
+// lobi: tidak mulai sampai semua Ready; Out keluar dari match; host bisa mengeluarkan pemain yang belum Ready
 const realNow = Date.now
 let offset = 0
 Date.now = () => realNow() + offset
-offset += 16000
+const d = await post({ type: 'join', access_token: 'tokD' })
+assert(d.token && d.s.lobby)
+offset += 60000
+assert.equal((await get({ token: a.token })).s.phase, 'waiting', 'tidak mulai sendiri')
+for (const p of [a, b, c]) assert.equal((await post({ token: p.token, type: 'ready' })).ok, true)
+let lv = (await get({ token: a.token })).s
+assert.equal(lv.countdown, false, 'D belum Ready')
+assert((await post({ token: a.token, type: 'kick', seat: 0 })).error, 'pemain biasa tidak bisa mengeluarkan')
+const dSeat = lv.players.findIndex(q => q.name === 'Dodi')
+assert((await post({ token: hst.token, type: 'kick', seat: lv.players.findIndex(q => q.name === 'Andi') })).error, 'yang sudah Ready tidak bisa dikeluarkan')
+const kicked = await post({ token: hst.token, type: 'kick', seat: lv.players.findIndex(q => q.name === 'Eka') })
+assert(kicked.ok && kicked.s.hostView && db.withdrawn.includes('uE') && kicked.s.players.length === 4, JSON.stringify(kicked.error))
+const out = await post({ token: d.token, type: 'out' })
+assert(out.left && db.withdrawn.includes('uD'), JSON.stringify(out))
+assert((await get({ token: d.token })).gone, 'pemain yang Out tidak punya kursi lagi')
+lv = (await get({ token: a.token })).s
+assert.equal(lv.players.length, 3); assert.equal(lv.countdown, true, 'sisanya Ready: hitung mundur')
+assert.equal(dSeat >= 0, true)
+offset += 5000
 const tok = { [a.token]: 'A', [b.token]: 'B', [c.token]: 'C' }
 let s = (await get({ token: a.token })).s
 assert.equal(s.phase, 'preflop')

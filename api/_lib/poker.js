@@ -23,7 +23,9 @@ export const AFK_HANDS = 4
 // waktu bisa dipercepat lewat env untuk pengujian
 const env = (k, d) => +(globalThis.process?.env?.[k] ?? '') || d
 export const TURN_MS = env('TURN_MS', 20000)
-const AWAY_MS = env('AWAY_MS', 3000), NEXT_MS = env('NEXT_MS', 6000), RUNOUT_MS = env('RUNOUT_MS', 1500), FIRST_MS = env('FIRST_MS', 15000)
+const AWAY_MS = env('AWAY_MS', 3000), NEXT_MS = env('NEXT_MS', 6000), RUNOUT_MS = env('RUNOUT_MS', 1500)
+/** Hitung mundur 3-2-1 setelah semua pemain Ready di lobi meja (lebih dari 3 detik: layar pemain bisa telat ~1 detik). */
+export const COUNTDOWN_MS = env('COUNTDOWN_MS', 4200)
 const HANDS = ['High Card', 'One Pair', 'Two Pair', 'Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush']
 const BASE = 15 ** 5, cat = s => s / BASE | 0
 
@@ -133,7 +135,8 @@ export class Table {
   }
   /**
    * Meja baru untuk satu match. seats = [{ uid, name }] (diacak di sini), cfg = { sb, start_chips, level_minutes }.
-   * Hand pertama dibagi FIRST_MS setelah meja dibuat, supaya pemain sempat membuka meja.
+   * Meja dimulai di lobi: tiap pemain menekan Ready (atau Out = keluar dari match). Setelah semua Ready,
+   * hitung mundur COUNTDOWN_MS lalu hand pertama dibagi.
    */
   static create(seats, cfg, now) {
     const t = new Table()
@@ -143,13 +146,13 @@ export class Table {
     for (const s of order) t.players.push({
       uid: s.uid, name: String(s.name).slice(0, 20), token: null, chips: cfg.start_chips, seen: 0, sitOut: false,
       inHand: false, folded: false, allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0,
-      score: 0, won: 0, last: '', stack0: 0, place: 0, afk: 0, afkOut: false,
+      score: 0, won: 0, last: '', stack0: 0, place: 0, afk: 0, afkOut: false, ready: false,
     })
     t.level0 = Math.max(0, LEVELS.indexOf(cfg.sb))
     t.levelMs = cfg.level_minutes * 60000
     ;[t.sb, t.bb] = t.blinds()
     t.started = true
-    t.defer('start', FIRST_MS)
+    t.lobby = true
     return t
   }
   static from(o) { return Object.assign(new Table(), o) }
@@ -179,6 +182,7 @@ export class Table {
     const el = this.alive()
     if (el.length < 2) return this.end()
     if (this.startedAt === null) this.startedAt = this.now
+    this.lobby = false
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
     for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, target: -1, forced: false, lucky: null })
     this.handNo++
@@ -296,6 +300,34 @@ export class Table {
     const left = this.alive()
     if (left.length === 1) { left[0].place = 1; this.winner = left[0].uid }
     this.phase = 'over'; this.turn = -1; this.due = null
+  }
+
+  // ---- lobi: Ready / Out sebelum hand pertama ----
+  counting() { return !!this.lobby && this.due?.kind === 'start' }
+  setReady(i, on) {
+    const p = this.players[i]
+    if (!this.lobby || !p) return 'Match sudah berjalan'
+    if (this.counting()) return 'Hitung mundur sudah berjalan'
+    p.ready = !!on
+    this.checkReady()
+  }
+  // Semua pemain Ready (minimal 2): mulai hitung mundur.
+  checkReady() {
+    if (this.lobby && !this.counting() && this.players.length >= 2 && this.players.every(p => p.ready)) this.defer('start', COUNTDOWN_MS)
+  }
+  canWithdraw(i) {
+    if (!this.lobby || !this.players[i]) return 'Match sudah berjalan, tidak bisa keluar lagi'
+    if (this.counting()) return 'Hitung mundur sudah berjalan'
+    if (this.players.length <= 2) return 'Minimal 2 pemain. Minta host membatalkan match kalau tidak jadi main.'
+  }
+  // Pemain keluar dari match sebelum hand pertama: kursinya dihapus dari meja.
+  // force: sudah tercatat keluar di database (request lain mungkin baru saja memulai hitung mundur), tetap hapus
+  // kursinya selama hand pertama belum dibagi.
+  withdraw(i, force = false) {
+    const err = force ? (!this.lobby || !this.players[i] ? 'Match sudah berjalan, tidak bisa keluar lagi' : '') : this.canWithdraw(i)
+    if (err) return err
+    this.players.splice(i, 1)
+    this.checkReady()
   }
 
   sitIn(i) { this.players[i].sitOut = false; this.players[i].afk = 0 }
@@ -418,6 +450,7 @@ export class Table {
       nextIn: this.startedAt === null || nextSb === LEVELS[lvl] ? 0 : Math.max(0, this.startedAt + (lvl - this.level0 + 1) * this.levelMs - this.now),
       next: [nextSb, nextSb * 2],
       startIn: this.startedAt === null && this.due ? Math.max(0, this.due.at - this.now) : 0,
+      lobby: !!this.lobby, countdown: this.counting(),
       pot: this.betting ? N.reduce((s, q) => s + q.total, 0) : 0,
       left: this.turn >= 0 && this.due ? Math.max(0, this.due.at - this.now) : 0,
       // showdown: kombinasi tiap pemain untuk disorot bergantian, terlemah dulu, pemenang terakhir
@@ -426,7 +459,7 @@ export class Table {
       afkLimit: AFK_HANDS, total: N.length, alive: N.filter(q => !q.place || q.place === 1).length,
       players: N.map(q => ({
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,
-        online: this.online(q), won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
+        online: this.online(q), ready: !!q.ready, won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
         // skill card yang dipakai hand ini: pemiliknya selalu tahu, pemain lain baru tahu saat kartu dibuka (showdown)
         skills: seen(q) ? q.skills || [] : [], target: seen(q) && q.target >= 0 ? q.target : -1, saved: q.saved || 0,
         forced: !!q.forced, peek: peek(q),

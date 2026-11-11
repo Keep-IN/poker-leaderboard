@@ -2,7 +2,9 @@
 //   GET  /api/meja?match=&token=&v=          -> state meja untuk pemain itu ({same:true} kalau tidak berubah)
 //   GET  /api/meja?match=&watch=1&v=         -> state untuk penonton (tanpa kartu tertutup)
 //   POST /api/meja {match, type:'join', access_token}       -> {token} untuk pemain match ini
-//   POST /api/meja {match, token, type, amount}             -> fold | check | call | raise | sitin
+//   POST /api/meja {match, token, type, amount}             -> fold | check | call | raise | sitin | ready | unready
+//   POST /api/meja {match, token, type:'out'}               -> keluar dari match di lobi (sebelum hand pertama)
+//   POST /api/meja {match, token: host, type:'kick', seat}  -> host mengeluarkan pemain di lobi
 //
 // db: {
 //   user(accessToken) -> uid | null
@@ -11,6 +13,7 @@
 //   load(match) -> { state, ver, status } | null
 //   create(match, state, dueAt) -> ver | null
 //   save(match, ver, state, dueAt, out, winner) -> ver baru | null (kalah balapan) ; throw 'match_not_ongoing'
+//   withdraw(match, uid)  -> pemain keluar dari match (hapus dari match_players) ; throw kalau hand pertama sudah dibagi
 // }
 import { randomUUID } from 'node:crypto'
 import { Table } from './poker.js'
@@ -169,8 +172,43 @@ async function playCard(db, match, b) {
   return p ? withPodium(db, r.t, { ...r.out, v: r.ver, s: r.t.view(p) }) : r.out
 }
 
+// Out di lobi (pemain sendiri) atau dikeluarkan host: cek di meja, catat di database, lalu hapus kursinya.
+async function leave(db, match, b) {
+  const token = String(b.token || '')
+  const peek = await db.load(match)
+  if (!peek || peek.status !== 'ongoing') return ended(peek?.status ?? 'ended')
+  const t0 = Table.from(peek.state)
+  t0.now = Date.now(); t0.tick()
+  const isHost = !!token && token === t0.hostToken
+  let i = -1
+  if (b.type === 'kick') {
+    if (!isHost) return { error: 'Hanya host yang bisa mengeluarkan pemain' }
+    i = Number(b.seat)
+    if (!Number.isInteger(i) || !t0.players[i]) return { error: 'Pemain tidak ditemukan' }
+    if (t0.players[i].ready) return { error: `${t0.players[i].name} sudah Ready` }
+  } else {
+    const p = t0.find(token)
+    if (!p) return { error: 'Sesi meja tidak ditemukan, buka ulang dari halaman match', gone: true }
+    i = t0.players.indexOf(p)
+  }
+  const pre = t0.canWithdraw(i)
+  if (pre) return { error: pre }
+  const uid = t0.players[i].uid
+  try { await db.withdraw(match, uid) } catch (e) { return { error: String(e.message).replace(/^.*?: /, '') } }
+  const r = await mutate(db, match, t => {
+    const k = t.players.findIndex(q => q.uid === uid)
+    if (k < 0) return { ok: true }
+    const err = t.withdraw(k, true)
+    return err ? { error: err } : { ok: true }
+  })
+  if (r.status) return ended(r.status)
+  if (isHost) return withPodium(db, r.t, { ...r.out, v: r.ver, s: hostView(match, r.t) })
+  return { ...r.out, left: true } // pemain yang keluar tidak punya kursi lagi
+}
+
 async function act(db, match, b) {
   if (b.type === 'card') return playCard(db, match, b)
+  if (b.type === 'out' || b.type === 'kick') return leave(db, match, b)
   const token = String(b.token || '')
   const r = await mutate(db, match, t => {
     const p = t.find(token)
@@ -178,7 +216,7 @@ async function act(db, match, b) {
     p.seen = t.now
     if (['fold', 'check', 'call', 'raise'].includes(b.type)) p.sitOut = false // pemain yang beraksi berarti sudah kembali
     const i = t.players.indexOf(p)
-    const err = b.type === 'sitin' ? t.sitIn(i) : t.act(i, b.type, b.amount)
+    const err = b.type === 'sitin' ? t.sitIn(i) : b.type === 'ready' || b.type === 'unready' ? t.setReady(i, b.type === 'ready') : t.act(i, b.type, b.amount)
     return err ? { error: err } : { ok: true }
   })
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
