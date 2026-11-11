@@ -32,7 +32,8 @@ export const KIND_LABELS: Record<CardKind, { label: string; icon: string; tone: 
   defend: { label: 'Defend', icon: '🛡️', tone: 'bg-sky-500/15 text-sky-300' },
 }
 
-export const CARD_ICONS: Record<string, string> = { double_down: '⚡', defend_me: '🛡️', reveal_card: '👁️', fold_player: '🚫' }
+export const CARD_ICONS: Record<string, string> = { double_down: '⚡', defend_me: '🛡️', reveal_card: '👁️', fold_player: '🚫',
+  give_me_straight: '🪜', give_me_flush: '💧', give_me_full_house: '🏠', give_me_quads: '🎲', give_me_straight_flush: '🌈', give_me_royal_flush: '👑' }
 
 /** The signed-in player's cards (RLS only returns their own). */
 export function useMyCards() {

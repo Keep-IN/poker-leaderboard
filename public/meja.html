@@ -551,7 +551,8 @@ const tagOf = (p, betting) => p.place > 1 ? ['', '#' + p.place + (p.afkOut ? ' A
   : p.forced && p.folded && p.inHand ? ['red', 'dipaksa fold'] : p.allIn && p.inHand && betting ? ['red', 'all-in'] : p.last ? [/^(bet|raise)/.test(p.last) ? 'red' : '', p.last]
   : p.inHand && p.folded ? ['', 'fold'] : !p.chips && !p.inHand ? ['', 'habis'] : null;
 // Skill card yang dipakai hand ini (pemiliknya selalu tahu; lawan baru tahu saat kartu dibuka).
-const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'], reveal_card: ['👁️', 'Reveal Card'], fold_player: ['🚫', 'Fold Player'] };
+const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'], reveal_card: ['👁️', 'Reveal Card'], fold_player: ['🚫', 'Fold Player'],
+  give_me_straight: ['🪜', 'Give Me A Straight'], give_me_flush: ['💧', 'Give Me A Flush'], give_me_full_house: ['🏠', 'Give Me A Full House'], give_me_quads: ['🎲', 'Give Me A Four of a Kind'], give_me_straight_flush: ['🌈', 'Give Me A Straight Flush'], give_me_royal_flush: ['👑', 'Give Me A Royal Flush'] };
 const skillBadges = p => (p.skills || []).length ? `<span class="skills" title="${esc(p.skills.map(c => (SKILL_ICONS[c] || ['', c])[1] + (p.target >= 0 && S.players[p.target] ? ' → ' + S.players[p.target].name : '')).join(', '))}">${p.skills.map(c => (SKILL_ICONS[c] || ['🃏'])[0]).join('')}${p.target >= 0 && S.players[p.target] ? '<small>→' + esc(S.players[p.target].name.slice(0, 8)) + '</small>' : ''}</span>` : '';
 const row3 = (p, mine, betting) => p.saved ? `<span class="tag grn">🛡️ +${p.saved}</span>` : p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
   : (t => t ? `<span class="tag ${t[0]}">${t[1]}</span>` : '')(tagOf(p, betting));
@@ -725,6 +726,10 @@ function render() {
         if (d > 0) play(p.allIn && !q.allIn ? 'allin' : 'chips', Math.min(10, 2 + Math.ceil(d / 60)));
         if (p.last === 'check' && q.last !== 'check') play('knock');
         if (p.last === 'fold' && q.last !== 'fold') play('fold');
+        if (k === me && S.lucky !== undefined && prevS.lucky === undefined) { // hasil kartu Luck, sesudah hand selesai
+          const c = (p.skills || []).find(x => USABLE[x] && USABLE[x].luck);
+          if (c) toast(S.lucky ? `🍀 ${USABLE[c].name} berhasil!` : `🍀 ${USABLE[c].name} kali ini belum beruntung`, S.lucky);
+        }
         if (p.forced && !q.forced && S.no === prevS.no) { // Fold Player: umumkan siapa yang memaksa
           const by = ps.find(x => (x.skills || []).includes('fold_player') && x.target === k);
           toast(`🚫 ${by ? by.name : 'Seseorang'} memaksa ${k === me ? 'kamu' : p.name} fold`, k !== me);
@@ -926,6 +931,12 @@ const USABLE = {
   defend_me: { icon: '🛡️', name: 'Defend Me', desc: 'Kalah di hand ini? Setengah chip yang kamu taruhkan kembali.' },
   reveal_card: { icon: '👁️', name: 'Reveal Card', desc: 'Intip 2 kartu satu lawan sampai hand ini selesai. Diam-diam: lawan baru tahu saat kartu dibuka.', target: true },
   fold_player: { icon: '🚫', name: 'Fold Player', desc: 'Paksa satu lawan fold. Hanya sebelum flop, tidak ke pemain all-in. Chip-nya tetap di pot.', target: true, preflop: true },
+  give_me_straight: { icon: '🪜', name: 'Give Me A Straight', desc: 'Berlaku di hand berikutnya: peluang 70% kamu dapat Straight.', luck: true },
+  give_me_flush: { icon: '💧', name: 'Give Me A Flush', desc: 'Berlaku di hand berikutnya: peluang 70% kamu dapat Flush.', luck: true },
+  give_me_full_house: { icon: '🏠', name: 'Give Me A Full House', desc: 'Berlaku di hand berikutnya: peluang 60% kamu dapat Full House.', luck: true },
+  give_me_quads: { icon: '🎲', name: 'Give Me A Four of a Kind', desc: 'Berlaku di hand berikutnya: peluang 40% kamu dapat Four of a Kind.', luck: true },
+  give_me_straight_flush: { icon: '🌈', name: 'Give Me A Straight Flush', desc: 'Berlaku di hand berikutnya: peluang 30% kamu dapat Straight Flush.', luck: true },
+  give_me_royal_flush: { icon: '👑', name: 'Give Me A Royal Flush', desc: 'Berlaku di hand berikutnya: peluang 15% kamu dapat Royal Flush.', luck: true },
 };
 // lawan yang bisa ditarget kartu ini
 const targetsFor = code => S.players.map((q, k) => ({ q, k })).filter(({ q, k }) => k !== S.me && q.inHand && !q.folded && !(code === 'fold_player' && q.allIn));
@@ -955,11 +966,16 @@ async function openBag() {
   const cards = await loadBag();
   const groups = {}; cards.forEach(c => (groups[c.card_code] = groups[c.card_code] || []).push(c));
   const ok = canPlayCard(), P = S && S.players[S.me];
+  // kartu Luck bisa dipasang kapan saja selama masih ikut turnamen (berlaku di hand berikutnya)
+  const luckOk = !!P && S.phase !== 'over' && !P.place && P.chips > 0 && !S.luckNext && !S.luckBusy;
+  const luckWhy = S.luckNext ? `${USABLE[S.luckNext].icon} ${USABLE[S.luckNext].name} sudah terpasang untuk hand berikutnya.` : S.luckBusy ? 'Pemain lain sudah memasang kartu Luck untuk hand berikutnya.' : '';
+  const can = code => USABLE[code].luck ? luckOk : ok && !(USABLE[code].preflop && S.phase !== 'preflop');
   const why = !P ? '' : (P.skills || []).length ? 'Kamu sudah pakai kartu di hand ini.' : !ok ? 'Bisa dipakai saat kamu ikut hand yang sedang berjalan.' : '';
   $('bagList').innerHTML = Object.keys(groups).length
-    ? (why ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it"><span class="ic">${USABLE[code].icon}</span>
+    ? (why && Object.keys(groups).some(c => !USABLE[c].luck) ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it"><span class="ic">${USABLE[code].icon}</span>
         <span style="flex:1"><b>${USABLE[code].name} ×${list.length}</b><small>${USABLE[code].desc}</small></span>
-        <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${ok && !(USABLE[code].preflop && S.phase !== 'preflop') ? '' : 'disabled'}>Pakai</button></div>
+        <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${can(code) ? '' : 'disabled'}>Pakai</button></div>
+        ${USABLE[code].luck && luckWhy ? `<p class="note" style="padding-left:36px">${luckWhy}</p>` : ''}
         ${USABLE[code].preflop && ok && S.phase !== 'preflop' ? '<p class="note" style="padding-left:36px">Hanya sebelum flop</p>' : ''}<div class="tg" data-for="${code}" hidden></div>`).join('')
     : '<p class="note">Belum ada skill card yang bisa dipakai di meja. Beli di Market.</p>';
   const play = async (b, code, target) => {
@@ -967,7 +983,7 @@ async function openBag() {
     const r = await api('card', { card: b.dataset.id, code, target });
     if (r && r.ok) {
       const u = USABLE[code], who = target >= 0 && S.players[target] ? S.players[target].name : '';
-      toast(u.icon + ' ' + u.name + (who ? ' → ' + who : ' aktif untuk hand ini'), true); el.remove();
+      toast(u.icon + ' ' + u.name + (who ? ' → ' + who : u.luck ? ' terpasang untuk hand berikutnya' : ' aktif untuk hand ini'), true); el.remove();
     } else b.disabled = false;
   };
   $('bagList').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => {

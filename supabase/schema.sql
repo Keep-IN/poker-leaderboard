@@ -191,7 +191,13 @@ insert into public.skill_cards (code, name, kind, description, price, stock, on_
   ('double_down', 'Double Down', 'passive', 'Poin dari match online ini jadi 2× lipat. Aktifkan di halaman match sebelum match dimulai.', 70, 10, true, 1),
   ('defend_me', 'Defend Me', 'defend', 'Kalau kalah di hand ini, setengah chip yang kamu taruhkan kembali.', 40, 10, true, 2),
   ('reveal_card', 'Reveal Card', 'attack', 'Intip 2 kartu satu lawan pilihanmu sampai hand ini selesai. Lawan baru tahu saat kartu dibuka.', 35, 10, true, 3),
-  ('fold_player', 'Fold Player', 'attack', 'Paksa satu lawan fold sebelum flop. Chip yang sudah dia taruh tetap di pot. Tidak bisa ke pemain all-in.', 130, 5, true, 4)
+  ('fold_player', 'Fold Player', 'attack', 'Paksa satu lawan fold sebelum flop. Chip yang sudah dia taruh tetap di pot. Tidak bisa ke pemain all-in.', 130, 5, true, 4),
+  ('give_me_straight', 'Give Me A Straight', 'luck', 'Pasang untuk hand berikutnya: peluang 70% kamu dapat Straight. Satu kartu Luck per hand di seluruh meja.', 50, 5, true, 5),
+  ('give_me_flush', 'Give Me A Flush', 'luck', 'Pasang untuk hand berikutnya: peluang 70% kamu dapat Flush. Satu kartu Luck per hand di seluruh meja.', 50, 5, true, 6),
+  ('give_me_full_house', 'Give Me A Full House', 'luck', 'Pasang untuk hand berikutnya: peluang 60% kamu dapat Full House. Satu kartu Luck per hand di seluruh meja.', 80, 5, true, 7),
+  ('give_me_quads', 'Give Me A Four of a Kind', 'luck', 'Pasang untuk hand berikutnya: peluang 40% kamu dapat Four of a Kind. Satu kartu Luck per hand di seluruh meja.', 100, 5, true, 8),
+  ('give_me_straight_flush', 'Give Me A Straight Flush', 'luck', 'Pasang untuk hand berikutnya: peluang 30% kamu dapat Straight Flush. Satu kartu Luck per hand di seluruh meja.', 130, 5, true, 9),
+  ('give_me_royal_flush', 'Give Me A Royal Flush', 'luck', 'Pasang untuk hand berikutnya: peluang 15% kamu dapat Royal Flush. Satu kartu Luck per hand di seluruh meja.', 150, 5, true, 10)
 on conflict (code) do update set name = excluded.name, kind = excluded.kind, description = excluded.description, sort = excluded.sort;
 
 -- Kartu milik player. owned = di inventory, armed = Double Down dipasang ke match, used = sudah terpakai.
@@ -1436,7 +1442,7 @@ begin
     raise exception 'Maksimal 3 skill card per match';
   end if;
   update public.player_cards set status = 'used', used_at = now(), match_id = p_match
-   where id = p_card and player_id = p_player and status = 'owned' and card_code in ('defend_me', 'reveal_card', 'fold_player')
+   where id = p_card and player_id = p_player and status = 'owned' and (card_code in ('defend_me', 'reveal_card', 'fold_player') or card_code like 'give\_me\_%')
   returning card_code into code;
   if code is null then
     raise exception 'Kartu tidak ada di inventory atau tidak bisa dipakai di meja';

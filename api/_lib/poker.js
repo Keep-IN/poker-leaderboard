@@ -80,6 +80,45 @@ export const SKILLS = {
   defend_me: { name: 'Defend Me', icon: '🛡️' },
   reveal_card: { name: 'Reveal Card', icon: '👁️', target: true },
   fold_player: { name: 'Fold Player', icon: '🚫', target: true, open: true },
+  // Luck: dipasang untuk hand berikutnya. Saat hand itu dibagi, dengan peluang `chance`% kartu pemiliknya + kartu meja
+  // disusun supaya kombinasi `cat` terbentuk (minimal satu kartu tangannya ikut membentuk kombinasi itu).
+  give_me_straight: { name: 'Give Me A Straight', icon: '🪜', luck: { cat: 4 }, chance: 70 },
+  give_me_flush: { name: 'Give Me A Flush', icon: '💧', luck: { cat: 5 }, chance: 70 },
+  give_me_full_house: { name: 'Give Me A Full House', icon: '🏠', luck: { cat: 6 }, chance: 60 },
+  give_me_quads: { name: 'Give Me A Four of a Kind', icon: '🎲', luck: { cat: 7 }, chance: 40 },
+  give_me_straight_flush: { name: 'Give Me A Straight Flush', icon: '🌈', luck: { cat: 8 }, chance: 30 },
+  give_me_royal_flush: { name: 'Give Me A Royal Flush', icon: '👑', luck: { cat: 8, royal: true }, chance: 15 },
+}
+
+// ---- kartu Luck: menyusun 2 kartu tangan + 5 kartu meja yang membentuk kombinasi tertentu ----
+const R = n => randomInt(n), card = (rank, suit) => suit * 13 + rank - 2 // rank 2..14
+const ROYAL = score5([12, 11, 10, 9, 8]) // A K Q J T sekop
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = R(i + 1); [a[i], a[j]] = [a[j], a[i]] } return a }
+// lima kartu inti kombinasi
+function core(t) {
+  const suits = () => [R(4), R(4), R(4), R(4), R(4)]
+  const run = (hi, ss) => [0, 1, 2, 3, 4].map(k => card(hi - k === 1 ? 14 : hi - k, ss[k])) // hi 5 = wheel (A sebagai 1)
+  const ranks = (n, not = []) => shuffle([...Array(13)].map((_, k) => k + 2).filter(r => !not.includes(r))).slice(0, n)
+  if (t.royal) return run(14, Array(5).fill(R(4)))
+  if (t.cat === 8) return run(5 + R(9), Array(5).fill(R(4)))
+  if (t.cat === 7) { const [a, b] = ranks(2); return [0, 1, 2, 3].map(x => card(a, x)).concat(card(b, R(4))) }
+  if (t.cat === 6) { const [a, b] = ranks(2); return shuffle([0, 1, 2, 3]).slice(0, 3).map(x => card(a, x)).concat(shuffle([0, 1, 2, 3]).slice(0, 2).map(x => card(b, x))) }
+  if (t.cat === 5) { const x = R(4); return ranks(5).map(r => card(r, x)) }
+  return run(5 + R(10), suits()) // straight (kalau kebetulan satu warna, dicek ulang di bawah)
+}
+/** {hole, board} yang membentuk kombinasi t untuk pemiliknya, atau null kalau gagal menyusun. */
+export function rigLuck(t) {
+  const ok = sc => t.royal ? sc === ROYAL : cat(sc) === t.cat
+  for (let tries = 0; tries < 200; tries++) {
+    const five = core(t), rest = shuffle([...Array(52).keys()].filter(c => !five.includes(c)))
+    const k = 1 + R(2), mine = shuffle(five.slice()), hole = mine.slice(0, k).concat(rest.slice(0, 2 - k))
+    const board = shuffle(mine.slice(k).concat(rest.slice(2 - k, 2 - k + 5 - (5 - k)))) // sisa inti + pengisi = 5
+    if (board.length !== 5 || new Set(hole.concat(board)).size !== 7) continue
+    if (!ok(best(hole.concat(board)))) continue
+    if (cat(best(board)) >= t.cat) continue // kombinasinya harus milik pemain, bukan kartu meja yang dipakai semua orang
+    return { hole, board }
+  }
+  return null
 }
 // Jeda tambahan sebelum hand berikutnya: tiap kombinasi pemain disorot bergantian di layar.
 export const REVEAL_MS = env('REVEAL_MS', 1500), REVEAL_LEAD_MS = 900
@@ -141,12 +180,13 @@ export class Table {
     if (el.length < 2) return this.end()
     if (this.startedAt === null) this.startedAt = this.now
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, target: -1, forced: false })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, target: -1, forced: false, lucky: null })
     this.handNo++
     this.deck = this.newDeck(); this.board = []; this.phase = 'preflop'; this.bet = this.bb; this.minRaise = this.bb
     this.dealer = this.after(this.dealer, p => p.inHand)
     const sb = el.length === 2 ? this.dealer : this.after(this.dealer, p => p.inHand), bb = this.after(sb, p => p.inHand)
     el.forEach(p => p.cards = [this.deck.pop(), this.deck.pop()])
+    this.applyLuck(el)
     this.put(this.players[sb], this.sb); this.put(this.players[bb], this.bb)
     this.players[sb].last = 'sb'; this.players[bb].last = 'bb'
     this.step(bb)
@@ -266,6 +306,11 @@ export class Table {
   canUseCard(i, code, j) {
     const p = this.players[i], sk = SKILLS[code]
     if (!sk) return 'Kartu ini tidak bisa dipakai di meja'
+    if (sk.luck) { // dipasang untuk hand berikutnya, satu kartu Luck saja untuk seluruh meja
+      if (this.phase === 'over' || !p || p.place || !p.chips) return 'Kamu sudah tidak ikut turnamen ini'
+      if (this.luck) return this.luck.i === i ? 'Kartu Luck kamu sudah menunggu hand berikutnya' : 'Sudah ada pemain lain yang memasang kartu Luck untuk hand berikutnya'
+      return
+    }
     if (!this.betting) return 'Skill card hanya bisa dipakai selama hand berjalan'
     if (!p || !p.inHand || p.folded) return 'Kamu sudah tidak ikut hand ini'
     if ((p.skills || []).length) return 'Maksimal 1 skill card per hand'
@@ -282,9 +327,29 @@ export class Table {
     const err = this.canUseCard(i, code, j)
     if (err) return err
     const p = this.players[i]
+    if (SKILLS[code].luck) { this.luck = { i, code }; return }
     p.skills = [...(p.skills || []), code]
     if (SKILLS[code].target) p.target = j
     if (code === 'fold_player') this.forceFold(j)
+  }
+  // Kartu Luck yang menunggu dipakai saat hand dibagi. Kalau pemiliknya sudah tersingkir, kartunya hangus.
+  // lucky (hanya terlihat pemiliknya) = berhasil atau tidak.
+  applyLuck(el) {
+    const L = this.luck
+    this.luck = null
+    const o = L && this.players[L.i]
+    if (!o || !el.includes(o)) return
+    o.skills = [L.code]
+    o.lucky = false
+    if (R(100) >= SKILLS[L.code].chance) return
+    const r = rigLuck(SKILLS[L.code].luck)
+    if (!r) return
+    // bagi ulang: pemilik mendapat kartu susunan, pemain lain dari sisa dek, lalu kartu meja ditaruh di ujung dek
+    const used = new Set(r.hole.concat(r.board))
+    this.deck = this.newDeck().filter(c => !used.has(c))
+    for (const p of el) p.cards = p === o ? r.hole : [this.deck.pop(), this.deck.pop()]
+    this.deck.push(...r.board.slice().reverse()) // pop() berikutnya = board[0], board[1], ...
+    o.lucky = true
   }
   // Fold di luar giliran. Kalau korbannya sedang giliran, sama seperti dia fold sendiri; kalau bukan, giliran tetap
   // di pemain yang sekarang, kecuali ronde taruhan jadi selesai karena dia keluar.
@@ -369,6 +434,10 @@ export class Table {
       })),
     }
     if (i >= 0 && this.turn === i) v.ctl = this.ctl(i)
+    if (i >= 0 && this.luck?.i === i) v.luckNext = this.luck.code // kartu Luck saya menunggu hand berikutnya
+    if (i >= 0) v.luckBusy = !!this.luck && this.luck.i !== i // pemain lain sudah memasang kartu Luck
+    // hasil kartu Luck baru diberitahu sesudah hand selesai (kalau sebelumnya, pemiliknya tahu kartu meja akan cocok)
+    if (me && !this.betting && me.lucky !== null && me.lucky !== undefined && (me.skills || []).some(c => SKILLS[c]?.luck)) v.lucky = me.lucky
     if (hostView) v.hostView = true
     return v
   }

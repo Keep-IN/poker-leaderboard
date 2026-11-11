@@ -75,6 +75,18 @@ Detailnya:
   - 🛡️ **Defend Me** (defend): dipakai di meja online lewat tombol 🎒 saat hand berjalan. Kalau kamu kalah di hand itu, **setengah chip yang hilang dikembalikan** (diambil dari pemenang hand). Kartu yang dipakai terlihat oleh semua pemain sebelum showdown.
   - 👁️ **Reveal Card** (attack): pilih satu lawan di meja, lalu **2 kartunya terlihat olehmu** sampai hand selesai (beserta nama kombinasinya). Diam-diam: lawan baru tahu saat kartu dibuka di akhir hand.
   - 🚫 **Fold Player** (attack): **paksa satu lawan fold**. Hanya bisa **sebelum flop** dan tidak bisa ke pemain yang sudah all-in. Chip yang sudah dia taruh tetap di pot. Langsung diumumkan ke semua pemain, dan korbannya ditandai "dipaksa fold".
+  - 🍀 **Give Me A…** (luck): dipasang lewat 🎒 kapan saja selama masih ikut turnamen, lalu berlaku di **hand berikutnya**. Saat hand itu dibagi, ada peluang server menyusun kartu tanganmu dan kartu meja supaya kombinasinya terbentuk, dengan minimal satu kartu tanganmu ikut membentuknya:
+
+    | Kartu | Peluang |
+    | --- | ---: |
+    | 🪜 Give Me A Straight | 70% |
+    | 💧 Give Me A Flush | 70% |
+    | 🏠 Give Me A Full House | 60% |
+    | 🎲 Give Me A Four of a Kind | 40% |
+    | 🌈 Give Me A Straight Flush | 30% |
+    | 👑 Give Me A Royal Flush | 15% |
+
+    Hanya **satu kartu Luck per hand di seluruh meja**: siapa yang memasang duluan, dia yang berlaku. Kartu Luck dihitung sebagai kartu hand itu. Berhasil atau tidaknya baru diberitahu ke pemiliknya setelah hand selesai. Kalau kamu tersingkir sebelum hand berikutnya, kartunya hangus.
 - Kartu Defend dan Reveal baru terlihat pemain lain saat kartu dibuka di akhir hand. Kalau kartu gagal dipakai (misalnya target keburu fold), kartunya kembali ke inventory.
 - Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match.
 

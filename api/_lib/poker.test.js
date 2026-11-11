@@ -1,6 +1,6 @@
 // Tes mesin turnamen: `node api/_lib/poker.test.js` (mencetak "semua tes lulus").
 import assert from 'node:assert'
-import { AFK_HANDS, LEVELS, REVEAL_MS, TURN_MS, Table, best, bestFive, equities, handName } from './poker.js'
+import { AFK_HANDS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
 
 const C = s => s.split(' ').map(x => 'shdc'.indexOf(x[1]) * 13 + '23456789TJQKA'.indexOf(x[0]))
 const S = s => best(C(s))
@@ -210,6 +210,45 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.equal(typeof a.useCard(1, 'fold_player', 0), 'string')
 }
 
+{ // kartu Luck: susunan selalu membentuk kombinasinya, dan kombinasinya tidak cuma dari kartu meja
+  for (const [code, sk] of Object.entries(SKILLS).filter(([, x]) => x.luck)) for (let k = 0; k < 150; k++) {
+    const r = rigLuck(sk.luck), all = r.hole.concat(r.board)
+    assert.equal(new Set(all).size, 7, code)
+    assert(all.every(c => c >= 0 && c < 52))
+    assert.equal(handName(r.hole, r.board), sk.luck.cat === 8 ? 'Straight Flush' : handName(r.hole, r.board))
+    if (sk.luck.royal) assert.equal(Math.floor(best(all) / 15 ** 4) % 15, 14, 'royal flush = straight flush as-tinggi')
+    else assert.equal(Math.floor(best(all) / 15 ** 5), sk.luck.cat, code)
+    assert(Math.floor(best(r.board) / 15 ** 5) < sk.luck.cat, code + ': kombinasi tidak boleh sudah jadi di kartu meja')
+  }
+}
+
+{ // kartu Luck dipasang untuk hand berikutnya: satu untuk seluruh meja, pemiliknya mendapat kombinasinya kalau berhasil
+  const t = mk([1000, 1000, 1000]); begin(t)
+  SKILLS.give_me_full_house.chance = 100 // paksa berhasil untuk tes
+  assert.equal(t.useCard(1, 'give_me_full_house'), undefined)
+  assert.equal(typeof t.useCard(2, 'give_me_flush'), 'string', 'satu kartu Luck per hand di seluruh meja')
+  assert.equal(typeof t.useCard(1, 'give_me_flush'), 'string')
+  assert.equal(t.view(t.players[1]).luckNext, 'give_me_full_house')
+  assert.equal(t.view(t.players[2]).luckBusy, true)
+  assert.equal(t.view(t.players[0]).players[1].skills.length, 0, 'tidak terlihat lawan')
+  assert.equal(t.useCard(1, 'defend_me'), undefined, 'kartu lain di hand sekarang tetap boleh')
+  ok(t, 0, 'fold'); ok(t, 1, 'fold'); nxt(t)
+  const o = t.players[1]
+  assert.deepEqual(o.skills, ['give_me_full_house']); assert.equal(o.lucky, true)
+  assert.equal(typeof t.useCard(1, 'defend_me'), 'string', 'kartu Luck dihitung sebagai kartu hand ini')
+  assert.equal(t.view(o).lucky, undefined, 'hasil belum diberitahu selama hand berjalan')
+  const dealt = t.players.flatMap(p => p.cards)
+  assert.equal(new Set(dealt).size, 6)
+  while (t.betting) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  assert.equal(handName(o.cards, t.board), 'Full House')
+  assert.equal(t.view(o).lucky, true); assert.equal(t.view(t.players[0]).lucky, undefined)
+  assert.equal(new Set(dealt.concat(t.board)).size, 11, 'tidak ada kartu ganda')
+  SKILLS.give_me_full_house.chance = 0 // gagal: hand biasa, kartu tetap terpakai
+  nxt(t); t.useCard(0, 'give_me_full_house'); while (t.betting) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check'); nxt(t)
+  assert.equal(t.players[0].lucky, false); assert.deepEqual(t.players[0].skills, ['give_me_full_house'])
+  SKILLS.give_me_full_house.chance = 60
+}
+
 { // dua pemain tersingkir di hand yang sama: stack awal hand lebih besar = peringkat lebih baik
   const t = mk([200, 300, 2000]); rig(t, '2c 7d 3c 8d As Ah Kh 9d 4c 5s Jd'); begin(t)
   ok(t, 0, 'raise', 200); ok(t, 1, 'raise', 300); ok(t, 2, 'call'); drain(t)
@@ -280,7 +319,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
       if (t.turn >= 0) {
         const i = t.turn, c = t.ctl(i), r = Math.random()
         if (r < .03) { // boleh gagal (fold/sudah pakai/target salah): tidak mengubah apa-apa
-          const code = ['defend_me', 'reveal_card', 'fold_player'][R(3)]
+          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush'][R(5)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
         if (r < .05) run(t, TURN_MS)

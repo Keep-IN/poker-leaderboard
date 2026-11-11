@@ -42,7 +42,7 @@ export default function Inventory() {
           {groups.map((g) => (
             <CardTile key={g[0].card_code} card={{ code: g[0].card_code, name: g[0].card?.name ?? g[0].card_code, kind: g[0].card?.kind ?? 'passive', description: g[0].card?.description ?? '' }}>
               <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-                <span className="text-slate-400">{howToUse[g[0].card_code]}</span>
+                <span className="text-slate-400">{howToUse[g[0].card_code] ?? (g[0].card?.kind === 'luck' ? 'Pakai di meja online lewat tombol 🎒. Berlaku di hand berikutnya.' : '')}</span>
                 <span className="shrink-0 rounded-lg bg-brand-400/15 px-2 py-1 text-sm font-bold text-brand-400">×{g.length}</span>
               </div>
             </CardTile>
