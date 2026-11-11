@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { DealerDuelSections, PlayerDuelSections } from '../components/DuelSections'
+import { DealerBounties, PlayerBounties } from '../components/BountySections'
 import { DealerMissions, PlayerMissions } from '../components/MissionSections'
 import { ACTIVE_DUEL_STATUSES, DUEL_SELECT, type Duel, type DuelStatus } from '../lib/duels'
 import { Avatar, Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
@@ -48,6 +49,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
       <PlayerStats playerId={profile.id} isMe>
         <PlayerDuelSections me={profile.id} />
         <PlayerMissions me={profile.id} />
+        <PlayerBounties me={profile.id} />
       </PlayerStats>
 
       {hosted.length > 0 && (
@@ -131,6 +133,7 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
     .filter((a) => a.reason === 'duel_stake' && a.duel && ACTIVE_DUEL_STATUSES.includes(a.duel.status))
     .reduce((sum, a) => sum + a.amount, 0)
   const missionRewards = adjustments.filter((a) => a.reason === 'mission_reward').reduce((sum, a) => sum + a.amount, 0)
+  const bountyRewards = adjustments.filter((a) => a.reason === 'bounty_reward').reduce((sum, a) => sum + a.amount, 0)
   const duelWins = duels.filter((d) => d.winner_id === playerId).length
   const showDuels = shown === 'duel'
   const monthPoints =
@@ -172,12 +175,13 @@ export function PlayerStats({ playerId, isMe, children }: { playerId: string; is
           <Stat label="Poin bulan ini" value={monthPoints} accent />
           <Stat label="Total poin" value={totalPoints} accent />
         </div>
-        {(spent > 0 || held > 0 || missionRewards > 0) && (
+        {(spent > 0 || held > 0 || missionRewards > 0 || bountyRewards > 0) && (
           <p className="mt-2 text-center text-[11px] text-slate-500">
             {[
               spent > 0 && `Sudah dikurangi ${spent} poin untuk membuat match`,
               held > 0 && `${held} poin ditahan untuk duel`,
               missionRewards > 0 && `+${missionRewards} poin dari misi`,
+              bountyRewards > 0 && `+${bountyRewards} poin dari bounty`,
             ]
               .filter(Boolean)
               .join(' · ')}
@@ -301,7 +305,7 @@ interface Adjustment {
   amount: number
   created_at: string
   counts_monthly: boolean
-  reason: 'create_match' | 'duel_stake' | 'duel_payout' | 'mission_reward'
+  reason: 'create_match' | 'duel_stake' | 'duel_payout' | 'mission_reward' | 'bounty_reward'
   duel: { status: DuelStatus } | null
 }
 
@@ -354,6 +358,7 @@ function DealerHome({ profile }: { profile: Profile }) {
 
       <DealerDuelSections me={profile.id} />
       <DealerMissions />
+      <DealerBounties />
 
       {active.length > 0 && (
         <section>

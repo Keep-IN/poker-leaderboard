@@ -144,9 +144,27 @@ alter table public.point_adjustments add column if not exists mission_id uuid re
 create unique index if not exists point_adjustments_mission_reward_idx
   on public.point_adjustments (mission_id, player_id) where reason = 'mission_reward';
 
+-- Bounty: dealer menandai player sebagai buruan dengan reward poin. Saat match yang diikuti player itu selesai,
+-- pemenang match mengklaim reward-nya (kalau yang menang si buruan sendiri, dia yang mengklaim). Satu bounty aktif per player.
+create table if not exists public.bounties (
+  id          uuid primary key default gen_random_uuid(),
+  target_id   uuid not null references public.profiles (id) on delete cascade,
+  reward      int  not null check (reward between 1 and 1000),
+  status      text not null default 'active' check (status in ('active', 'claimed', 'cancelled')),
+  created_by  uuid references public.profiles (id) on delete set null,
+  created_at  timestamptz not null default now(),
+  claimed_by  uuid references public.profiles (id) on delete set null,
+  claimed_at  timestamptz,
+  match_id    uuid references public.matches (id) on delete set null
+);
+create unique index if not exists bounties_one_active_idx on public.bounties (target_id) where status = 'active';
+create index if not exists bounties_match_idx on public.bounties (match_id);
+
+alter table public.point_adjustments add column if not exists bounty_id uuid references public.bounties (id) on delete cascade;
+
 alter table public.point_adjustments drop constraint if exists point_adjustments_reason_check;
 alter table public.point_adjustments add constraint point_adjustments_reason_check
-  check (reason in ('create_match', 'duel_stake', 'duel_payout', 'mission_reward'));
+  check (reason in ('create_match', 'duel_stake', 'duel_payout', 'mission_reward', 'bounty_reward'));
 
 -- ---------- Auto-create profile on sign-up -----------------------------
 
@@ -180,6 +198,7 @@ alter table public.match_players enable row level security;
 alter table public.point_adjustments enable row level security;
 alter table public.duels enable row level security;
 alter table public.missions enable row level security;
+alter table public.bounties enable row level security;
 
 drop policy if exists "profiles readable"      on public.profiles;
 drop policy if exists "matches readable"       on public.matches;
@@ -187,6 +206,7 @@ drop policy if exists "match_players readable" on public.match_players;
 drop policy if exists "point_adjustments readable" on public.point_adjustments;
 drop policy if exists "duels readable" on public.duels;
 drop policy if exists "missions readable" on public.missions;
+drop policy if exists "bounties readable" on public.bounties;
 
 create policy "profiles readable"      on public.profiles      for select to authenticated using (true);
 create policy "matches readable"       on public.matches       for select to authenticated using (true);
@@ -194,6 +214,7 @@ create policy "match_players readable" on public.match_players for select to aut
 create policy "point_adjustments readable" on public.point_adjustments for select to authenticated using (true);
 create policy "duels readable" on public.duels for select to authenticated using (true);
 create policy "missions readable" on public.missions for select to authenticated using (true);
+create policy "bounties readable" on public.bounties for select to authenticated using (true);
 
 -- ---------- Helpers ----------------------------------------------------
 
@@ -518,6 +539,7 @@ begin
      set status = 'finished', winner_id = p_player, finished_at = now()
    where id = p_match;
   perform public.award_missions(p_player);
+  perform public.claim_bounties(p_match, p_player);
 end;
 $$;
 
@@ -1022,8 +1044,73 @@ begin
        set status = 'finished', winner_id = p_winner, finished_at = now()
      where id = p_match;
     perform public.award_missions(p_winner);
+    perform public.claim_bounties(p_match, p_winner);
   end if;
   return nv;
+end;
+$$;
+
+-- ---------- Bounty -----------------------------------------------------
+
+-- Dipanggil saat match selesai: semua bounty aktif yang target-nya ikut match ini diklaim oleh pemenang.
+create or replace function public.claim_bounties(p_match uuid, p_winner uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  with claimed as (
+    update public.bounties
+       set status = 'claimed', claimed_by = p_winner, claimed_at = now(), match_id = p_match
+     where status = 'active'
+       and target_id in (select player_id from public.match_players where match_id = p_match)
+    returning id, reward
+  )
+  insert into public.point_adjustments (player_id, amount, reason, bounty_id, counts_monthly)
+  select p_winner, reward, 'bounty_reward', id, true from claimed;
+$$;
+
+create or replace function public.create_bounty(p_target uuid, p_reward int)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_id uuid;
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa memasang bounty';
+  end if;
+  if not exists (select 1 from public.profiles where id = p_target and role = 'player') then
+    raise exception 'Bounty hanya bisa dipasang ke player';
+  end if;
+  if p_reward is null or p_reward < 1 or p_reward > 1000 then
+    raise exception 'Reward bounty harus 1 sampai 1000 poin';
+  end if;
+  if exists (select 1 from public.bounties where target_id = p_target and status = 'active') then
+    raise exception 'Player ini sudah punya bounty aktif';
+  end if;
+  insert into public.bounties (target_id, reward, created_by) values (p_target, p_reward, auth.uid())
+  returning id into new_id;
+  return new_id;
+end;
+$$;
+
+create or replace function public.cancel_bounty(p_bounty uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa membatalkan bounty';
+  end if;
+  update public.bounties set status = 'cancelled' where id = p_bounty and status = 'active';
+  if not found then
+    raise exception 'Bounty tidak ditemukan atau sudah selesai';
+  end if;
 end;
 $$;
 
@@ -1112,6 +1199,7 @@ revoke all on function public.meja_save(uuid, int, jsonb, timestamptz, uuid[], u
 grant execute on function public.meja_create(uuid, jsonb, timestamptz) to service_role;
 grant execute on function public.meja_save(uuid, int, jsonb, timestamptz, uuid[], uuid) to service_role;
 revoke all on function public.award_missions(uuid) from public, anon, authenticated;
+revoke all on function public.claim_bounties(uuid, uuid) from public, anon, authenticated;
 
 do $$
 declare
@@ -1142,6 +1230,8 @@ begin
     'public.create_mission(int, int, int, timestamptz, text, text)',
     'public.cancel_mission(uuid)',
     'public.get_my_missions()',
+    'public.create_bounty(uuid, int)',
+    'public.cancel_bounty(uuid)',
     'public.current_role_name()'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
@@ -1168,6 +1258,10 @@ begin
   end;
   begin
     alter publication supabase_realtime add table public.missions;
+  exception when duplicate_object then null;
+  end;
+  begin
+    alter publication supabase_realtime add table public.bounties;
   exception when duplicate_object then null;
   end;
 end;

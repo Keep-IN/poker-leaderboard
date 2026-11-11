@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import ConfirmSheet, { type Confirmation } from '../components/ConfirmSheet'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { BOUNTY_SELECT, type Bounty } from '../lib/bounties'
 import { formatDateTime } from '../lib/format'
 import { matchMessage, shareToWhatsApp } from '../lib/share'
 import {
@@ -24,17 +25,21 @@ export default function MatchRoom() {
   const { profile } = useAuth()
   const [match, setMatch] = useState<MatchWithDealer | null | undefined>(undefined)
   const [players, setPlayers] = useState<MatchPlayer[]>([])
+  // bounty aktif (untuk penanda di daftar player) dan bounty yang diklaim di match ini
+  const [bounties, setBounties] = useState<Bounty[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [confirm, setConfirm] = useState<Confirmation | null>(null)
 
   const load = useCallback(async () => {
-    const [m, p] = await Promise.all([
+    const [m, p, b] = await Promise.all([
       supabase.from('matches').select('*, dealer:profiles!matches_dealer_id_fkey(name, role)').eq('id', id).maybeSingle(),
       supabase.from('match_players').select('*, profile:profiles(name)').eq('match_id', id).order('joined_at'),
+      supabase.from('bounties').select(BOUNTY_SELECT).or(`status.eq.active,match_id.eq.${id}`),
     ])
     setMatch((m.data as MatchWithDealer | null) ?? null)
     setPlayers((p.data as MatchPlayer[]) ?? [])
+    setBounties((b.data as unknown as Bounty[]) ?? [])
   }, [id])
 
   useEffect(() => {
@@ -42,6 +47,7 @@ export default function MatchRoom() {
     const channel = supabase
       .channel(`match-${id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `id=eq.${id}` }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bounties' }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_players' }, (payload) => {
         const row = (payload.new && 'match_id' in payload.new ? payload.new : payload.old) as { match_id?: string }
         if (!row?.match_id || row.match_id === id) load()
@@ -84,6 +90,9 @@ export default function MatchRoom() {
   // Placements come from elimination order, so a winner can only be picked once it is heads-up.
   const canPickWinner = stillPlaying.length <= 2
   const winner = players.find((p) => p.status === 'winner')
+  const inMatch = new Set(players.map((p) => p.player_id))
+  const activeBounty = new Map(bounties.filter((b) => b.status === 'active' && inMatch.has(b.target_id)).map((b) => [b.target_id, b]))
+  const claimedHere = bounties.filter((b) => b.status === 'claimed' && b.match_id === id)
   const sorted = [...players].sort(byStanding)
   const nameOf = (p: MatchPlayer) => p.profile?.name ?? 'Player'
 
@@ -119,6 +128,34 @@ export default function MatchRoom() {
           </p>
         )}
       </div>
+
+      {/* Bounty: siapa buruan di match ini, atau siapa yang mengklaimnya setelah selesai */}
+      {(match.status === 'open' || match.status === 'ongoing') && activeBounty.size > 0 && (
+        <div className="rounded-2xl border border-brand-400/40 bg-brand-400/10 px-4 py-3 text-sm">
+          <p className="font-semibold">💰 Ada bounty di match ini!</p>
+          <p className="mt-0.5 text-slate-300">
+            Juara match ini mengklaim{' '}
+            {[...activeBounty.values()].map((b, i) => (
+              <span key={b.id}>
+                {i > 0 && ', '}
+                <span className="font-semibold">{b.target?.name ?? 'Player'}</span> (+{b.reward})
+              </span>
+            ))}
+            .
+          </p>
+        </div>
+      )}
+      {match.status === 'finished' && claimedHere.length > 0 && (
+        <div className="rounded-2xl border border-brand-400/40 bg-brand-400/10 px-4 py-3 text-sm">
+          {claimedHere.map((b) => (
+            <p key={b.id}>
+              💰 <span className="font-semibold">{b.claimer?.name ?? 'Player'}</span>{' '}
+              {b.claimed_by === b.target_id ? 'menang & mengklaim bounty-nya sendiri' : <>mengklaim bounty <span className="font-semibold">{b.target?.name ?? 'player'}</span></>}{' '}
+              <span className="font-bold text-brand-400">+{b.reward} poin</span>
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* Winner banner */}
       {match.status === 'finished' && winner && (
@@ -252,6 +289,11 @@ export default function MatchRoom() {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-baseline gap-1.5 font-medium">
                     <span className={cx('truncate', out && 'line-through decoration-slate-500')}>{nameOf(p)}</span>
+                    {activeBounty.has(p.player_id) && (
+                      <span className="shrink-0 rounded-md bg-brand-400/15 px-1.5 text-[11px] font-bold text-brand-400" title="Bounty">
+                        🎯 +{activeBounty.get(p.player_id)!.reward}
+                      </span>
+                    )}
                     {p.player_id === profile.id && <span className="shrink-0 text-xs text-brand-300">(kamu)</span>}
                   </p>
                   <PlayerStatusLabel player={p} matchStatus={match.status} />

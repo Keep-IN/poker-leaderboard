@@ -1,4 +1,5 @@
 import { formatDateTime } from './format'
+import type { Bounty } from './bounties'
 import { missionText, type Mission } from './missions'
 import { formatChips, onlineConfigText, pointsFor, type Match, type MatchPlayer } from './supabase'
 
@@ -71,5 +72,16 @@ export function missionMessage(m: Pick<Mission, 'kind' | 'match_mode' | 'require
     `Deadline: ${formatDateTime(m.deadline)}`,
     '',
     `Cek progres di Beranda 👉 ${link('/')}`,
+  ].join('\n')
+}
+
+export function bountyMessage(b: Pick<Bounty, 'reward' | 'target'>) {
+  const name = b.target?.name ?? 'Player'
+  return [
+    `💰 *BOUNTY: ${name}* 🎯`,
+    `Reward: *+${formatChips(b.reward)} poin*`,
+    `Menangkan match yang diikuti ${name} untuk mengklaimnya. Kalau ${name} sendiri yang menang, bounty-nya jadi miliknya.`,
+    '',
+    `Lihat daftar bounty 👉 ${link('/')}`,
   ].join('\n')
 }

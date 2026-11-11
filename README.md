@@ -50,6 +50,13 @@ Detailnya:
 - Reward **masuk otomatis** begitu target tercapai.
 - Dealer bisa mengumumkan misi baru ke grup WA lewat tombol **📲 Kirim ke grup WA**.
 
+### 💰 Bounty
+- Dealer bisa **memasang bounty** ke player mana pun dengan reward poin (1–1000). Bisa banyak player sekaligus, satu bounty aktif per player.
+- **Cara klaim**: menangkan match (offline atau online) yang **diikuti player buruan**. Juara match itu mendapat reward-nya. Kalau **si buruan sendiri yang juara**, dia yang mengklaim bounty-nya.
+- Bounty langsung hilang setelah diklaim. Satu match bisa mengklaim beberapa bounty sekaligus kalau ada beberapa buruan di dalamnya.
+- Daftar bounty muncul di **Beranda player** (player yang jadi buruan dapat peringatan khusus), dan buruan ditandai 🎯 di halaman match.
+- Reward masuk ke **poin bulan ini dan total poin**. Dealer bisa membatalkan bounty atau mengirimnya ke grup WA.
+
 ### 🎩 Beranda Dealer
 - Jumlah **match yang sudah di-host**.
 - Tombol **Buat Match Baru**.
@@ -180,8 +187,8 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Match dimainkan | Jumlah match **selesai** yang diikuti pemain, terpisah untuk tab **Offline** dan **Online** |
 | Match menang    | Jumlah match selesai di mana pemain menjadi **pemenang**, terpisah per tab |
 | Win rate        | Match menang ÷ match dimainkan × 100%                        |
-| Poin bulan ini  | Poin dari match bulan berjalan + hasil duel + reward misi − biaya membuat match di bulan itu |
-| Total poin      | Poin dari semua match + hasil duel + reward misi − biaya membuat match |
+| Poin bulan ini  | Poin dari match bulan berjalan + hasil duel + reward misi & bounty − biaya membuat match di bulan itu |
+| Total poin      | Poin dari semua match + hasil duel + reward misi & bounty − biaya membuat match |
 | Leaderboard     | Total poin per pemain, untuk bulan terpilih / all time       |
 | Match di-host   | Jumlah match **selesai** yang dibuat dealer                  |
 
@@ -199,6 +206,8 @@ Statistik **tidak disimpan sebagai angka**. Statistik dihitung ulang dari riwaya
 | Setujui, tolak & host duel              |   –    |   ✅   |
 | Kerjakan misi                           |   ✅   |   –    |
 | Buat & batalkan misi                    |   –    |   ✅   |
+| Pasang & batalkan bounty                |   –    |   ✅   |
+| Klaim bounty (menang match)             |   ✅   |   –    |
 
 Semua akun baru otomatis menjadi **Player**. Akun dijadikan **Dealer** oleh admin melalui Supabase (Table Editor → tabel `profiles` → ubah kolom `role` menjadi `dealer`).
 
