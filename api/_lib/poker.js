@@ -93,7 +93,9 @@ export const SKILLS = {
   // Wildcard: menarget pemain lain yang masih bertahan; dijalankan sesudah hand berjalan selesai, didahului jeda
   // pengumuman di tengah meja. Tidak bisa dipakai (dan batal, kartu dikembalikan) kalau pemain tersisa tinggal 2.
   you_owe_me: { name: 'You Owe Me My Money', icon: '💸', wild: true },
-  duel_me: { name: 'Duel Me!', icon: '⚔️', wild: true },
+  // Duel Me!: berlaku langsung di hand yang sedang berjalan, sebelum kartu ke-4 (turn) dibuka. Semua pemain lain
+  // dipaksa fold (tanpa denda, chip yang sudah masuk tetap di pot) sehingga sisa hand jadi duel pemakai vs target.
+  duel_me: { name: 'Duel Me!', icon: '⚔️', target: true, open: true, cursed: true },
   get_out: { name: 'Get The F*ck Out!', icon: '💀', wild: true },
   // Go Big or Go Home!: wildcard yang langsung berlaku di hand yang sedang berjalan. Lawan yang fold sesudahnya
   // kehilangan BIG_SHARE chip-nya ke pot (kecuali dipaksa fold oleh kartu lain). Tidak bisa dipakai kalau pemain tinggal 2.
@@ -405,6 +407,11 @@ export class Table {
     if (!this.betting) return 'Skill card hanya bisa dipakai selama hand berjalan'
     if (!p || !p.inHand || p.folded) return 'Kamu sudah tidak ikut hand ini'
     if ((p.skills || []).length) return 'Maksimal 1 skill card per hand'
+    if (code === 'duel_me') {
+      if (this.board.length >= 4) return 'Duel Me! hanya bisa dipakai sebelum kartu ke-4 (turn) dibuka'
+      if (this.alive().length <= 2) return 'Duel Me! tidak bisa dipakai kalau pemain tinggal 2'
+      if (this.players.filter(q => q.inHand && !q.folded).length <= 2) return 'Hand ini sudah tinggal kalian berdua'
+    }
     if (sk.big) {
       if (this.alive().length <= 2) return 'Wildcard tidak bisa dipakai kalau pemain tinggal 2'
       if (this.big >= 0) return 'Go Big or Go Home! sudah aktif di hand ini'
@@ -444,6 +451,16 @@ export class Table {
       this.rr = (this.rr || 0) + 1
     }
     if (code === 'fold_player') this.forceFold(j)
+    if (code === 'duel_me') this.duelNow(i, j)
+  }
+  // Duel Me!: semua pemain selain i dan j dipaksa fold sekaligus, lalu permainan lanjut seperti forceFold.
+  duelNow(i, j) {
+    const out = this.players.filter((q, k) => k !== i && k !== j && q.inHand && !q.folded)
+    for (const q of out) { q.folded = true; q.forced = true; q.last = 'fold' }
+    this.duel = [i, j]
+    if (out.includes(this.players[this.turn])) return this.step(this.turn)
+    const live = [this.players[i], this.players[j]].filter(p => !p.allIn)
+    if (live.every(p => p.acted && p.bet === this.bet) || (live.length < 2 && live.every(p => p.bet >= this.bet))) this.advance()
   }
   /** Chip awal match (meja lama tidak menyimpannya: chip di meja + yang hangus dibagi jumlah pemain). */
   startChipsOf() {

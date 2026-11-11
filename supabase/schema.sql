@@ -203,7 +203,7 @@ insert into public.skill_cards (code, name, kind, description, price, stock, on_
   ('give_me_royal_flush', 'Give Me A Royal Flush', 'luck', 'Pasang untuk hand berikutnya: peluang 15% kamu dapat Royal Flush. Satu kartu Luck per hand di seluruh meja.', 150, 5, true, 10),
   -- Wildcard: belum dijual sampai dealer membukanya di Market
   ('you_owe_me', 'You Owe Me My Money', 'wildcard', 'Pilih 1 pemain: 80% chip-nya pindah ke kamu. Diumumkan dan dijalankan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 700, 1, false, 11),
-  ('duel_me', 'Duel Me!', 'wildcard', 'Pilih 1 pemain untuk duel di hand berikutnya; pemain lain auto fold di hand itu. Diumumkan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 500, 1, false, 12),
+  ('duel_me', 'Duel Me!', 'wildcard', 'Pakai di tengah hand, sebelum kartu ke-4 (turn) dibuka: pilih 1 lawan, semua pemain lain langsung dipaksa fold (chip mereka tetap di pot). Langsung diumumkan. Tidak bisa dipakai kalau pemain tinggal 2.', 500, 1, false, 12),
   ('get_out', 'Get The F*ck Out!', 'wildcard', 'Pilih 1 pemain untuk langsung tereliminasi (chip-nya hangus). Diumumkan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 1000, 1, false, 13),
   ('go_big', 'Go Big or Go Home!', 'wildcard', 'Pakai di tengah hand: semua lawan cuma boleh call atau raise. Yang fold kehilangan 50% chip-nya ke pot. Langsung diumumkan. Tidak bisa dipakai kalau pemain tinggal 2.', 1500, 1, false, 14),
   -- Defend termurah: tukar 2 kartu tangan dengan kartu baru dari bandar

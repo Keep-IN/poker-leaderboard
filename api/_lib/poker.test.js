@@ -307,22 +307,42 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert(!t.players[1].inHand && t.betting)
   assert.equal(typeof t.useCard(0, 'get_out', 1), 'string', 'target yang sudah tersingkir tidak bisa')
 
-  // Duel Me!: hand berikutnya hanya pemakai vs target, sisanya tidak dibagi kartu (tanpa bayar blind)
-  t = mk([1000, 1000, 1000, 1000]); begin(t)
+  // Duel Me!: langsung berlaku di hand ini (sebelum turn); pemain lain dipaksa fold tanpa denda, chip-nya tetap di pot
+  t = mk([1000, 1000, 1000, 1000]); begin(t) // dealer P0, SB P1, BB P2, giliran P3
+  ok(t, 3, 'call')
+  run(t, TURN_MS - 1000)
   assert.equal(t.useCard(0, 'duel_me', 2), undefined)
-  toShowdown(t); nextDue(t); nextDue(t)
-  assert.deepEqual(t.players.map(p => p.inHand), [true, false, true, false])
+  assert.equal(t.ann.code, 'duel_me'); assert.equal(t.ann.target, 2)
+  assert.deepEqual([t.players[1].folded, t.players[3].folded], [true, true]); assert(t.players[3].forced)
   assert.deepEqual(t.view(null).duel, [0, 2])
-  assert.deepEqual([t.players[1].total, t.players[3].total], [0, 0])
-  fin(t); nextDue(t)
-  assert.equal(t.view(null).duel, undefined, 'hanya satu hand')
-  assert.equal(t.players.filter(p => p.inHand).length, 4)
+  assert.equal(t.turn, 0); assert.equal(t.due.at - t.now, TURN_MS, 'waktu giliran diulang')
+  assert.equal(t.players[3].chips, 980, 'tanpa denda'); assert.equal(t.players[3].total, 20)
+  fin(t); assert.equal(t.phase, 'showdown')
+  assert.equal(t.players.reduce((s, p) => s + p.chips, 0), 4000)
+  nextDue(t); assert.equal(t.view(null).duel, undefined, 'hanya satu hand')
+  assert.equal(t.players.filter(p => p.inHand && !p.folded).length, 4)
+  // giliran pemain yang dipaksa fold: giliran pindah ke pemain duel berikutnya
+  t = mk([1000, 1000, 1000, 1000]); begin(t)
+  assert.equal(t.useCard(1, 'duel_me', 2), undefined) // P3 sedang giliran, ikut dipaksa fold
+  assert.equal(t.turn, 1)
+  // syarat: sebelum kartu ke-4; minimal 3 orang di hand; pemain tersisa > 2
+  t = mk([1000, 1000, 1000, 1000]); begin(t); ok(t, 3, 'call'); ok(t, 0, 'call'); ok(t, 1, 'call'); ok(t, 2, 'check')
+  assert.equal(t.board.length, 3); assert.equal(typeof t.canUseCard(0, 'duel_me', 1), 'undefined', 'flop masih boleh')
+  for (const i of [1, 2, 3, 0]) ok(t, i, 'check')
+  assert.equal(t.board.length, 4); assert.equal(typeof t.useCard(0, 'duel_me', 1), 'string', 'sesudah turn tidak bisa')
+  t = mk([1000, 1000, 1000]); begin(t); ok(t, 0, 'fold')
+  assert.equal(typeof t.useCard(1, 'duel_me', 2), 'string', 'sudah tinggal berdua')
+  const two0 = mk([1000, 1000]); begin(two0); assert.equal(typeof two0.useCard(0, 'duel_me', 1), 'string')
+  // semua pemain sudah call dan target menutup ronde: duel langsung lanjut ke flop
+  t = mk([1000, 1000, 1000, 1000]); begin(t); ok(t, 3, 'call'); ok(t, 0, 'call'); ok(t, 1, 'call')
+  assert.equal(t.turn, 2); assert.equal(t.useCard(2, 'duel_me', 0), undefined); assert.equal(t.turn, 2) // BB masih boleh raise
+  ok(t, 2, 'check'); assert.equal(t.board.length, 3); assert.equal(t.players.filter(p => p.inHand && !p.folded).length, 2)
 
   // tidak bisa kalau pemain tinggal 2; batal kalau sebelum dijalankan pemain jadi tinggal 2 (kartu dikembalikan)
   const two = mk([1000, 1000]); begin(two)
   assert.equal(typeof two.useCard(0, 'get_out', 1), 'string')
   t = mk([1000, 1000, 1000]); rig(t, 'As Ah Kd Kc 2c 7d 9h 9s 4d Jc 3h'); begin(t) // P2 pasti kalah
-  assert.equal(t.useCard(0, 'duel_me', 1, 'card-123'), undefined)
+  assert.equal(t.useCard(0, 'you_owe_me', 1, 'card-123'), undefined)
   t.players[2].chips = 0; t.players[2].allIn = true // anggap P2 bust di hand ini
   fin(t); nextDue(t)
   assert.deepEqual(t.refunds, [{ uid: 'u0', card: 'card-123' }]); assert.equal(t.wild, null)
