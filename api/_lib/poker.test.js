@@ -1,6 +1,6 @@
 // Tes mesin turnamen: `node api/_lib/poker.test.js` (mencetak "semua tes lulus").
 import assert from 'node:assert'
-import { AFK_HANDS, COUNTDOWN_MS, WILD_MS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
+import { AFK_HANDS, BIG_SHARE, COUNTDOWN_MS, WILD_MS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
 
 const C = s => s.split(' ').map(x => 'shdc'.indexOf(x[1]) * 13 + '23456789TJQKA'.indexOf(x[0]))
 const S = s => best(C(s))
@@ -321,7 +321,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   // tidak bisa kalau pemain tinggal 2; batal kalau sebelum dijalankan pemain jadi tinggal 2 (kartu dikembalikan)
   const two = mk([1000, 1000]); begin(two)
   assert.equal(typeof two.useCard(0, 'get_out', 1), 'string')
-  t = mk([1000, 1000, 1000]); begin(t)
+  t = mk([1000, 1000, 1000]); rig(t, 'As Ah Kd Kc 2c 7d 9h 9s 4d Jc 3h'); begin(t) // P2 pasti kalah
   assert.equal(t.useCard(0, 'duel_me', 1, 'card-123'), undefined)
   t.players[2].chips = 0; t.players[2].allIn = true // anggap P2 bust di hand ini
   fin(t); nextDue(t)
@@ -391,6 +391,47 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert(!/"cards":\[\d/.test(w), 'penonton tidak boleh melihat kartu tertutup')
 }
 
+{ // Go Big or Go Home!: diumumkan, waktu giliran diulang, lawan yang fold kena denda 50% chip ke pot
+  const t = mk([1000, 1000, 1000, 1000]); rig(t, 'As Ah 2c 7d 3h 8s 4d 9c Kd Kc Ks Qh Jh'); begin(t) // P3 giliran (UTG)
+  assert.equal(t.turn, 3)
+  run(t, TURN_MS - 1000) // hampir habis waktunya
+  assert.equal(typeof t.useCard(1, 'go_big', -1), 'undefined')
+  assert.equal(t.ann.code, 'go_big'); assert.equal(t.ann.target, -1)
+  assert.equal(t.due.at - t.now, TURN_MS, 'waktu giliran diulang dari awal')
+  assert.equal(t.view(t.players[3]).fine, Math.floor(1000 * BIG_SHARE))
+  assert.equal(t.view(t.players[0]).big, 1)
+  assert.equal(typeof t.useCard(2, 'go_big', -1), 'string') // satu saja per hand
+  const tot = t.players.reduce((s, p) => s + p.chips + p.total, 0)
+  ok(t, 3, 'fold')
+  assert.equal(t.players[3].chips, 500); assert.equal(t.players[3].fined, 500)
+  assert.equal(t.players.reduce((s, p) => s + p.chips + p.total, 0), tot)
+  ok(t, 0, 'raise', 990) // all-in P0
+  assert.equal(t.bigFine(1), 0, 'pemakainya bebas denda')
+  ok(t, 1, 'call')
+  const c2 = t.players[2].chips; ok(t, 2, 'fold')
+  assert.equal(t.players[2].chips, c2 - Math.floor(c2 * BIG_SHARE))
+  drain(t)
+  assert.equal(t.players.reduce((s, p) => s + p.chips, 0), 4000) // chip tetap, denda jadi bagian pot
+  assert.equal(t.players[0].chips, 10 + 500 + 990 + 990 + 510) // AA menang semua, termasuk denda P3 (500) dan P2 (490)
+  nxt(t); assert.equal(t.big, -1); assert.equal(t.bigFine(3), 0, 'hand berikutnya tidak berlaku lagi')
+  const two = mk([1000, 1000]); begin(two)
+  assert.equal(typeof two.useCard(0, 'go_big', -1), 'string') // pemain tinggal 2
+}
+{ // Card Reroll: kartu tangan diganti dari dasar dek, kartu meja tetap; diumumkan + waktu giliran diulang
+  const t = mk([1000, 1000, 1000]); rig(t, 'As Ah 2c 7d 3h 8s Kd Kc Ks Qh Jh 9c 9d'); begin(t)
+  const old = t.players[1].cards.slice(), deck = t.deck.slice()
+  run(t, 5000)
+  assert.equal(t.useCard(1, 'card_reroll', -1), undefined)
+  assert.notDeepEqual(t.players[1].cards, old)
+  assert.deepEqual(t.players[1].cards, deck.slice(0, 2))
+  assert.equal(t.ann.code, 'card_reroll'); assert.equal(t.due.at - t.now, TURN_MS)
+  assert.deepEqual(t.view(t.players[0]).players[1].skills, ['card_reroll']) // terlihat semua pemain
+  assert.deepEqual(t.view(t.players[0]).players[1].cards, [-1, -1])
+  assert.equal(typeof t.useCard(1, 'card_reroll', -1), 'string') // 1 kartu per hand
+  ok(t, 0, 'call'); ok(t, 1, 'call'); ok(t, 2, 'check')
+  assert.deepEqual(t.board, deck.slice(-3).reverse(), 'flop tetap kartu yang sama')
+}
+
 { // fuzz: aksi acak dan timeout, state selalu dimuat ulang dari JSON; chip tetap, urutan tersingkir konsisten, selalu selesai
   for (let round = 0; round < 300; round++) {
     const n = 3 + (round % 6), R = k => Math.random() * k | 0
@@ -403,7 +444,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
       if (t.turn >= 0) {
         const i = t.turn, c = t.ctl(i), r = Math.random()
         if (r < .03) { // boleh gagal (fold/sudah pakai/target salah): tidak mengubah apa-apa
-          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out'][R(8)]
+          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll'][R(10)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
         if (r < .05) run(t, TURN_MS)

@@ -12,6 +12,8 @@ const howToUse: Record<string, string> = {
   you_owe_me: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih korban. Jalan setelah hand selesai.',
   duel_me: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih lawan duel. Jalan di hand berikutnya.',
   get_out: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih korban. Jalan setelah hand selesai.',
+  go_big: 'Pakai di meja online lewat 🎒 saat hand berjalan (pemain minimal 3). Lawan yang fold kena denda 50% chip.',
+  card_reroll: 'Pakai di meja online lewat 🎒 saat hand berjalan: 2 kartu tanganmu ditukar dengan kartu baru.',
 }
 
 export default function Inventory() {

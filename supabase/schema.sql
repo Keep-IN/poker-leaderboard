@@ -204,7 +204,10 @@ insert into public.skill_cards (code, name, kind, description, price, stock, on_
   -- Wildcard: belum dijual sampai dealer membukanya di Market
   ('you_owe_me', 'You Owe Me My Money', 'wildcard', 'Pilih 1 pemain: 80% chip-nya pindah ke kamu. Diumumkan dan dijalankan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 700, 1, false, 11),
   ('duel_me', 'Duel Me!', 'wildcard', 'Pilih 1 pemain untuk duel di hand berikutnya; pemain lain auto fold di hand itu. Diumumkan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 500, 1, false, 12),
-  ('get_out', 'Get The F*ck Out!', 'wildcard', 'Pilih 1 pemain untuk langsung tereliminasi (chip-nya hangus). Diumumkan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 1000, 1, false, 13)
+  ('get_out', 'Get The F*ck Out!', 'wildcard', 'Pilih 1 pemain untuk langsung tereliminasi (chip-nya hangus). Diumumkan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 1000, 1, false, 13),
+  ('go_big', 'Go Big or Go Home!', 'wildcard', 'Pakai di tengah hand: semua lawan cuma boleh call atau raise. Yang fold kehilangan 50% chip-nya ke pot. Langsung diumumkan. Tidak bisa dipakai kalau pemain tinggal 2.', 1500, 1, false, 14),
+  -- Defend termurah: tukar 2 kartu tangan dengan kartu baru dari bandar
+  ('card_reroll', 'Card Reroll', 'defend', 'Pakai di tengah hand: 2 kartu tanganmu dikembalikan ke bandar dan diganti 2 kartu baru. Diumumkan ke semua pemain.', 20, 10, true, 2)
 on conflict (code) do update set name = excluded.name, kind = excluded.kind, description = excluded.description, sort = excluded.sort;
 
 -- Kartu milik player. owned = di inventory, armed = Double Down dipasang ke match, used = sudah terpakai.
@@ -1463,7 +1466,7 @@ begin
     raise exception 'Maksimal 3 skill card per match';
   end if;
   update public.player_cards set status = 'used', used_at = now(), match_id = p_match
-   where id = p_card and player_id = p_player and status = 'owned' and (card_code in ('defend_me', 'reveal_card', 'fold_player', 'you_owe_me', 'duel_me', 'get_out') or card_code like 'give\_me\_%')
+   where id = p_card and player_id = p_player and status = 'owned' and (card_code in ('defend_me', 'reveal_card', 'fold_player', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll') or card_code like 'give\_me\_%')
   returning card_code into code;
   if code is null then
     raise exception 'Kartu tidak ada di inventory atau tidak bisa dipakai di meja';

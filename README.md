@@ -73,6 +73,7 @@ Detailnya:
 - Kartu yang tersedia sekarang:
   - ⚡ **Double Down** (passive): pasang di halaman match **online** yang sudah kamu join sebelum match dimulai, atau lewat 🎒 di lobi meja sebelum hand pertama. Poin match itu jadi **2× lipat**. Satu per match. Kalau match batal atau kamu keluar, kartunya kembali.
   - 🛡️ **Defend Me** (defend): dipakai di meja online lewat tombol 🎒 saat hand berjalan. Kalau kamu kalah di hand itu, **setengah chip yang hilang dikembalikan** (diambil dari pemenang hand). Kartu yang dipakai terlihat oleh semua pemain sebelum showdown.
+  - 🔄 **Card Reroll** (defend, termurah): dipakai lewat 🎒 saat hand berjalan. 2 kartu tanganmu dikembalikan ke bandar dan diganti 2 kartu baru (kartu meja tidak berubah). Diumumkan di tengah meja, dengan animasi kartu dilempar ke bandar lalu dibagi lagi.
   - 👁️ **Reveal Card** (attack): pilih satu lawan di meja, lalu **2 kartunya terlihat olehmu** sampai hand selesai (beserta nama kombinasinya). Pemakaiannya diumumkan di tengah meja, tapi **korbannya dirahasiakan**.
   - 🚫 **Fold Player** (attack): **paksa satu lawan fold**. Hanya bisa **sebelum flop** dan tidak bisa ke pemain yang sudah all-in. Chip yang sudah dia taruh tetap di pot. Langsung diumumkan ke semua pemain, dan korbannya ditandai "dipaksa fold".
   - 🍀 **Give Me A…** (luck): dipasang lewat 🎒 kapan saja selama masih ikut turnamen, lalu berlaku di **hand berikutnya**. Saat hand itu dibagi, ada peluang server menyusun kartu tanganmu dan kartu meja supaya kombinasinya terbentuk, dengan minimal satu kartu tanganmu ikut membentuknya:
@@ -91,7 +92,8 @@ Detailnya:
     - 💸 **You Owe Me My Money**: 80% chip pemain pilihan pindah ke pemakai.
     - ⚔️ **Duel Me!**: hand berikutnya hanya pemakai vs pemain pilihan yang dibagi kartu; pemain lain auto fold (tidak bayar blind).
     - 💀 **Get The F\*ck Out!**: pemain pilihan langsung tereliminasi (chip-nya hangus, peringkat di bawah semua yang masih bertahan).
-- **Pengumuman di tengah meja**: pemakaian kartu Attack dan Wildcard ditampilkan ke semua pemain (siapa memakai kartu apa ke siapa; khusus Reveal Card tanpa nama korban). Kartu Passive, Luck, dan Defend tidak diumumkan.
+    - 🔥 **Go Big or Go Home!**: beda dari wildcard lain, **langsung berlaku di hand yang sedang berjalan** dan langsung diumumkan. Sesudahnya semua lawan cuma boleh call/raise (check kalau tidak ada bet); yang fold, termasuk karena waktu habis, kehilangan **50% chip-nya ke pot**. Tombol Fold mereka diberi tanda denda dan perlu diketuk dua kali. Pemakainya bebas denda; fold karena Fold Player tidak kena denda. Memakai jatah 1 kartu per hand.
+- **Pengumuman di tengah meja**: pemakaian kartu Attack dan Wildcard ditampilkan ke semua pemain (siapa memakai kartu apa ke siapa; khusus Reveal Card tanpa nama korban). Kartu Passive, Luck, dan Defend tidak diumumkan, kecuali Card Reroll. Setiap pengumuman di tengah hand **mengulang waktu giliran** pemain yang sedang jalan dari awal.
 - Kartu Defend dan Luck baru terlihat pemain lain saat kartu dibuka di akhir hand. Kalau kartu gagal dipakai (misalnya target keburu fold), kartunya kembali ke inventory.
 - Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match.
 

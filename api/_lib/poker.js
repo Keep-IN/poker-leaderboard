@@ -95,11 +95,18 @@ export const SKILLS = {
   you_owe_me: { name: 'You Owe Me My Money', icon: '💸', wild: true },
   duel_me: { name: 'Duel Me!', icon: '⚔️', wild: true },
   get_out: { name: 'Get The F*ck Out!', icon: '💀', wild: true },
+  // Go Big or Go Home!: wildcard yang langsung berlaku di hand yang sedang berjalan. Lawan yang fold sesudahnya
+  // kehilangan BIG_SHARE chip-nya ke pot (kecuali dipaksa fold oleh kartu lain). Tidak bisa dipakai kalau pemain tinggal 2.
+  go_big: { name: 'Go Big or Go Home!', icon: '🔥', open: true, big: true },
+  // Card Reroll: 2 kartu tangan dikembalikan ke bandar, diganti 2 kartu baru dari dek.
+  card_reroll: { name: 'Card Reroll', icon: '🔄', open: true },
 }
 /** Jeda pengumuman wildcard sebelum hand berikutnya dibagi. */
 export const WILD_MS = env('WILD_MS', 5000)
 /** Bagian chip target yang diambil You Owe Me My Money. */
 export const OWE_SHARE = 0.8
+/** Bagian chip yang masuk pot kalau fold saat Go Big or Go Home! aktif. */
+export const BIG_SHARE = 0.5
 
 // ---- kartu Luck: menyusun 2 kartu tangan + 5 kartu meja yang membentuk kombinasi tertentu ----
 const R = n => randomInt(n), card = (rank, suit) => suit * 13 + rank - 2 // rank 2..14
@@ -192,6 +199,7 @@ export class Table {
     let el = this.alive()
     if (el.length < 2) return this.end()
     this.duel = null
+    this.big = -1
     if (this.duelNext) { // Duel Me!: hand ini hanya dua pemain itu; sisanya tidak dibagi kartu (auto fold)
       const pair = this.duelNext.map(u => this.players.find(p => p.uid === u)).filter(p => p && el.includes(p))
       this.duelNext = null
@@ -200,7 +208,7 @@ export class Table {
     if (this.startedAt === null) this.startedAt = this.now
     this.lobby = false
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, target: -1, forced: false, lucky: null })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null })
     this.handNo++
     this.deck = this.newDeck(); this.board = []; this.phase = 'preflop'; this.bet = this.bb; this.minRaise = this.bb
     this.dealer = this.after(this.dealer, p => p.inHand)
@@ -230,7 +238,11 @@ export class Table {
   act(i, type, amount) {
     if (i !== this.turn) return 'Bukan giliranmu'
     const p = this.players[i], toCall = this.bet - p.bet
-    if (type === 'fold') { p.folded = true; p.last = 'fold' }
+    if (type === 'fold') {
+      p.folded = true; p.last = 'fold'
+      const pen = this.bigFine(i)
+      if (pen) { p.chips -= pen; p.total += pen; p.fined = pen } // Go Big or Go Home!: denda fold masuk pot
+    }
     else if (type === 'check') { if (toCall) return 'Tidak bisa check, ada bet'; p.last = 'check' }
     else if (type === 'call') { const a = Math.min(toCall, p.chips); this.put(p, a); p.last = a ? 'call ' + a : 'check' }
     else if (type === 'raise') {
@@ -346,6 +358,12 @@ export class Table {
     this.checkReady()
   }
 
+  /** Denda fold pemain i kalau Go Big or Go Home! aktif di hand ini (0 = tidak kena). */
+  bigFine(i) {
+    const p = this.players[i]
+    return this.big >= 0 && this.big !== i && this.betting && p?.inHand ? Math.floor(p.chips * BIG_SHARE) : 0
+  }
+
   sitIn(i) { this.players[i].sitOut = false; this.players[i].afk = 0 }
 
   // ---- skill card di meja ----
@@ -372,6 +390,11 @@ export class Table {
     if (!this.betting) return 'Skill card hanya bisa dipakai selama hand berjalan'
     if (!p || !p.inHand || p.folded) return 'Kamu sudah tidak ikut hand ini'
     if ((p.skills || []).length) return 'Maksimal 1 skill card per hand'
+    if (sk.big) {
+      if (this.alive().length <= 2) return 'Wildcard tidak bisa dipakai kalau pemain tinggal 2'
+      if (this.big >= 0) return 'Go Big or Go Home! sudah aktif di hand ini'
+      if (this.players.filter(q => q !== p && q.inHand && !q.folded).length < 1) return 'Tidak ada lawan di hand ini'
+    }
     if (!sk.target) return
     const q = this.players[j]
     if (!Number.isInteger(j) || !q || j === i) return 'Pilih lawan yang mau ditarget'
@@ -394,12 +417,19 @@ export class Table {
     p.skills = [...(p.skills || []), code]
     if (SKILLS[code].target) p.target = j
     if (SKILLS[code].open) this.announce(i, code, SKILLS[code].secret ? -1 : j) // kartu Attack langsung diumumkan di tengah meja
+    if (code === 'go_big') this.big = i
+    if (code === 'card_reroll') { // kartu lama dibuang; kartu baru diambil dari dasar dek supaya urutan kartu meja tetap
+      p.cards = [this.deck.shift(), this.deck.shift()]
+      this.rr = (this.rr || 0) + 1
+    }
     if (code === 'fold_player') this.forceFold(j)
   }
   // Pengumuman di tengah meja: siapa memakai kartu apa ke siapa (extra = keterangan hasil).
   announce(i, code, j, extra = '') {
     this.annN = (this.annN || 0) + 1
     this.ann = { n: this.annN, at: this.now, by: i, code, target: j, extra }
+    // kartu yang diumumkan di tengah hand menyela permainan: waktu pemain yang sedang giliran diulang dari awal
+    if (this.betting && this.turn >= 0) this.setTurn(this.turn)
   }
   // Wildcard yang menunggu: tahap 1 = umumkan dan beri jeda; tahap 2 = jalankan efeknya lalu hand dibagi seperti biasa.
   // Mengembalikan true kalau hand belum boleh dibagi sekarang.
@@ -480,7 +510,7 @@ export class Table {
   // Kunci berubah hanya saat kartu meja atau pemain yang tersisa berubah, supaya hasilnya bisa disimpan sementara.
   oddsKey() {
     if (!this.betting) return null
-    return [this.handNo, this.board.join('.'), this.players.map((q, i) => q.inHand && !q.folded ? i : '').join(',')].join('|')
+    return [this.handNo, this.rr || 0, this.board.join('.'), this.players.map((q, i) => q.inHand && !q.folded ? i : '').join(',')].join('|')
   }
   odds() {
     const live = this.players.map((q, i) => ({ q, i })).filter(({ q }) => q.inHand && !q.folded)
@@ -523,7 +553,7 @@ export class Table {
       afkLimit: AFK_HANDS, total: N.length, alive: N.filter(q => !q.place || q.place === 1).length,
       players: N.map(q => ({
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,
-        online: this.online(q), ready: !!q.ready, killed: !!q.killed, won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
+        online: this.online(q), ready: !!q.ready, killed: !!q.killed, won: q.won, fined: q.fined || 0, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
         // skill card yang dipakai hand ini: pemiliknya selalu tahu, pemain lain baru tahu saat kartu dibuka (showdown)
         skills: seen(q) ? q.skills || [] : [], target: q.target >= 0 && (q === me || (seen(q) && !(q.skills || []).some(c => SKILLS[c]?.secret))) ? q.target : -1, saved: q.saved || 0,
         forced: !!q.forced, peek: peek(q),
@@ -537,6 +567,8 @@ export class Table {
     // pengumuman kartu Attack/Wildcard di tengah meja (beberapa detik)
     if (this.ann && this.now - this.ann.at < WILD_MS + 1500) v.ann = this.ann
     if (this.duel) v.duel = this.duel
+    if (this.big >= 0 && this.betting) v.big = this.big // Go Big or Go Home! aktif: fold kena denda
+    if (i >= 0 && this.turn === i && this.bigFine(i)) v.fine = this.bigFine(i)
     if (i >= 0) v.luckBusy = !!this.luck && this.luck.i !== i // pemain lain sudah memasang kartu Luck
     // hasil kartu Luck baru diberitahu sesudah hand selesai (kalau sebelumnya, pemiliknya tahu kartu meja akan cocok)
     if (me && !this.betting && me.lucky !== null && me.lucky !== undefined && (me.skills || []).some(c => SKILLS[c]?.luck)) v.lucky = me.lucky

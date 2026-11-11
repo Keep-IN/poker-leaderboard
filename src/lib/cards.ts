@@ -35,7 +35,7 @@ export const KIND_LABELS: Record<CardKind, { label: string; icon: string; tone: 
 
 export const CARD_ICONS: Record<string, string> = { double_down: '⚡', defend_me: '🛡️', reveal_card: '👁️', fold_player: '🚫',
   give_me_straight: '🪜', give_me_flush: '💧', give_me_full_house: '🏠', give_me_quads: '🎲', give_me_straight_flush: '🌈', give_me_royal_flush: '👑',
-  you_owe_me: '💸', duel_me: '⚔️', get_out: '💀' }
+  you_owe_me: '💸', duel_me: '⚔️', get_out: '💀', go_big: '🔥', card_reroll: '🔄' }
 
 /** The signed-in player's cards (RLS only returns their own). */
 export function useMyCards() {
