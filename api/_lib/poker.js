@@ -95,6 +95,7 @@ export const SKILLS = {
   you_owe_me: { name: 'You Owe Me My Money', icon: '💸', wild: true },
   // Duel Me!: berlaku langsung di hand yang sedang berjalan, sebelum kartu ke-4 (turn) dibuka. Semua pemain lain
   // dipaksa fold (tanpa denda, chip yang sudah masuk tetap di pot) sehingga sisa hand jadi duel pemakai vs target.
+  // Seperti Go Big or Go Home!, target cuma boleh call/raise: kalau fold, BIG_SHARE chip-nya masuk pot.
   duel_me: { name: 'Duel Me!', icon: '⚔️', target: true, open: true, cursed: true },
   get_out: { name: 'Get The F*ck Out!', icon: '💀', wild: true },
   // Go Big or Go Home!: wildcard yang langsung berlaku di hand yang sedang berjalan. Lawan yang fold sesudahnya
@@ -207,6 +208,7 @@ export class Table {
     if (el.length < 2) return this.end()
     this.duel = null
     this.big = -1
+    this.duelFine = -1
     if (this.duelNext) { // Duel Me!: hand ini hanya dua pemain itu; sisanya tidak dibagi kartu (auto fold)
       const pair = this.duelNext.map(u => this.players.find(p => p.uid === u)).filter(p => p && el.includes(p))
       this.duelNext = null
@@ -366,9 +368,11 @@ export class Table {
   }
 
   /** Denda fold pemain i kalau Go Big or Go Home! aktif di hand ini (0 = tidak kena). */
+  // Duel Me! juga: lawan yang diajak duel (duelFine) kena denda yang sama kalau fold.
   bigFine(i) {
     const p = this.players[i]
-    return this.big >= 0 && this.big !== i && this.betting && p?.inHand ? Math.floor(p.chips * BIG_SHARE) : 0
+    const hit = (this.big >= 0 && this.big !== i) || (this.duelFine >= 0 && this.duelFine === i)
+    return hit && this.betting && p?.inHand ? Math.floor(p.chips * BIG_SHARE) : 0
   }
 
   sitIn(i) { this.players[i].sitOut = false; this.players[i].afk = 0 }
@@ -458,6 +462,7 @@ export class Table {
     const out = this.players.filter((q, k) => k !== i && k !== j && q.inHand && !q.folded)
     for (const q of out) { q.folded = true; q.forced = true; q.last = 'fold' }
     this.duel = [i, j]
+    this.duelFine = j
     if (out.includes(this.players[this.turn])) return this.step(this.turn)
     const live = [this.players[i], this.players[j]].filter(p => !p.allIn)
     if (live.every(p => p.acted && p.bet === this.bet) || (live.length < 2 && live.every(p => p.bet >= this.bet))) this.advance()
@@ -632,6 +637,7 @@ export class Table {
     if (this.duel) v.duel = this.duel
     if (this.revive) v.reviveNext = this.players.findIndex(p => p.uid === this.revive.target)
     if (this.big >= 0 && this.betting) v.big = this.big // Go Big or Go Home! aktif: fold kena denda
+    if (this.duelFine >= 0 && this.betting) v.duelFine = this.duelFine // lawan Duel Me!: fold kena denda
     if (i >= 0 && this.turn === i && this.bigFine(i)) v.fine = this.bigFine(i)
     if (i >= 0) v.luckBusy = !!this.luck && this.luck.i !== i // pemain lain sudah memasang kartu Luck
     // hasil kartu Luck baru diberitahu sesudah hand selesai (kalau sebelumnya, pemiliknya tahu kartu meja akan cocok)

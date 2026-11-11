@@ -10,7 +10,7 @@ const howToUse: Record<string, string> = {
   reveal_card: 'Pakai di meja online lewat tombol 🎒, lalu pilih lawan yang mau diintip.',
   fold_player: 'Pakai di meja online lewat tombol 🎒 sebelum flop, lalu pilih lawan.',
   you_owe_me: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih korban. Jalan setelah hand selesai.',
-  duel_me: 'Pakai di meja online lewat 🎒 saat hand berjalan, sebelum turn (pemain minimal 3). Pilih lawan duel, yang lain dipaksa fold.',
+  duel_me: 'Pakai di meja online lewat 🎒 saat hand berjalan, sebelum turn (pemain minimal 3). Pilih lawan duel, yang lain dipaksa fold; lawanmu fold = denda 50% chip.',
   get_out: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih korban. Jalan setelah hand selesai.',
   go_big: 'Pakai di meja online lewat 🎒 saat hand berjalan (pemain minimal 3). Lawan yang fold kena denda 50% chip.',
   revive: 'Pakai di meja online lewat 🎒 (pemain tersisa minimal 3), pilih pemain yang tersingkir, termasuk dirimu sendiri.',

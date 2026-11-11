@@ -320,7 +320,18 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   fin(t); assert.equal(t.phase, 'showdown')
   assert.equal(t.players.reduce((s, p) => s + p.chips, 0), 4000)
   nextDue(t); assert.equal(t.view(null).duel, undefined, 'hanya satu hand')
+  assert.equal(t.bigFine(2), 0, 'denda duel hanya di hand itu')
   assert.equal(t.players.filter(p => p.inHand && !p.folded).length, 4)
+  // lawan yang diajak duel kena denda 50% kalau fold; pemakainya tidak
+  t = mk([1000, 1000, 1000, 1000]); begin(t); ok(t, 3, 'call')
+  assert.equal(t.useCard(0, 'duel_me', 2), undefined)
+  assert.equal(t.view(t.players[0]).duelFine, 2); assert.equal(t.bigFine(0), 0)
+  ok(t, 0, 'raise', 300)
+  assert.equal(t.view(t.players[2]).fine, Math.floor(980 * BIG_SHARE))
+  ok(t, 2, 'fold')
+  assert.equal(t.players[2].chips, 980 - 490); assert.equal(t.players[2].fined, 490)
+  assert.equal(t.phase, 'showdown'); assert.equal(t.players.reduce((s, p) => s + p.chips, 0), 4000)
+  assert.equal(t.players[0].chips, 1000 + 10 + 20 + 20 + 490) // pot: blind, call P3, denda P2
   // giliran pemain yang dipaksa fold: giliran pindah ke pemain duel berikutnya
   t = mk([1000, 1000, 1000, 1000]); begin(t)
   assert.equal(t.useCard(1, 'duel_me', 2), undefined) // P3 sedang giliran, ikut dipaksa fold

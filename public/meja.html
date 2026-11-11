@@ -374,6 +374,16 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 @keyframes bigFire{0%,100%{box-shadow:0 0 0 3px #1a0303,0 0 30px #ff5a1acc,0 10px 30px #000c}50%{box-shadow:0 0 0 3px #1a0303,0 0 60px #ff2d00,0 10px 30px #000c}}
 @keyframes blinkW{50%{opacity:.55}}
 #bigTag{align-self:center;width:max-content;max-width:92%;margin:4px auto 0;padding:2px 8px;border:1.5px solid #ff7a1a;background:#2a0500e6;color:#ffb347;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 0 14px #ff5a1a99;animation:bigFire 1.2s ease-in-out infinite}
+#ann.duel{border-color:#ff3b5c;background:radial-gradient(130% 150% at 50% 0%,#3d0010,#12020a 55%,#050005);animation:pop .25s cubic-bezier(.2,1.6,.4,1) both,bigShake .5s ease-in-out .25s 3,duelPulse 1s ease-in-out infinite}
+#ann.duel .ic{font-size:46px;filter:drop-shadow(0 0 12px #ff2d55);animation:clash .9s ease-in-out .2s 2}
+#ann.duel .cn{color:#ffd0d8;border-color:#ff3b5c;background:#ff2d5526;text-shadow:0 0 8px #ff2d55}
+#ann.duel .who b{color:#ff8da0}
+#ann.duel .vs{display:block;margin:4px 0 2px;font-family:var(--serif);font-style:italic;font-size:22px;color:#fff;text-shadow:0 0 12px #ff2d55}
+#ann.duel .vs i{font-style:normal;font-family:var(--mono);font-size:13px;color:#ff6b84;margin:0 8px}
+@keyframes duelPulse{0%,100%{box-shadow:0 0 0 3px #12020a,0 0 30px #ff2d55aa,0 10px 30px #000c}50%{box-shadow:0 0 0 3px #12020a,0 0 64px #ff2d55,0 10px 30px #000c}}
+@keyframes clash{0%,100%{transform:scale(1) rotate(0)}30%{transform:scale(1.35) rotate(-14deg)}60%{transform:scale(1.2) rotate(12deg)}}
+#bigTag.duel{border-color:#ff3b5c;background:#2a0010e6;color:#ff9fb0;box-shadow:0 0 14px #ff2d5599;animation:duelPulse 1.2s ease-in-out infinite}
+.bigwarn.duel{border-color:#ff3b5c;background:#2a0010;color:#ffd0d8}
 .bigwarn{margin:0 0 6px;padding:5px 8px;border:1.5px solid #ff7a1a;background:#2a0500;color:#ffd2b8;font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-align:center}
 .btn.fine{border-color:#ff2d55;color:#ff8da0;box-shadow:0 0 12px #ff2d5566}
 .btn.fine small{display:block;font-size:10px;letter-spacing:.04em;color:#ff6b84}
@@ -645,7 +655,7 @@ const chip1 = n => { const d = DEN.find(([v]) => n >= v) || DEN[DEN.length - 1];
 const chips = n => { let h = ''; for (const [d, c] of DEN) { const k = Math.min(n / d | 0, 6); n %= d; if (k) h += `<span class="stk">${`<i class="chip" style="--c:${c}"></i>`.repeat(k)}</span>`; } return h; };
 const tagOf = (p, betting) => S.lobby ? (p.ready ? ['grn', '✓ ready'] : ['', 'belum']) : S.reviveNext === S.players.indexOf(p) ? ['grn', '😇 bangkit'] : p.place > 1 ? ['', '#' + p.place + (p.killed ? ' 💀' : p.afkOut ? ' AFK' : ' keluar')] : p.place === 1 ? ['grn', 'juara']
   : p.sitOut ? ['red', p.afk ? `AFK ${p.afk}/${S.afkLimit}` : 'istirahat'] : !p.online ? ['', 'offline']
-  : S.duel && betting && p.forced && p.folded && p.inHand ? ['', '⚔️ nonton'] : p.forced && p.folded && p.inHand ? ['red', 'dipaksa fold'] : p.fined && p.folded && p.inHand ? ['red', `fold −${p.fined} 🔥`] : p.allIn && p.inHand && betting ? ['red', 'all-in'] : p.last ? [/^(bet|raise)/.test(p.last) ? 'red' : '', p.last]
+  : S.duel && betting && p.forced && p.folded && p.inHand ? ['', '⚔️ nonton'] : p.forced && p.folded && p.inHand ? ['red', 'dipaksa fold'] : p.fined && p.folded && p.inHand ? ['red', `fold −${p.fined} ${S.duel ? '⚔️' : '🔥'}`] : p.allIn && p.inHand && betting ? ['red', 'all-in'] : p.last ? [/^(bet|raise)/.test(p.last) ? 'red' : '', p.last]
   : p.inHand && p.folded ? ['', 'fold'] : S.duel && betting && !p.inHand && p.chips ? ['', '⚔️ nonton'] : !p.chips && !p.inHand ? ['', 'habis'] : null;
 // Skill card yang dipakai hand ini (pemiliknya selalu tahu; lawan baru tahu saat kartu dibuka).
 const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'], reveal_card: ['👁️', 'Reveal Card'], fold_player: ['🚫', 'Fold Player'], go_big: ['🔥', 'Go Big or Go Home!'], duel_me: ['⚔️', 'Duel Me!'], card_reroll: ['🔄', 'Card Reroll'],
@@ -789,7 +799,9 @@ function controls(c, P) {
   if (key !== rkey) { rkey = key; raiseTo = c.minTo; }
   const f = x => Math.min(c.maxTo, Math.max(c.minTo, c.bet + Math.round((S.pot + c.call) * x))); // raise-to untuk x * pot
   const fold = S.fine ? `<button class="btn ghost fine" onclick="sure(this, () => act('fold'))">Fold<small>−${S.fine} chip ke pot</small></button>` : `<button class="btn ghost" onclick="act('fold')">Fold</button>`;
-  let h = (S.fine ? `<div class="bigwarn">🔥 Go Big or Go Home! aktif · fold = <b>${S.fine}</b> chip kamu masuk pot</div>` : '') + `<div class="row">${fold}
+  const duelHit = S.duelFine === S.me && S.duel;
+  let h = (S.fine ? duelHit ? `<div class="bigwarn duel">⚔️ Kamu diajak duel ${esc(S.players[S.duel[0]].name)} · fold = <b>${S.fine}</b> chip kamu masuk pot</div>`
+    : `<div class="bigwarn">🔥 Go Big or Go Home! aktif · fold = <b>${S.fine}</b> chip kamu masuk pot</div>` : '') + `<div class="row">${fold}
     <button class="btn green" onclick="act('${c.call ? 'call' : 'check'}')">${c.call ? 'Call ' + c.call + (c.call >= P.chips ? ' · all-in' : '') : 'Check'}</button></div>`;
   if (c.raise) h += `<div class="row q">${[['Min', c.minTo], ['½ Pot', f(.5)], ['Pot', f(1)], ['All-in', c.maxTo]].map(([l, v]) => `<button onclick="setR(${v})">${l}</button>`).join('')}</div>
     <div class="row"><input id="rs" type="range" min="0" max="${SL}" step="1" aria-label="Jumlah taruhan" oninput="setR(fromPos(+this.value),'slider')">
@@ -950,7 +962,10 @@ function render() {
     : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}</em></span>`).join(''));
 
   drawBubbles(); syncChatBtn(); drawReveal(); drawAnn();
-  $('bigTag').hidden = !(S.big !== undefined && betting);
+  const tagBig = S.big !== undefined && betting, tagDuel = S.duelFine !== undefined && betting && S.players[S.duelFine];
+  $('bigTag').hidden = !(tagBig || tagDuel);
+  $('bigTag').classList.toggle('duel', !tagBig && !!tagDuel);
+  set($('bigTag'), tagBig ? '🔥 Go Big or Go Home · fold = −50% chip' : tagDuel ? `⚔️ Duel · ${esc(S.players[S.duelFine].name)} fold = −50% chip` : '');
   $('bag').hidden = !(me >= 0 && phase !== 'over' && !(P && P.place && S.alive <= 2)); // yang tersingkir masih bisa pakai Revive Card
   aim();
   if (deals) flick(deals);
@@ -1088,7 +1103,7 @@ setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
 const USABLE = {
   double_down: { icon: '⚡', name: 'Double Down', desc: 'Poin match ini jadi 2× lipat. Pasang sebelum hand pertama dibagi.', passive: true },
   you_owe_me: { icon: '💸', name: 'You Owe Me My Money', desc: '☠ Wildcard: ambil 80% chip 1 pemain. Diumumkan & dijalankan setelah hand ini selesai.', target: true, wild: true },
-  duel_me: { icon: '⚔️', name: 'Duel Me!', desc: '☠ Wildcard: langsung berlaku di hand ini (sebelum turn). Pilih lawan duel; semua pemain lain dipaksa fold.', target: true, cursed: true },
+  duel_me: { icon: '⚔️', name: 'Duel Me!', desc: '☠ Wildcard: langsung berlaku di hand ini (sebelum turn). Pilih lawan duel; pemain lain dipaksa fold, lawanmu cuma boleh call/raise (fold = 50% chip ke pot).', target: true, cursed: true },
   get_out: { icon: '💀', name: 'Get The F*ck Out!', desc: '☠ Wildcard: 1 pemain langsung tereliminasi setelah hand ini.', target: true, wild: true },
   go_big: { icon: '🔥', name: 'Go Big or Go Home!', desc: '☠ Wildcard: langsung berlaku di hand ini. Semua lawan cuma boleh call/raise; yang fold kehilangan 50% chip-nya ke pot.', cursed: true },
   revive: { icon: '😇', name: 'Revive Card', desc: '✦ Angelic: hidupkan lagi 1 pemain yang sudah tersingkir (boleh dirimu sendiri) dengan chip awal. Ikut lagi mulai hand berikutnya.', target: true, angel: true },
@@ -1116,18 +1131,19 @@ function drawAnn() {
     const sub = { fold_player: `${tg} dipaksa fold`, reveal_card: 'mengintip kartu seorang lawan 👀', card_reroll: 'menukar 2 kartunya dengan kartu baru dari bandar',
       go_big: 'semua lawan cuma boleh call atau raise',
       revive: `${tg} bangkit kembali dengan ${a.extra} chip ✨ ikut lagi di hand berikutnya`,
-      you_owe_me: `80% chip ${tg} (${a.extra}) pindah ke ${by}`, duel_me: `hand ini jadi duel ${by} vs ${tg} · pemain lain dipaksa fold`,
+      you_owe_me: `80% chip ${tg} (${a.extra}) pindah ke ${by}`, duel_me: 'hand ini jadi duel · pemain lain dipaksa fold',
       get_out: `${tg} langsung tereliminasi` }[a.code] || '';
-    el.className = a.code === 'go_big' ? 'wild big' : u.angel ? 'angel' : u.wild || u.cursed ? 'wild' : '';
+    el.className = a.code === 'go_big' ? 'wild big' : a.code === 'duel_me' ? 'wild big duel' : u.angel ? 'angel' : u.wild || u.cursed ? 'wild' : '';
     el.innerHTML = `<span class="ic">${u.icon}</span><span class="who"><b>${by}</b> memakai</span><span class="cn">${esc(u.name)}</span>` +
       (tg && a.code !== 'reveal_card' ? `<span class="who">→ <b>${tg}</b></span>` : '') + (sub ? `<span class="sub">${sub}</span>` : '') +
-      (a.code === 'go_big' ? '<span class="warn">⚠ fold = 50% chip masuk pot ⚠</span>' : '');
+      (a.code === 'go_big' ? '<span class="warn">⚠ fold = 50% chip masuk pot ⚠</span>' : a.code === 'duel_me' ? `<span class="warn">⚠ ${tg} cuma boleh call/raise · fold = 50% chip masuk pot ⚠</span>` : '');
+    if (a.code === 'duel_me') el.querySelector('.cn + .who')?.replaceWith(Object.assign(document.createElement('span'), { className: 'vs', innerHTML: `${by}<i>VS</i>${tg}` }));
     if (u.angel) {
       el.innerHTML = `<span class="ic">😇</span><span class="who"><b>${by}</b> memakai</span><span class="cn">✦ ${esc(u.name)} ✦</span>` +
         `<span class="who">${a.by === a.target ? 'untuk dirinya sendiri' : '→ <b>' + tg + '</b>'}</span><span class="sub">${sub}</span>` +
         [12, 30, 70, 86].map((x, i) => `<i class="feather" style="left:${x}%;top:-8px;animation-delay:${i * .35}s">🪶</i>`).join('');
       if (prevS) play('angel');
-    } else if (prevS) { play(u.wild || u.cursed ? 'allin' : 'chips', a.code === 'go_big' ? 10 : 4); if (a.code === 'go_big' && S.me !== a.by && navigator.vibrate) navigator.vibrate([120, 60, 120, 60, 240]); }
+    } else if (prevS) { play(u.wild || u.cursed ? 'allin' : 'chips', a.code === 'go_big' || a.code === 'duel_me' ? 10 : 4); if ((a.code === 'go_big' && S.me !== a.by || a.code === 'duel_me' && S.me === a.target) && navigator.vibrate) navigator.vibrate([120, 60, 120, 60, 240]); }
   }
   el.hidden = !(a && Date.now() < annUntil);
 }
