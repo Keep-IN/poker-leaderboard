@@ -198,8 +198,10 @@ export function PlayerProfile({ self }: { self?: boolean }) {
             <Avatar name={player.name} id={player.id} size="xl" />
             <div className="min-w-0">
               {rank > 0 && (
-                <p className={cx('text-xs font-bold uppercase tracking-wider', rank === 1 ? 'text-[#d9a521]' : rank === 2 ? 'text-slate-300' : 'text-[#c98a52]')}>
-                  {rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'} {PODIUM_TITLES[rank]} · #{rank} all time
+                <p className={cx('pod-wrap mb-1 inline-flex', `pod-${rank}`)}>
+                  <span className="pod-title inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider">
+                    {rank === 1 ? '👑' : rank === 2 ? '🥈' : '🥉'} {PODIUM_TITLES[rank]} · #{rank} all time
+                  </span>
                 </p>
               )}
               <h1 className="truncate text-2xl font-bold">

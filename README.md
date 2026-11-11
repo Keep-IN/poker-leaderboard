@@ -91,7 +91,9 @@ Detailnya:
 - Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match.
 
 ### 👑 Podium all time
-- Tiga besar leaderboard all time mendapat **bingkai avatar** (emas berkilau + 👑, perak, perunggu) dan **gelar**: Raja Meja, Tangan Dingin, Penantang. Bingkai tampil di semua tempat avatar muncul, termasuk kursi di meja online.
+- Tiga besar leaderboard all time mendapat **bingkai avatar logam** (emas, perak, perunggu) dengan kilau berputar dan **medali peringkat**. #1 juga mendapat 👑 dan bintang berkelip. Bingkai tampil di semua tempat avatar muncul.
+- Di meja online, papan nama mereka dibingkai logam berkilau dengan medali peringkat di sudutnya (#1 ditambah cahaya berdenyut).
+- Gelar tampil sebagai pita logam di profil: Raja Meja, Tangan Dingin, Penantang.
 
 ### 🎩 Beranda Dealer
 - Jumlah **match yang sudah di-host**.

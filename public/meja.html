@@ -250,6 +250,8 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bor
   .nm{font-size:11.5px}.ch{font-size:11px}
   .r3{min-height:12px;margin-top:1px;font-size:9.5px;line-height:12px}.tag{font-size:8px;line-height:11px;padding:0 3px}
   .dealer{right:-9px;top:-9px;width:18px;height:18px;font-size:10px;line-height:14px}
+  .seat[class*=pod] .plate::after{width:18px;height:18px;left:-10px;bottom:-9px;font-size:9.5px}
+  .seat[class*=pod] .plate::before{inset:-5px;padding:3px}
   #pot .stk{display:none} /* di HP cukup angka pot, tumpukan chip makan tempat */
   #pot .num{font-size:20px}
   #mine .card{width:54px;height:78px}#mine .card b{font-size:21px}#mine .card i{top:27px;font-size:16px}#mine .card::after{font-size:38px}
@@ -269,9 +271,27 @@ body.watching #chatFab{top:50%;transform:translateY(-50%)}
 body.watching #chatFab:active{transform:translate(2px,calc(-50% + 2px))}
 body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height:0;margin-bottom:8px}
 /* bingkai podium all time di kursi (emas/perak/perunggu) */
-.seat.pod1 .plate{border-color:#f2c14e;box-shadow:0 0 0 2px #f2c14e88,3px 3px 0 #000b}
-.seat.pod2 .plate{border-color:#c9d1dc;box-shadow:0 0 0 2px #c9d1dc88,3px 3px 0 #000b}
-.seat.pod3 .plate{border-color:#c98a52;box-shadow:0 0 0 2px #c98a5288,3px 3px 0 #000b}
+/* kosmetik podium all time: bingkai logam berkilau di sekeliling papan nama + medali peringkat */
+.seat.pod1{--m1:#fff4b8;--m2:#f2c14e;--m3:#a8740f;--glow:#f2c14e}
+.seat.pod2{--m1:#ffffff;--m2:#c9d1dc;--m3:#7d8899;--glow:#c9d1dc}
+.seat.pod3{--m1:#ffd9b3;--m2:#c98a52;--m3:#6f3f1a;--glow:#d8955a}
+.seat[class*=pod] .plate{border-color:var(--m3);box-shadow:0 0 12px var(--glow),3px 3px 0 #000b}
+.seat[class*=pod] .plate::before{content:'';position:absolute;inset:-6px;border-radius:7px;padding:4px;pointer-events:none;z-index:-1;
+  background:linear-gradient(120deg,var(--m3),var(--m2) 18%,var(--m1) 28%,var(--m2) 38%,var(--m3) 50%,var(--m2) 62%,var(--m1) 72%,var(--m2) 82%,var(--m3));background-size:250% 100%;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:podSheen 3.2s linear infinite;filter:drop-shadow(0 0 3px var(--glow))}
+.seat[class*=pod] .plate::after{content:attr(data-pod);position:absolute;left:-13px;bottom:-11px;width:22px;height:22px;border-radius:50%;z-index:3;
+  display:grid;place-items:center;font:900 11px/1 var(--mono);color:#1b1405;background:linear-gradient(145deg,var(--m1),var(--m2) 45%,var(--m3));
+  border:1.5px solid #000a;box-shadow:0 0 8px var(--glow),1px 1px 0 #000}
+.seat.pod1 .plate{animation:podGlow 2.4s ease-in-out infinite}
+.seat.pod1 .plate::before{padding:5px;inset:-7px;border-radius:8px}
+.seat.pod1 .nm .crown{display:inline-block;filter:drop-shadow(0 0 4px #f2c14e);animation:podBob 2.4s ease-in-out infinite}
+.seat[class*=pod].turn .plate{outline-offset:7px}
+.seat[class*=pod] .spark{position:absolute;z-index:3;font-size:11px;line-height:1;color:#ffe27a;text-shadow:0 0 6px #f2c14e;pointer-events:none;animation:podTwinkle 2.4s ease-in-out infinite}
+@keyframes podSheen{to{background-position:-250% 0}}
+@keyframes podGlow{0%,100%{box-shadow:0 0 10px #f2c14e99,3px 3px 0 #000b}50%{box-shadow:0 0 22px #f2c14ee6,3px 3px 0 #000b}}
+@keyframes podBob{0%,100%{transform:rotate(-8deg)}50%{transform:translateY(-2px) rotate(8deg)}}
+@keyframes podTwinkle{0%,100%{opacity:0;transform:scale(.4) rotate(0)}50%{opacity:1;transform:scale(1.1) rotate(45deg)}}
 /* skill card yang dipakai: lencana kecil di pojok kiri atas kotak nama */
 .skills small{margin-left:2px;font-family:var(--mono);font-size:9px;color:#a9defa}
 .seat.peek .cards{position:relative}
@@ -795,7 +815,7 @@ function render() {
     const cs = k === me ? '' : p.cards.map((c, j) => card(c, anims.has('r' + k + '.' + j) ? 'r' + k + '.' + j : 'c' + k + '.' + j)).join('');
     seats += `<div data-k="${k}" class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}${p.podium ? ' pod' + p.podium : ''}${p.peek ? ' peek' : ''}" style="left:${x}%;top:${y}%">
       <div class="cards">${cs}</div>
-      <div class="plate">${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}${skillBadges(p)}
+      <div class="plate"${p.podium ? ` data-pod="${p.podium}" title="#${p.podium} all time"` : ''}>${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}${skillBadges(p)}${p.podium === 1 ? '<i class="spark" style="right:-12px;top:30%">✦</i><i class="spark" style="left:30%;bottom:-13px;animation-delay:1.2s">✦</i>' : ''}
         <div class="nm">${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : p.podium === 1 ? '<span class="crown" title="#1 all time">👑</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
         ${k === S.turn ? '<div class="tm"><b></b></div>' : ''}</div>${narrow && p.bet ? `<div class="sbet">${chip1(p.bet)}${p.bet}</div>` : ''}</div>`;
     if (p.bet) { sumBets += p.bet; if (!narrow) bets += `<div class="bet" style="left:${x + (50 - x) * .45}%;top:${y + (50 - y) * .45}%">${chips(p.bet)}<span>${p.bet}</span></div>`; }

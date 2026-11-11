@@ -72,14 +72,63 @@ body {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
-/* kilau pelan di bingkai emas podium #1 */
-@keyframes podium-shine {
-  0%, 100% { box-shadow: 0 0 8px #f2c14e88; }
-  50% { box-shadow: 0 0 16px #f2c14ecc; }
+/* ---- kosmetik podium all time (Avatar di components/ui.tsx) ---- */
+.pod-1 { --m1: #fff4b8; --m2: #f2c14e; --m3: #a8740f; --glow: #f2c14e; --spin: 2.6s; }
+.pod-2 { --m1: #ffffff; --m2: #c9d1dc; --m3: #7d8899; --glow: #c9d1dc; --spin: 3.6s; }
+.pod-3 { --m1: #ffd9b3; --m2: #c98a52; --m3: #6f3f1a; --glow: #d8955a; --spin: 4.6s; }
+.pod-ring {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: conic-gradient(from 20deg, var(--m1), var(--m2), var(--m3), var(--m1), var(--m2), var(--m3), var(--m1));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--glow) 60%, transparent), 0 0 22px color-mix(in srgb, var(--glow) 25%, transparent);
 }
-.podium-gold {
-  animation: podium-shine 2.4s ease-in-out infinite;
+/* kilau putih yang berputar mengelilingi cincin */
+.pod-ring::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  z-index: 0;
+  background: conic-gradient(transparent 0 68%, #fff 80%, transparent 92%);
+  opacity: 0.85;
+  animation: pod-spin var(--spin) linear infinite;
 }
+.pod-ring > * { position: relative; z-index: 1; }
+.pod-1 .pod-ring { animation: pod-glow 2.4s ease-in-out infinite; }
+.pod-medal {
+  z-index: 2;
+  color: #1b1405;
+  background: linear-gradient(145deg, var(--m1), var(--m2) 45%, var(--m3));
+  border: 1.5px solid color-mix(in srgb, var(--m3) 70%, #000);
+  box-shadow: 0 1px 3px #0008;
+}
+.pod-title {
+  position: relative;
+  overflow: hidden;
+  color: #1b1405;
+  background: linear-gradient(110deg, var(--m3), var(--m2) 30%, var(--m1) 50%, var(--m2) 70%, var(--m3));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--glow) 45%, transparent), inset 0 1px 0 #fff8;
+}
+.pod-title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, #fffc 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: pod-sweep 3.2s ease-in-out infinite;
+}
+@keyframes pod-sweep { 60%, 100% { transform: translateX(120%); } }
+.pod-crown { z-index: 2; filter: drop-shadow(0 0 4px #f2c14e) drop-shadow(0 1px 1px #0009); animation: pod-bob 2.4s ease-in-out infinite; }
+.pod-spark { z-index: 2; font-size: 10px; line-height: 1; color: #ffe27a; text-shadow: 0 0 6px #f2c14e; animation: pod-twinkle 2.4s ease-in-out infinite; }
+@keyframes pod-spin { to { transform: rotate(1turn); } }
+@keyframes pod-glow {
+  0%, 100% { box-shadow: 0 0 10px #f2c14e99, 0 0 22px #f2c14e40; }
+  50% { box-shadow: 0 0 16px #f2c14ee6, 0 0 34px #f2c14e80; }
+}
+/* Tailwind -translate-x-1/2 memakai properti `translate`, jadi di sini cukup transform tambahan */
+@keyframes pod-bob { 0%, 100% { transform: rotate(-6deg); } 50% { transform: translateY(-2px) rotate(6deg); } }
+@keyframes pod-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4) rotate(0); } 50% { opacity: 1; transform: scale(1.1) rotate(45deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .podium-gold { animation: none; }
+  .pod-ring::before, .pod-1 .pod-ring, .pod-crown, .pod-spark, .pod-title::after { animation: none; }
+  .pod-spark { opacity: 1; }
 }

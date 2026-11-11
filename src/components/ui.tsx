@@ -67,31 +67,49 @@ export function PageLoader() {
 
 const avatarColors = ['bg-emerald-600', 'bg-sky-600', 'bg-violet-600', 'bg-rose-600', 'bg-amber-600', 'bg-teal-600', 'bg-fuchsia-600', 'bg-indigo-600']
 
-// Bingkai podium all time: emas berkilau + mahkota untuk #1, perak #2, perunggu #3.
-const podiumRings: Record<number, string> = {
-  1: 'ring-[3px] ring-[#f2c14e] shadow-[0_0_12px_#f2c14e99] podium-gold',
-  2: 'ring-[3px] ring-[#c9d1dc]',
-  3: 'ring-[3px] ring-[#c98a52]',
-}
+// Bingkai podium all time: cincin logam (emas/perak/perunggu) dengan kilau berputar, medali peringkat di bawah,
+// dan untuk #1 mahkota + bintang berkelip. Gaya ada di index.css (.pod-*).
+const ringWidth = { sm: 'p-[2px]', md: 'p-[3px]', lg: 'p-1', xl: 'p-[5px]' }
+const medalSize = { sm: '', md: 'size-4 text-[9px] -bottom-1', lg: 'size-5 text-[10px] -bottom-1.5', xl: 'size-7 text-xs -bottom-2' }
 
 export function Avatar({ name, id, size = 'md' }: { name: string; id: string; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
   const hash = [...id].reduce((acc, c) => acc + c.charCodeAt(0), 0)
   const sizes = { sm: 'size-8 text-xs', md: 'size-10 text-sm', lg: 'size-14 text-lg', xl: 'size-20 text-2xl' }
-  const crown = { sm: 'text-[10px] -top-2', md: 'text-xs -top-2.5', lg: 'text-base -top-3.5', xl: 'text-xl -top-5' }
+  const crown = { sm: 'text-[11px] -top-2.5', md: 'text-sm -top-3', lg: 'text-lg -top-4', xl: 'text-2xl -top-6' }
   const rank = usePodiumRank(id)
+  const face = (
+    <span
+      className={cx(
+        'inline-flex items-center justify-center rounded-full font-bold text-white',
+        rank ? 'ring-2 ring-black/30' : 'ring-2 ring-black/20',
+        avatarColors[hash % avatarColors.length],
+        sizes[size],
+      )}
+    >
+      {initials(name)}
+    </span>
+  )
+  if (!rank) return <span className="relative inline-flex shrink-0">{face}</span>
   return (
-    <span className="relative inline-flex shrink-0">
-      <span
-        className={cx(
-          'inline-flex items-center justify-center rounded-full font-bold text-white',
-          rank ? podiumRings[rank] : 'ring-2 ring-black/20',
-          avatarColors[hash % avatarColors.length],
-          sizes[size],
-        )}
-      >
-        {initials(name)}
-      </span>
-      {rank === 1 && <span className={cx('pointer-events-none absolute left-1/2 -translate-x-1/2 leading-none', crown[size])}>👑</span>}
+    <span className={cx('relative inline-flex shrink-0', `pod-wrap pod-${rank}`)} title={`#${rank} all time`}>
+      <span className={cx('pod-ring inline-flex rounded-full', ringWidth[size])}>{face}</span>
+      {rank === 1 && (
+        <>
+          <span className={cx('pod-crown pointer-events-none absolute left-1/2 -translate-x-1/2 leading-none', crown[size])}>👑</span>
+          {size !== 'sm' && (
+            <>
+              <span className="pod-spark pointer-events-none absolute -top-0.5 -left-1">✦</span>
+              <span className="pod-spark pointer-events-none absolute top-1/3 -right-1.5 [animation-delay:.8s]">✦</span>
+              <span className="pod-spark pointer-events-none absolute -bottom-0.5 -left-1.5 [animation-delay:1.6s]">✦</span>
+            </>
+          )}
+        </>
+      )}
+      {size !== 'sm' && (
+        <span className={cx('pod-medal pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center justify-center rounded-full font-black', medalSize[size])}>
+          {rank}
+        </span>
+      )}
     </span>
   )
 }
