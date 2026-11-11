@@ -73,7 +73,7 @@ Detailnya:
 - Kartu yang tersedia sekarang:
   - ⚡ **Double Down** (passive): pasang di halaman match **online** yang sudah kamu join sebelum match dimulai, atau lewat 🎒 di lobi meja sebelum hand pertama. Poin match itu jadi **2× lipat**. Satu per match. Kalau match batal atau kamu keluar, kartunya kembali.
   - 🛡️ **Defend Me** (defend): dipakai di meja online lewat tombol 🎒 saat hand berjalan. Kalau kamu kalah di hand itu, **setengah chip yang hilang dikembalikan** (diambil dari pemenang hand). Kartu yang dipakai terlihat oleh semua pemain sebelum showdown.
-  - 👁️ **Reveal Card** (attack): pilih satu lawan di meja, lalu **2 kartunya terlihat olehmu** sampai hand selesai (beserta nama kombinasinya). Diam-diam: lawan baru tahu saat kartu dibuka di akhir hand.
+  - 👁️ **Reveal Card** (attack): pilih satu lawan di meja, lalu **2 kartunya terlihat olehmu** sampai hand selesai (beserta nama kombinasinya). Pemakaiannya diumumkan di tengah meja, tapi **korbannya dirahasiakan**.
   - 🚫 **Fold Player** (attack): **paksa satu lawan fold**. Hanya bisa **sebelum flop** dan tidak bisa ke pemain yang sudah all-in. Chip yang sudah dia taruh tetap di pot. Langsung diumumkan ke semua pemain, dan korbannya ditandai "dipaksa fold".
   - 🍀 **Give Me A…** (luck): dipasang lewat 🎒 kapan saja selama masih ikut turnamen, lalu berlaku di **hand berikutnya**. Saat hand itu dibagi, ada peluang server menyusun kartu tanganmu dan kartu meja supaya kombinasinya terbentuk, dengan minimal satu kartu tanganmu ikut membentuknya:
 
@@ -87,7 +87,12 @@ Detailnya:
     | 👑 Give Me A Royal Flush | 15% |
 
     Hanya **satu kartu Luck per hand di seluruh meja**: siapa yang memasang duluan, dia yang berlaku. Kartu Luck dihitung sebagai kartu hand itu. Berhasil atau tidaknya baru diberitahu ke pemiliknya setelah hand selesai. Kalau kamu tersingkir sebelum hand berikutnya, kartunya hangus.
-- Kartu Defend dan Reveal baru terlihat pemain lain saat kartu dibuka di akhir hand. Kalau kartu gagal dipakai (misalnya target keburu fold), kartunya kembali ke inventory.
+  - ☠️ **Wildcard** (cursed, sangat mahal, stok 1, **tidak dijual sampai dealer membukanya**; tampil paling atas di Market dengan bingkai cursed). Dipakai lewat 🎒 di meja selama match berjalan, lalu **diumumkan di tengah meja setelah hand itu selesai** (jeda beberapa detik) dan dijalankan sebelum kartu dibagi lagi. **Tidak bisa dipakai kalau pemain tersisa tinggal 2**; kalau sebelum dijalankan pemakai/target tersingkir atau pemain jadi tinggal 2, wildcard batal dan kartunya kembali ke inventory. Satu wildcard menunggu sekaligus di satu meja.
+    - 💸 **You Owe Me My Money**: 80% chip pemain pilihan pindah ke pemakai.
+    - ⚔️ **Duel Me!**: hand berikutnya hanya pemakai vs pemain pilihan yang dibagi kartu; pemain lain auto fold (tidak bayar blind).
+    - 💀 **Get The F\*ck Out!**: pemain pilihan langsung tereliminasi (chip-nya hangus, peringkat di bawah semua yang masih bertahan).
+- **Pengumuman di tengah meja**: pemakaian kartu Attack dan Wildcard ditampilkan ke semua pemain (siapa memakai kartu apa ke siapa; khusus Reveal Card tanpa nama korban). Kartu Passive, Luck, dan Defend tidak diumumkan.
+- Kartu Defend dan Luck baru terlihat pemain lain saat kartu dibuka di akhir hand. Kalau kartu gagal dipakai (misalnya target keburu fold), kartunya kembali ke inventory.
 - Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match.
 
 ### 👑 Podium all time

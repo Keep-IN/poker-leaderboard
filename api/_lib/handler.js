@@ -68,6 +68,14 @@ async function mutate(db, match, fn) {
   throw new Error('Meja sedang ramai, coba lagi')
 }
 
+// Wildcard yang batal (pemakai/target tersingkir atau pemain tinggal 2) dicatat meja di t.refunds: kembalikan kartunya
+// ke inventory lalu hapus catatannya. Aman dipanggil berulang (refund hanya mengubah kartu yang masih 'used').
+async function settleRefunds(db, match, r) {
+  if (!r?.t?.refunds?.length || !db.refundCard) return
+  for (const x of r.t.refunds) await db.refundCard(match, x.uid, x.card).catch(() => {})
+  await mutate(db, match, t => { t.refunds = [] }).catch(() => {})
+}
+
 // Meja dibuat saat ada yang pertama kali membukanya setelah match dimulai.
 async function ensureTable(db, match) {
   if (await db.meta(match)) return
@@ -105,6 +113,7 @@ async function getState(db, match, token, v, watch) {
     if (p && t.now - p.seen > SEEN_MS) p.seen = t.now
   })
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
+  await settleRefunds(db, match, r)
   if (r.status === 'finished') return finalView(db, match, token)
   if (r.status) return ended(r.status)
   if (token && token === r.t.hostToken) return withPodium(db, r.t, { v: r.ver, s: hostView(match, r.t) })
@@ -160,7 +169,7 @@ async function playCard(db, match, b) {
   try {
     r = await mutate(db, match, t => {
       const p = t.find(token)
-      const err = p ? t.useCard(t.players.indexOf(p), used, target) : 'Sesi meja tidak ditemukan'
+      const err = p ? t.useCard(t.players.indexOf(p), used, target, cardId) : 'Sesi meja tidak ditemukan'
       return err ? { error: err } : { ok: true, used }
     })
   } catch (e) { r = { error: e } }
@@ -221,6 +230,7 @@ async function act(db, match, b) {
   })
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
   if (r.status) return ended(r.status)
+  await settleRefunds(db, match, r)
   const p = r.t.find(token)
   return p ? withPodium(db, r.t, { ...r.out, v: r.ver, s: r.t.view(p) }) : r.out
 }

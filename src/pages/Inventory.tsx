@@ -9,6 +9,9 @@ const howToUse: Record<string, string> = {
   defend_me: 'Pakai di meja poker online lewat tombol 🎒 saat hand berjalan.',
   reveal_card: 'Pakai di meja online lewat tombol 🎒, lalu pilih lawan yang mau diintip.',
   fold_player: 'Pakai di meja online lewat tombol 🎒 sebelum flop, lalu pilih lawan.',
+  you_owe_me: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih korban. Jalan setelah hand selesai.',
+  duel_me: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih lawan duel. Jalan di hand berikutnya.',
+  get_out: 'Pakai di meja online lewat 🎒 (pemain minimal 3), pilih korban. Jalan setelah hand selesai.',
 }
 
 export default function Inventory() {
@@ -20,6 +23,7 @@ export default function Inventory() {
   const used = cards.filter((c) => c.status === 'used')
   // kartu yang sama digabung: tampil satu kali dengan jumlahnya
   const groups = [...owned.reduce((m, c) => m.set(c.card_code, [...(m.get(c.card_code) ?? []), c]), new Map<string, OwnedCard[]>()).values()]
+    .sort((x, y) => Number(y[0].card?.kind === 'wildcard') - Number(x[0].card?.kind === 'wildcard')) // kartu cursed paling atas
 
   return (
     <div className="space-y-5">

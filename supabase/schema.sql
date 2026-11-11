@@ -180,13 +180,16 @@ create index if not exists coin_ledger_player_idx on public.coin_ledger (player_
 create table if not exists public.skill_cards (
   code        text primary key,
   name        text not null,
-  kind        text not null check (kind in ('passive', 'attack', 'luck', 'defend')),
+  kind        text not null check (kind in ('passive', 'attack', 'luck', 'defend', 'wildcard')),
   description text not null,
   price       int  not null check (price between 1 and 10000),
   stock       int  not null default 0 check (stock >= 0),
   on_sale     boolean not null default false,
   sort        int  not null default 0
 );
+-- tabel lama: tambah jenis 'wildcard'
+alter table public.skill_cards drop constraint if exists skill_cards_kind_check;
+alter table public.skill_cards add constraint skill_cards_kind_check check (kind in ('passive', 'attack', 'luck', 'defend', 'wildcard'));
 insert into public.skill_cards (code, name, kind, description, price, stock, on_sale, sort) values
   ('double_down', 'Double Down', 'passive', 'Poin dari match online ini jadi 2× lipat. Aktifkan di halaman match sebelum match dimulai.', 70, 10, true, 1),
   ('defend_me', 'Defend Me', 'defend', 'Kalau kalah di hand ini, setengah chip yang kamu taruhkan kembali.', 40, 10, true, 2),
@@ -197,7 +200,11 @@ insert into public.skill_cards (code, name, kind, description, price, stock, on_
   ('give_me_full_house', 'Give Me A Full House', 'luck', 'Pasang untuk hand berikutnya: peluang 60% kamu dapat Full House. Satu kartu Luck per hand di seluruh meja.', 80, 5, true, 7),
   ('give_me_quads', 'Give Me A Four of a Kind', 'luck', 'Pasang untuk hand berikutnya: peluang 40% kamu dapat Four of a Kind. Satu kartu Luck per hand di seluruh meja.', 100, 5, true, 8),
   ('give_me_straight_flush', 'Give Me A Straight Flush', 'luck', 'Pasang untuk hand berikutnya: peluang 30% kamu dapat Straight Flush. Satu kartu Luck per hand di seluruh meja.', 130, 5, true, 9),
-  ('give_me_royal_flush', 'Give Me A Royal Flush', 'luck', 'Pasang untuk hand berikutnya: peluang 15% kamu dapat Royal Flush. Satu kartu Luck per hand di seluruh meja.', 150, 5, true, 10)
+  ('give_me_royal_flush', 'Give Me A Royal Flush', 'luck', 'Pasang untuk hand berikutnya: peluang 15% kamu dapat Royal Flush. Satu kartu Luck per hand di seluruh meja.', 150, 5, true, 10),
+  -- Wildcard: belum dijual sampai dealer membukanya di Market
+  ('you_owe_me', 'You Owe Me My Money', 'wildcard', 'Pilih 1 pemain: 80% chip-nya pindah ke kamu. Diumumkan dan dijalankan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 700, 1, false, 11),
+  ('duel_me', 'Duel Me!', 'wildcard', 'Pilih 1 pemain untuk duel di hand berikutnya; pemain lain auto fold di hand itu. Diumumkan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 500, 1, false, 12),
+  ('get_out', 'Get The F*ck Out!', 'wildcard', 'Pilih 1 pemain untuk langsung tereliminasi (chip-nya hangus). Diumumkan setelah hand selesai. Tidak bisa dipakai kalau pemain tinggal 2.', 1000, 1, false, 13)
 on conflict (code) do update set name = excluded.name, kind = excluded.kind, description = excluded.description, sort = excluded.sort;
 
 -- Kartu milik player. owned = di inventory, armed = Double Down dipasang ke match, used = sudah terpakai.
@@ -1456,7 +1463,7 @@ begin
     raise exception 'Maksimal 3 skill card per match';
   end if;
   update public.player_cards set status = 'used', used_at = now(), match_id = p_match
-   where id = p_card and player_id = p_player and status = 'owned' and (card_code in ('defend_me', 'reveal_card', 'fold_player') or card_code like 'give\_me\_%')
+   where id = p_card and player_id = p_player and status = 'owned' and (card_code in ('defend_me', 'reveal_card', 'fold_player', 'you_owe_me', 'duel_me', 'get_out') or card_code like 'give\_me\_%')
   returning card_code into code;
   if code is null then
     raise exception 'Kartu tidak ada di inventory atau tidak bisa dipakai di meja';

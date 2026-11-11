@@ -11,7 +11,8 @@ function useCatalog() {
   const [cards, setCards] = useState<SkillCard[] | null>(null)
   const load = useCallback(async () => {
     const { data } = await supabase.from('skill_cards').select('*').order('sort')
-    setCards((data as SkillCard[]) ?? [])
+    // kartu cursed (wildcard) selalu paling atas
+    setCards(((data as SkillCard[]) ?? []).sort((x, y) => Number(y.kind === 'wildcard') - Number(x.kind === 'wildcard')))
   }, [])
   useEffect(() => {
     load()
@@ -122,23 +123,29 @@ export default function Market() {
 }
 
 export function CardTile({ card: c, children, dim }: { card: Pick<SkillCard, 'code' | 'name' | 'kind' | 'description'>; children?: React.ReactNode; dim?: boolean }) {
-  const kind = KIND_LABELS[c.kind]
+  const kind = KIND_LABELS[c.kind] ?? KIND_LABELS.passive
+  const cursed = c.kind === 'wildcard'
   return (
-    <Card className={cx('relative overflow-hidden', dim && 'opacity-60')}>
-      <div className="pointer-events-none absolute -top-4 -right-2 text-[90px] leading-none opacity-[0.07]">{CARD_ICONS[c.code] ?? '🃏'}</div>
-      <div className="flex items-start gap-3">
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-400/15 text-2xl">{CARD_ICONS[c.code] ?? '🃏'}</span>
+    <Card className={cx('relative overflow-hidden', cursed && 'cursed-card', dim && 'opacity-60')}>
+      <div className={cx('pointer-events-none absolute -top-4 -right-2 text-[90px] leading-none', cursed ? 'opacity-[0.12]' : 'opacity-[0.07]')}>
+        {cursed ? '☠️' : CARD_ICONS[c.code] ?? '🃏'}
+      </div>
+      {cursed && <span className="cursed-label">☠ Cursed · Overpowered</span>}
+      <div className="relative flex items-start gap-3">
+        <span className={cx('flex size-12 shrink-0 items-center justify-center rounded-xl text-2xl', cursed ? 'cursed-icon' : 'bg-brand-400/15')}>
+          {CARD_ICONS[c.code] ?? '🃏'}
+        </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-bold">{c.name}</p>
+            <p className={cx('font-bold', cursed && 'cursed-name')}>{c.name}</p>
             <span className={cx('rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider', kind.tone)}>
               {kind.icon} {kind.label}
             </span>
           </div>
-          <p className="mt-1 text-sm text-slate-400">{c.description}</p>
+          <p className={cx('mt-1 text-sm', cursed ? 'text-[#ffb3c0]' : 'text-slate-400')}>{c.description}</p>
         </div>
       </div>
-      {children}
+      <div className="relative">{children}</div>
     </Card>
   )
 }
@@ -182,6 +189,7 @@ function DealerListing({ card, onSaved }: { card: SkillCard; onSaved: () => void
           Simpan
         </Button>
       </div>
+      {card.kind === 'wildcard' && !onSale && <p className="mt-2 text-xs text-[#ff8da0]">☠ Tersembunyi dari player sampai kamu centang "Dijual di market".</p>}
       {msg && <p className="mt-1 text-right text-xs text-slate-400">{msg}</p>}
     </CardTile>
   )

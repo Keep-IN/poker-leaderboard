@@ -1,6 +1,6 @@
 // Tes mesin turnamen: `node api/_lib/poker.test.js` (mencetak "semua tes lulus").
 import assert from 'node:assert'
-import { AFK_HANDS, COUNTDOWN_MS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
+import { AFK_HANDS, COUNTDOWN_MS, WILD_MS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
 
 const C = s => s.split(' ').map(x => 'shdc'.indexOf(x[1]) * 13 + '23456789TJQKA'.indexOf(x[0]))
 const S = s => best(C(s))
@@ -190,15 +190,18 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.equal(t.view(t.players[0]).players[2].peek, true)
   assert.deepEqual(t.view(t.players[0]).players[1].cards, [-1, -1])
   assert.deepEqual(t.view(t.players[1]).players[2].cards, [-1, -1])
-  assert.deepEqual(t.view(t.players[2]).players[0].skills, [])
+  // diumumkan ke semua bahwa A memakai Reveal Card, tapi korbannya tidak (kartu yang diintip hanya terlihat pemakainya)
+  assert.deepEqual(t.view(t.players[2]).players[0].skills, ['reveal_card'])
   assert.equal(t.view(t.players[2]).players[0].target, -1)
+  assert.equal(t.view(t.players[0]).players[0].target, 2, 'pemakainya tahu targetnya sendiri')
+  assert.deepEqual([t.view(t.players[1]).ann.by, t.view(t.players[1]).ann.code, t.view(t.players[1]).ann.target], [0, 'reveal_card', -1])
   ok(t, 0, 'call'); ok(t, 1, 'call'); ok(t, 2, 'check') // flop
   assert.equal(t.view(t.players[0]).players[2].hand, handName(t.players[2].cards, t.board)) // nama kombinasinya ikut
   ok(t, 1, 'check'); ok(t, 2, 'fold')
   assert.deepEqual(t.view(t.players[0]).players[2].cards, [], 'kartu yang sudah fold tidak terlihat lagi')
   ok(t, 0, 'check'); drain(t)
   assert.deepEqual(t.view(t.players[2]).players[0].skills, ['reveal_card']) // dibuka di akhir hand
-  assert.equal(t.view(t.players[2]).players[0].target, 2)
+  assert.equal(t.view(t.players[2]).players[0].target, -1, 'korban tetap dirahasiakan')
   nxt(t); assert.equal(t.players[0].target, -1) // hand baru, efeknya hilang
 }
 
@@ -271,6 +274,65 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   SKILLS.give_me_full_house.chance = 60
 }
 
+{ // Wildcard: dipasang selama hand, diumumkan sesudah hand selesai (jeda), lalu efeknya jalan sebelum hand dibagi
+  const fin = t => { while (t.betting) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check') }
+  const toShowdown = t => { fin(t); assert.equal(t.phase, 'showdown') }
+  const nextDue = t => run(t, Math.max(0, t.due.at - t.now))
+
+  // You Owe Me My Money: 80% chip target pindah ke pemakai
+  let t = mk([1000, 1000, 1000, 1000]); begin(t)
+  assert.equal(typeof t.useCard(0, 'you_owe_me'), 'string', 'butuh target')
+  assert.equal(t.useCard(0, 'you_owe_me', 3), undefined)
+  assert.equal(typeof t.useCard(1, 'get_out', 2), 'string', 'satu wildcard menunggu sekaligus')
+  assert.equal(t.view(t.players[0]).wildNext, 'you_owe_me'); assert.equal(t.view(t.players[1]).wildBusy, true)
+  assert.equal(t.view(t.players[3]).ann, undefined, 'belum diumumkan selama hand berjalan')
+  ok(t, t.turn, 'fold'); ok(t, t.turn, 'fold'); ok(t, t.turn, 'fold') // hand cepat selesai
+  const before = stacks(t), no = t.handNo
+  nextDue(t) // waktu hand berikutnya: jeda pengumuman dulu, belum dibagi
+  assert.equal(t.handNo, no); assert(!t.betting)
+  const a = t.view(t.players[2]).ann
+  assert.deepEqual([a.by, a.code, a.target, a.extra], [0, 'you_owe_me', 3, String(Math.floor(before[3] * 0.8))])
+  assert.equal(t.due.at - t.now, WILD_MS)
+  nextDue(t)
+  assert.equal(t.handNo, no + 1)
+  const take = Math.floor(before[3] * 0.8)
+  assert.equal(t.players[3].stack0, before[3] - take); assert.equal(t.players[0].stack0, before[0] + take)
+
+  // Get The F*ck Out!: target langsung tersingkir, chip hangus, peringkat terbawah
+  t = mk([1000, 1000, 1000, 1000]); begin(t)
+  assert.equal(t.useCard(2, 'get_out', 1), undefined)
+  toShowdown(t); nextDue(t); nextDue(t)
+  assert.equal(t.players[1].place, 4); assert.equal(t.players[1].chips, 0); assert(t.view(null).players[1].killed)
+  assert.deepEqual(t.out, ['u1']); assert(t.forfeited > 0)
+  assert(!t.players[1].inHand && t.betting)
+  assert.equal(typeof t.useCard(0, 'get_out', 1), 'string', 'target yang sudah tersingkir tidak bisa')
+
+  // Duel Me!: hand berikutnya hanya pemakai vs target, sisanya tidak dibagi kartu (tanpa bayar blind)
+  t = mk([1000, 1000, 1000, 1000]); begin(t)
+  assert.equal(t.useCard(0, 'duel_me', 2), undefined)
+  toShowdown(t); nextDue(t); nextDue(t)
+  assert.deepEqual(t.players.map(p => p.inHand), [true, false, true, false])
+  assert.deepEqual(t.view(null).duel, [0, 2])
+  assert.deepEqual([t.players[1].total, t.players[3].total], [0, 0])
+  fin(t); nextDue(t)
+  assert.equal(t.view(null).duel, undefined, 'hanya satu hand')
+  assert.equal(t.players.filter(p => p.inHand).length, 4)
+
+  // tidak bisa kalau pemain tinggal 2; batal kalau sebelum dijalankan pemain jadi tinggal 2 (kartu dikembalikan)
+  const two = mk([1000, 1000]); begin(two)
+  assert.equal(typeof two.useCard(0, 'get_out', 1), 'string')
+  t = mk([1000, 1000, 1000]); begin(t)
+  assert.equal(t.useCard(0, 'duel_me', 1, 'card-123'), undefined)
+  t.players[2].chips = 0; t.players[2].allIn = true // anggap P2 bust di hand ini
+  fin(t); nextDue(t)
+  assert.deepEqual(t.refunds, [{ uid: 'u0', card: 'card-123' }]); assert.equal(t.wild, null)
+  // dipasang di antara hand: langsung diumumkan tanpa menunggu lama
+  t = mk([1000, 1000, 1000]); begin(t); fin(t)
+  assert.equal(t.phase, 'showdown')
+  assert.equal(t.useCard(1, 'you_owe_me', 0), undefined)
+  assert(t.due.at - t.now <= 1500)
+}
+
 { // dua pemain tersingkir di hand yang sama: stack awal hand lebih besar = peringkat lebih baik
   const t = mk([200, 300, 2000]); rig(t, '2c 7d 3c 8d As Ah Kh 9d 4c 5s Jd'); begin(t)
   ok(t, 0, 'raise', 200); ok(t, 1, 'raise', 300); ok(t, 2, 'call'); drain(t)
@@ -341,7 +403,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
       if (t.turn >= 0) {
         const i = t.turn, c = t.ctl(i), r = Math.random()
         if (r < .03) { // boleh gagal (fold/sudah pakai/target salah): tidak mengubah apa-apa
-          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush'][R(5)]
+          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out'][R(8)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
         if (r < .05) run(t, TURN_MS)

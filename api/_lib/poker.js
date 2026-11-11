@@ -80,7 +80,7 @@ export function equities(hands, board, iters = 1200) {
 // kartu lain baru terlihat pemain lain saat kartu dibuka di akhir hand.
 export const SKILLS = {
   defend_me: { name: 'Defend Me', icon: '🛡️' },
-  reveal_card: { name: 'Reveal Card', icon: '👁️', target: true },
+  reveal_card: { name: 'Reveal Card', icon: '👁️', target: true, open: true, secret: true }, // secret: korbannya tidak diumumkan
   fold_player: { name: 'Fold Player', icon: '🚫', target: true, open: true },
   // Luck: dipasang untuk hand berikutnya. Saat hand itu dibagi, dengan peluang `chance`% kartu pemiliknya + kartu meja
   // disusun supaya kombinasi `cat` terbentuk (minimal satu kartu tangannya ikut membentuk kombinasi itu).
@@ -90,7 +90,16 @@ export const SKILLS = {
   give_me_quads: { name: 'Give Me A Four of a Kind', icon: '🎲', luck: { cat: 7 }, chance: 40 },
   give_me_straight_flush: { name: 'Give Me A Straight Flush', icon: '🌈', luck: { cat: 8 }, chance: 30 },
   give_me_royal_flush: { name: 'Give Me A Royal Flush', icon: '👑', luck: { cat: 8, royal: true }, chance: 15 },
+  // Wildcard: menarget pemain lain yang masih bertahan; dijalankan sesudah hand berjalan selesai, didahului jeda
+  // pengumuman di tengah meja. Tidak bisa dipakai (dan batal, kartu dikembalikan) kalau pemain tersisa tinggal 2.
+  you_owe_me: { name: 'You Owe Me My Money', icon: '💸', wild: true },
+  duel_me: { name: 'Duel Me!', icon: '⚔️', wild: true },
+  get_out: { name: 'Get The F*ck Out!', icon: '💀', wild: true },
 }
+/** Jeda pengumuman wildcard sebelum hand berikutnya dibagi. */
+export const WILD_MS = env('WILD_MS', 5000)
+/** Bagian chip target yang diambil You Owe Me My Money. */
+export const OWE_SHARE = 0.8
 
 // ---- kartu Luck: menyusun 2 kartu tangan + 5 kartu meja yang membentuk kombinasi tertentu ----
 const R = n => randomInt(n), card = (rank, suit) => suit * 13 + rank - 2 // rank 2..14
@@ -179,8 +188,15 @@ export class Table {
 
   startHand() {
     if (this.betting || this.phase === 'over') return
-    const el = this.alive()
+    if (this.wild && this.wildStage()) return // jeda pengumuman wildcard dulu
+    let el = this.alive()
     if (el.length < 2) return this.end()
+    this.duel = null
+    if (this.duelNext) { // Duel Me!: hand ini hanya dua pemain itu; sisanya tidak dibagi kartu (auto fold)
+      const pair = this.duelNext.map(u => this.players.find(p => p.uid === u)).filter(p => p && el.includes(p))
+      this.duelNext = null
+      if (pair.length === 2) { el = pair; this.duel = pair.map(p => this.players.indexOf(p)) }
+    }
     if (this.startedAt === null) this.startedAt = this.now
     this.lobby = false
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
@@ -338,6 +354,16 @@ export class Table {
   canUseCard(i, code, j) {
     const p = this.players[i], sk = SKILLS[code]
     if (!sk) return 'Kartu ini tidak bisa dipakai di meja'
+    if (sk.wild) {
+      if (this.phase === 'over' || !p || p.place || !p.chips) return 'Kamu sudah tidak ikut turnamen ini'
+      if (this.lobby || !this.handNo) return 'Wildcard baru bisa dipakai setelah match berjalan'
+      if (this.alive().length <= 2) return 'Wildcard tidak bisa dipakai kalau pemain tinggal 2'
+      if (this.wild) return this.wild.i === i ? 'Wildcard kamu sudah menunggu hand ini selesai' : 'Sudah ada wildcard lain yang menunggu, tunggu sampai selesai'
+      const q = this.players[j]
+      if (!Number.isInteger(j) || !q || j === i) return 'Pilih pemain yang mau ditarget'
+      if (q.place || !q.chips) return `${q.name} sudah tersingkir`
+      return
+    }
     if (sk.luck) { // dipasang untuk hand berikutnya, satu kartu Luck saja untuk seluruh meja
       if (this.phase === 'over' || !p || p.place || !p.chips) return 'Kamu sudah tidak ikut turnamen ini'
       if (this.luck) return this.luck.i === i ? 'Kartu Luck kamu sudah menunggu hand berikutnya' : 'Sudah ada pemain lain yang memasang kartu Luck untuk hand berikutnya'
@@ -355,14 +381,51 @@ export class Table {
       if (q.allIn) return `${q.name} sudah all-in, tidak bisa dipaksa fold`
     }
   }
-  useCard(i, code, j) {
+  useCard(i, code, j, card = null) {
     const err = this.canUseCard(i, code, j)
     if (err) return err
     const p = this.players[i]
     if (SKILLS[code].luck) { this.luck = { i, code }; return }
+    if (SKILLS[code].wild) {
+      this.wild = { by: p.uid, target: this.players[j].uid, code, card, shown: false }
+      if (!this.betting) this.defer('next', Math.max(0, Math.min(this.due ? this.due.at - this.now : 0, 1500))) // di antara hand: segera
+      return
+    }
     p.skills = [...(p.skills || []), code]
     if (SKILLS[code].target) p.target = j
+    if (SKILLS[code].open) this.announce(i, code, SKILLS[code].secret ? -1 : j) // kartu Attack langsung diumumkan di tengah meja
     if (code === 'fold_player') this.forceFold(j)
+  }
+  // Pengumuman di tengah meja: siapa memakai kartu apa ke siapa (extra = keterangan hasil).
+  announce(i, code, j, extra = '') {
+    this.annN = (this.annN || 0) + 1
+    this.ann = { n: this.annN, at: this.now, by: i, code, target: j, extra }
+  }
+  // Wildcard yang menunggu: tahap 1 = umumkan dan beri jeda; tahap 2 = jalankan efeknya lalu hand dibagi seperti biasa.
+  // Mengembalikan true kalau hand belum boleh dibagi sekarang.
+  wildStage() {
+    const w = this.wild, by = this.players.findIndex(p => p.uid === w.by), tg = this.players.findIndex(p => p.uid === w.target)
+    const P = this.players[by], Q = this.players[tg], alive = this.alive()
+    if (!P || !Q || !P.chips || P.place || !Q.chips || Q.place || alive.length <= 2) { // batal: kartu dikembalikan
+      this.wild = null
+      if (w.card) this.refunds = [...(this.refunds || []), { uid: w.by, card: w.card }]
+      return false
+    }
+    if (!w.shown) {
+      w.shown = true
+      this.announce(by, w.code, tg, w.code === 'you_owe_me' ? String(Math.floor(Q.chips * OWE_SHARE)) : '')
+      this.defer('next', WILD_MS)
+      return true
+    }
+    this.wild = null
+    this.wildUsed = [...(this.wildUsed || []), { uid: w.by, code: w.code, target: w.target }]
+    if (w.code === 'you_owe_me') { const a = Math.floor(Q.chips * OWE_SHARE); Q.chips -= a; P.chips += a }
+    else if (w.code === 'duel_me') this.duelNext = [w.by, w.target]
+    else if (w.code === 'get_out') { // langsung tersingkir; chip-nya hangus, peringkat di bawah semua yang masih bertahan
+      this.forfeited = (this.forfeited || 0) + Q.chips; Q.chips = 0; Q.killed = true
+      Q.place = this.players.length - this.out.length; this.out.push(Q.uid)
+    }
+    return false
   }
   // Kartu Luck yang menunggu dipakai saat hand dibagi. Kalau pemiliknya sudah tersingkir, kartunya hangus.
   // lucky (hanya terlihat pemiliknya) = berhasil atau tidak.
@@ -370,6 +433,7 @@ export class Table {
     const L = this.luck
     this.luck = null
     const o = L && this.players[L.i]
+    if (o && !el.includes(o) && o.chips > 0 && !o.place) { this.luck = L; return } // tidak ikut hand ini (duel): tunggu
     if (!o || !el.includes(o)) return
     o.skills = [L.code]
     o.lucky = false
@@ -459,15 +523,20 @@ export class Table {
       afkLimit: AFK_HANDS, total: N.length, alive: N.filter(q => !q.place || q.place === 1).length,
       players: N.map(q => ({
         name: q.name, chips: q.chips, bet: q.bet, folded: q.folded, allIn: q.allIn, inHand: q.inHand, sitOut: q.sitOut,
-        online: this.online(q), ready: !!q.ready, won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
+        online: this.online(q), ready: !!q.ready, killed: !!q.killed, won: q.won, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
         // skill card yang dipakai hand ini: pemiliknya selalu tahu, pemain lain baru tahu saat kartu dibuka (showdown)
-        skills: seen(q) ? q.skills || [] : [], target: seen(q) && q.target >= 0 ? q.target : -1, saved: q.saved || 0,
+        skills: seen(q) ? q.skills || [] : [], target: q.target >= 0 && (q === me || (seen(q) && !(q.skills || []).some(c => SKILLS[c]?.secret))) ? q.target : -1, saved: q.saved || 0,
         forced: !!q.forced, peek: peek(q),
         cards: q === me || q.show || peek(q) ? q.cards : q.inHand && !q.folded ? [-1, -1] : [],
       })),
     }
     if (i >= 0 && this.turn === i) v.ctl = this.ctl(i)
     if (i >= 0 && this.luck?.i === i) v.luckNext = this.luck.code // kartu Luck saya menunggu hand berikutnya
+    if (me && this.wild?.by === me.uid) v.wildNext = this.wild.code // wildcard saya menunggu hand ini selesai
+    if (i >= 0) v.wildBusy = !!this.wild && this.wild.by !== me.uid
+    // pengumuman kartu Attack/Wildcard di tengah meja (beberapa detik)
+    if (this.ann && this.now - this.ann.at < WILD_MS + 1500) v.ann = this.ann
+    if (this.duel) v.duel = this.duel
     if (i >= 0) v.luckBusy = !!this.luck && this.luck.i !== i // pemain lain sudah memasang kartu Luck
     // hasil kartu Luck baru diberitahu sesudah hand selesai (kalau sebelumnya, pemiliknya tahu kartu meja akan cocok)
     if (me && !this.betting && me.lucky !== null && me.lucky !== undefined && (me.skills || []).some(c => SKILLS[c]?.luck)) v.lucky = me.lucky
