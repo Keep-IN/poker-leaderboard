@@ -1607,6 +1607,132 @@ as $$
    order by points desc, wins desc, played desc, p.name asc;
 $$;
 
+-- ---------- Gift dari dealer ------------------------------------------
+-- Dealer mengirim koin dan/atau skill card ke satu, beberapa, atau semua player. Gift menunggu di Beranda player
+-- sampai diklaim. Kartu gift tidak mengambil stok market.
+create table if not exists public.gifts (
+  id          uuid primary key default gen_random_uuid(),
+  player_id   uuid not null references public.profiles (id) on delete cascade,
+  from_id     uuid references public.profiles (id) on delete set null,
+  batch       uuid not null,
+  coins       int  not null default 0 check (coins between 0 and 10000),
+  card_code   text references public.skill_cards (code),
+  card_qty    int  not null default 0 check (card_qty between 0 and 10),
+  message     text check (char_length(message) <= 140),
+  status      text not null default 'pending' check (status in ('pending', 'claimed', 'cancelled')),
+  created_at  timestamptz not null default now(),
+  claimed_at  timestamptz,
+  check (coins > 0 or (card_code is not null and card_qty > 0))
+);
+create index if not exists gifts_player_idx on public.gifts (player_id, status);
+create index if not exists gifts_batch_idx on public.gifts (batch);
+alter table public.gifts enable row level security;
+drop policy if exists "gifts own or dealer" on public.gifts;
+create policy "gifts own or dealer" on public.gifts for select to authenticated
+  using (player_id = auth.uid() or public.current_role_name() = 'dealer');
+grant select on public.gifts to authenticated;
+
+-- koin dari gift dicatat di buku besar dengan reason 'gift'
+alter table public.coin_ledger drop constraint if exists coin_ledger_reason_check;
+alter table public.coin_ledger add constraint coin_ledger_reason_check
+  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift'));
+
+-- p_players null = semua player. Mengembalikan jumlah player yang dikirimi.
+create or replace function public.send_gift(p_players uuid[], p_coins int, p_card text, p_qty int, p_message text)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  b uuid := gen_random_uuid();
+  n int;
+  c int := coalesce(p_coins, 0);
+  q int := case when nullif(p_card, '') is null then 0 else coalesce(p_qty, 0) end;
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa mengirim gift';
+  end if;
+  if c < 0 or c > 10000 then
+    raise exception 'Koin harus 0 sampai 10.000';
+  end if;
+  if q < 0 or q > 10 then
+    raise exception 'Jumlah kartu 1 sampai 10';
+  end if;
+  if nullif(p_card, '') is not null and not exists (select 1 from public.skill_cards where code = p_card) then
+    raise exception 'Kartu tidak ditemukan';
+  end if;
+  if c = 0 and q = 0 then
+    raise exception 'Isi koin atau pilih skill card dulu';
+  end if;
+  if char_length(coalesce(p_message, '')) > 140 then
+    raise exception 'Pesan maksimal 140 karakter';
+  end if;
+  insert into public.gifts (player_id, from_id, batch, coins, card_code, card_qty, message)
+  select p.id, auth.uid(), b, c, case when q > 0 then p_card end, q, nullif(trim(p_message), '')
+    from public.profiles p
+   where p.role = 'player' and (p_players is null or p.id = any (p_players));
+  get diagnostics n = row_count;
+  if n = 0 then
+    raise exception 'Pilih minimal 1 player';
+  end if;
+  return n;
+end;
+$$;
+
+-- Dealer membatalkan gift yang belum diklaim (satu gift, atau semua yang belum diklaim di satu kiriman).
+create or replace function public.cancel_gift(p_gift uuid, p_batch boolean default false)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  n int;
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa membatalkan gift';
+  end if;
+  update public.gifts set status = 'cancelled'
+   where status = 'pending'
+     and (id = p_gift or (p_batch and batch = (select batch from public.gifts where id = p_gift)));
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
+-- Player mengklaim gift miliknya (p_gift null = semua yang menunggu). Mengembalikan jumlah gift yang diklaim.
+create or replace function public.claim_gift(p_gift uuid default null)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  g public.gifts;
+  n int := 0;
+begin
+  perform 1 from public.profiles where id = auth.uid() for update;
+  for g in
+    select * from public.gifts
+     where player_id = auth.uid() and status = 'pending' and (p_gift is null or id = p_gift)
+     order by created_at
+     for update
+  loop
+    if g.coins > 0 then
+      insert into public.coin_ledger (player_id, amount, reason, ref) values (g.player_id, g.coins, 'gift', g.id::text);
+    end if;
+    if g.card_code is not null and g.card_qty > 0 then
+      insert into public.player_cards (player_id, card_code, price)
+      select g.player_id, g.card_code, 0 from generate_series(1, g.card_qty);
+    end if;
+    update public.gifts set status = 'claimed', claimed_at = now() where id = g.id;
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+
 -- ---------- Grants -----------------------------------------------------
 
 revoke all on function public.lock_own_match(uuid) from public, anon, authenticated;
@@ -1710,6 +1836,10 @@ begin
   end;
   begin
     alter publication supabase_realtime add table public.skill_cards;
+  exception when duplicate_object then null;
+  end;
+  begin
+    alter publication supabase_realtime add table public.gifts;
   exception when duplicate_object then null;
   end;
 end;

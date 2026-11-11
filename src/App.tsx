@@ -15,6 +15,7 @@ import MissionNew from './pages/MissionNew'
 import Players, { PlayerProfile } from './pages/Players'
 import Market from './pages/Market'
 import Inventory from './pages/Inventory'
+import Gifts from './pages/Gifts'
 import { ForgotPassword, ResetPassword } from './pages/PasswordPages'
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="profile" element={<PlayerProfile self />} />
             <Route path="market" element={<Market />} />
             <Route path="inventory" element={<Inventory />} />
+            <Route path="gifts" element={<Gifts />} />
             <Route path="duel/:opponentId" element={<DuelNew />} />
             <Route path="matches/new" element={<CreateMatch />} />
             <Route path="missions/new" element={<MissionNew />} />

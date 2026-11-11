@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { DealerDuelSections, PlayerDuelSections } from '../components/DuelSections'
 import { DealerBounties, PlayerBounties } from '../components/BountySections'
+import GiftInbox from '../components/GiftInbox'
 import { DealerMissions, PlayerMissions } from '../components/MissionSections'
 import { ACTIVE_DUEL_STATUSES, DUEL_SELECT, type Duel, type DuelStatus } from '../lib/duels'
 import { Avatar, Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
@@ -47,7 +48,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
   return (
     <div className="space-y-5">
       <Greeting profile={profile} subtitle="Statistik kamu" />
-      <CoinStrip />
+      <CoinStrip me={profile.id} />
       <PlayerStats playerId={profile.id} isMe>
         <PlayerDuelSections me={profile.id} />
         <PlayerMissions me={profile.id} />
@@ -358,6 +359,13 @@ function DealerHome({ profile }: { profile: Profile }) {
       </Link>
       </div>
 
+      <Link
+        to="/gifts"
+        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-fuchsia-400/50 bg-fuchsia-500/10 text-sm font-bold text-fuchsia-200 transition hover:bg-fuchsia-500/20 active:scale-[0.98] md:w-fit md:px-8"
+      >
+        🎁 Kirim Gift ke Player
+      </Link>
+
       <DealerDuelSections me={profile.id} />
       <DealerMissions />
       <DealerBounties />
@@ -409,8 +417,8 @@ function DealerHome({ profile }: { profile: Profile }) {
 }
 
 /** Saldo koin, klaim koin, dan pintasan ke Inventory & Market di Beranda player. */
-function CoinStrip() {
-  const { balance, claimable, claim } = useCoins()
+function CoinStrip({ me }: { me: string }) {
+  const { balance, claimable, claim, reload } = useCoins()
   const [busy, setBusy] = useState(false)
   const total = claimable.reduce((s, c) => s + c.amount, 0)
   return (
@@ -427,6 +435,7 @@ function CoinStrip() {
           🛒<span className="text-[11px] font-medium text-slate-400">Market</span>
         </Link>
       </div>
+      <GiftInbox me={me} onClaimed={reload} />
       {total > 0 && (
         <button
           onClick={async () => { setBusy(true); await claim(); setBusy(false) }}

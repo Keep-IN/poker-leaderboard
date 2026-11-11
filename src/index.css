@@ -184,3 +184,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .cursed-card, .cursed-card::after { animation: none; }
 }
+
+/* gift dari dealer di Beranda */
+.gift-box{box-shadow:0 0 0 1px #e879f933,0 8px 28px -10px #e879f966}
+.gift-bounce{animation:giftBounce 1.6s ease-in-out infinite;transform-origin:50% 90%}
+@keyframes giftBounce{0%,60%,100%{transform:none}70%{transform:rotate(-12deg) scale(1.15)}80%{transform:rotate(10deg) scale(1.15)}90%{transform:rotate(-4deg)}}
+@media(prefers-reduced-motion:reduce){.gift-bounce{animation:none}}
