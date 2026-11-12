@@ -72,6 +72,8 @@ Detailnya:
 - Kartu yang dibeli masuk ke **Inventory** (tombol di Beranda player).
 - Kartu yang tersedia sekarang:
   - ⚡ **Double Down** (passive): pasang di halaman match **online** yang sudah kamu join sebelum match dimulai, atau lewat 🎒 di lobi meja sebelum hand pertama. Poin match itu jadi **2× lipat**. Satu per match. Kalau match batal atau kamu keluar, kartunya kembali.
+  - 🪞 **Full Counter** (passive): dipasang dengan cara yang sama seperti Double Down, lalu aktif **sepanjang match**. Kalau ada yang memakai **Fold Player** atau **Reveal Card** ke kamu, serangannya berbalik: penyerang yang dipaksa fold, atau kamu yang melihat kartu penyerang. Pengumumannya cuma menyebut penyerang ("X terkena Full Counter, serangan berbalik ke arahnya"), tanpa nama yang diserang. Hanya pemiliknya yang tahu dia memasang Full Counter.
+  - Passive boleh dipasang **lebih dari satu** (masing-masing satu per match), tapi tiap passive **memakai 1 dari 3 jatah kartu match itu**. Contoh: pasang Double Down + Full Counter, di meja tinggal 1 kartu.
   - 🛡️ **Defend Me** (defend): dipakai di meja online lewat tombol 🎒 saat hand berjalan. Kalau kamu kalah di hand itu, **setengah chip yang hilang dikembalikan** (diambil dari pemenang hand). Kartu yang dipakai terlihat oleh semua pemain sebelum showdown.
   - 🔄 **Card Reroll** (defend, termurah): dipakai lewat 🎒 saat hand berjalan. 2 kartu tanganmu dikembalikan ke bandar dan diganti 2 kartu baru (kartu meja tidak berubah). Diumumkan di tengah meja, dengan animasi kartu dilempar ke bandar lalu dibagi lagi.
   - 👁️ **Reveal Card** (attack): pilih satu lawan di meja, lalu **2 kartunya terlihat olehmu** sampai hand selesai (beserta nama kombinasinya). Pemakaiannya diumumkan di tengah meja, tapi **korbannya dirahasiakan**.
@@ -86,6 +88,7 @@ Detailnya:
     | 🎲 Give Me A Four of a Kind | 40% |
     | 🌈 Give Me A Straight Flush | 30% |
     | 👑 Give Me A Royal Flush | 15% |
+    | 👯 Pair Me Up | 100%: pocket pair (2 kartu tangan kembar), kartu meja dibagi biasa |
 
     Hanya **satu kartu Luck per hand di seluruh meja**: siapa yang memasang duluan, dia yang berlaku. Kartu Luck dihitung sebagai kartu hand itu. Berhasil atau tidaknya baru diberitahu ke pemiliknya setelah hand selesai. Kalau kamu tersingkir sebelum hand berikutnya, kartunya hangus.
   - ☠️ **Wildcard** (cursed, sangat mahal, stok 1, **tidak dijual sampai dealer membukanya**; tampil paling atas di Market dengan bingkai cursed). Dipakai lewat 🎒 di meja selama match berjalan, lalu **diumumkan di tengah meja setelah hand itu selesai** (jeda beberapa detik) dan dijalankan sebelum kartu dibagi lagi. **Tidak bisa dipakai kalau pemain tersisa tinggal 2**; kalau sebelum dijalankan pemakai/target tersingkir atau pemain jadi tinggal 2, wildcard batal dan kartunya kembali ke inventory. Satu wildcard menunggu sekaligus di satu meja.
@@ -98,7 +101,7 @@ Detailnya:
 - **Pengumuman di tengah meja**: pemakaian kartu Attack dan Wildcard ditampilkan ke semua pemain (siapa memakai kartu apa ke siapa; khusus Reveal Card tanpa nama korban). Kartu Passive, Luck, dan Defend tidak diumumkan, kecuali Card Reroll. Setiap pengumuman di tengah hand **mengulang waktu giliran** pemain yang sedang jalan dari awal.
 - 🎁 **Gift dari dealer** (menu dealer **Kirim Gift** di Beranda, `/gifts`): dealer mengirim koin dan/atau skill card (1–10 per player, semua kartu termasuk wildcard) ke semua player atau player pilihan, dengan pesan opsional. Kartu gift tidak mengurangi stok market. Gift muncul di Beranda player dan masuk ke akun setelah player menekan **Klaim** (atau **Klaim semua**); koin tercatat di riwayat koin sebagai "Gift dari dealer". Dealer melihat riwayat kiriman (berapa yang sudah diklaim) dan bisa membatalkan gift yang belum diklaim.
 - Kartu Defend dan Luck baru terlihat pemain lain saat kartu dibuka di akhir hand. Kalau kartu gagal dipakai (misalnya target keburu fold), kartunya kembali ke inventory.
-- Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match.
+- Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match (termasuk passive yang dipasang sebelum match).
 
 ### 👑 Podium all time
 - Tiga besar leaderboard all time mendapat **bingkai avatar logam** (emas, perak, perunggu) dengan kilau berputar dan **medali peringkat**. #1 juga mendapat 👑 dan bintang berkelip. Bingkai tampil di semua tempat avatar muncul.
@@ -130,7 +133,7 @@ Detailnya:
 - Peringkat dan poin dicatat **otomatis** oleh meja, jadi host tidak perlu menekan Kalah/Menang.
 - Pemain yang tidak membuka meja atau diam terlalu lama tetap dibagi kartu, tapi otomatis check/fold. Pemain yang **AFK 4 putaran berturut-turut langsung dianggap keluar** (chip-nya hangus, peringkatnya di bawah pemain yang bust di putaran yang sama). Menekan **Main lagi** atau beraksi lagi mengulang hitungan AFK dari 0.
 - **Peluang menang**: tiap pemain hanya melihat peluang menang tangannya sendiri, dalam persen, di kiri bawah meja (kartu di tangan + kartu meja melawan kartu acak sebanyak lawan yang masih main). Host match melihat peluang menang semua pemain yang masih main di pojok kanan atas. Peluang untuk host dihitung di server, jadi kartu tertutup pemain tidak pernah dikirim ke host.
-- **Sorotan showdown**: saat kartu dibuka, kombinasi 5 kartu terbaik tiap pemain yang belum fold disorot bergantian (kartu naik dan menyala, kartu lain meredup), mulai dari kombinasi terlemah sampai pemenang. Cap "Menang" baru muncul di giliran pemenang.
+- **Sorotan showdown**: saat kartu dibuka, kombinasi 5 kartu terbaik tiap pemain yang belum fold disorot bergantian (kartu naik dan menyala, kartu lain meredup), mulai dari kombinasi terlemah sampai pemenang. Cap "Menang" baru muncul di giliran pemenang. Tiap pemain disorot **3 detik**. Showdown hand terakhir (penentu juara) juga diputar, lalu muncul pengumuman besar **🏆 Winner: nama juara** di tengah meja sebelum daftar hasil turnamen.
 - **Chat bubble**: pemain bisa kirim pesan singkat atau emoji (tombol 💬 di kanan panel bawah; kolom ketik tertutup lagi setelah pesan terkirim). Pesan muncul sebagai bubble di atas kursi pengirim lalu hilang sendiri. Chat tidak disimpan di database (lewat Supabase Realtime), maksimal 60 huruf, jeda 2 detik, dan maksimal 5 pesan per 30 detik supaya tidak bisa spam. Host match juga bisa chat (bubble-nya muncul di dekat bandar dengan label HOST). Penonton lain bisa membaca tapi tidak bisa mengirim.
 - Meja poker diadaptasi dari [Meja Hold'em](https://github.com/ragila/meja-holdem) karya Ragil.
 

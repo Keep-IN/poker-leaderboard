@@ -390,6 +390,22 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 .rrfly{position:fixed;z-index:30;pointer-events:none;margin:0}
 @keyframes curseGlow{50%{box-shadow:0 0 0 3px #12020a,0 0 44px #ff2d55dd,0 10px 30px #000c}}
 /* Revive Card: angelic, putih suci bersinar */
+#ann.counter{max-width:min(94vw,440px);padding:13px 18px 14px;border:3px solid #7fe3ff;background:radial-gradient(130% 150% at 50% 0%,#0b4a63,#03192a 60%,#020c16);color:#e9fbff;
+  box-shadow:0 0 0 3px #020c16,0 0 30px #47d4ff99,0 10px 30px #000c;animation:pop .25s cubic-bezier(.2,1.6,.4,1) both,bigShake .45s ease-in-out .25s 2,mirrorGlow 1.1s ease-in-out infinite}
+#ann.counter .ic{font-size:44px;filter:drop-shadow(0 0 12px #7fe3ff);animation:mirrorFlip .8s ease-in-out .15s 2}
+#ann.counter .cn{font-size:15px;color:#bff3ff;border-color:#7fe3ff;background:#47d4ff22;text-shadow:0 0 8px #47d4ff}
+#ann.counter .who b{color:#ffd166}
+#ann.counter .sub{color:#bfe9f7;font-size:11.5px}
+@keyframes mirrorGlow{50%{box-shadow:0 0 0 3px #020c16,0 0 44px #7fe3ffcc,0 10px 30px #000c}}
+@keyframes mirrorFlip{50%{transform:rotateY(180deg) scale(1.15)}}
+#ann.winner{max-width:min(94vw,480px);padding:16px 26px 18px;border:3px solid var(--gold);background:radial-gradient(130% 150% at 50% 0%,#5a4300,#1c1400 60%,#0b0800);color:#fff7dc;
+  box-shadow:0 0 0 3px #0b0800,0 0 40px #ffcf4d99,0 10px 30px #000c;animation:pop .35s cubic-bezier(.2,1.6,.4,1) both,winGlow 1.4s ease-in-out infinite}
+#ann.winner .ic{font-size:56px;filter:drop-shadow(0 0 14px #ffd84d);animation:clash 1s ease-in-out .3s 2}
+#ann.winner .cn{font-size:15px;letter-spacing:.3em;color:#ffe08a;border-color:var(--gold);background:#ffcf4d22}
+#ann.winner .nm{display:block;margin-top:6px;font-family:var(--serif);font-size:30px;font-style:italic;font-weight:700;color:#ffd84d;text-shadow:0 0 14px #ffb30080;line-height:1.15}
+#ann.winner .sub{color:#f5e2a8;font-size:11px}
+#ann.winner .conf{position:absolute;font-size:16px;pointer-events:none;animation:feather 3.2s ease-in both}
+@keyframes winGlow{50%{box-shadow:0 0 0 3px #0b0800,0 0 60px #ffd84dcc,0 10px 30px #000c}}
 #ann.angel{color:#3b3320;border:2px solid #fff6d6;background:radial-gradient(120% 140% at 50% 0%,#ffffff,#fff7dc 45%,#f3e2a6);
   box-shadow:0 0 0 3px #fffdf3,0 0 40px #fff3b0,0 0 90px #ffe9a0aa,0 10px 30px #0008;animation:pop .3s cubic-bezier(.2,1.6,.4,1) both,angelGlow 1.6s ease-in-out infinite}
 #ann.angel::before{content:"";position:absolute;left:50%;top:-24px;width:64px;height:14px;transform:translateX(-50%);border:3px solid #ffe27a;border-radius:50%;box-shadow:0 0 14px #fff1a8,inset 0 0 8px #fff1a8;animation:haloBob 2s ease-in-out infinite}
@@ -659,7 +675,7 @@ const tagOf = (p, betting) => S.lobby ? (p.ready ? ['grn', '✓ ready'] : ['', '
   : p.inHand && p.folded ? ['', 'fold'] : S.duel && betting && !p.inHand && p.chips ? ['', '⚔️ nonton'] : !p.chips && !p.inHand ? ['', 'habis'] : null;
 // Skill card yang dipakai hand ini (pemiliknya selalu tahu; lawan baru tahu saat kartu dibuka).
 const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'], reveal_card: ['👁️', 'Reveal Card'], fold_player: ['🚫', 'Fold Player'], go_big: ['🔥', 'Go Big or Go Home!'], duel_me: ['⚔️', 'Duel Me!'], card_reroll: ['🔄', 'Card Reroll'],
-  give_me_straight: ['🪜', 'Give Me A Straight'], give_me_flush: ['💧', 'Give Me A Flush'], give_me_full_house: ['🏠', 'Give Me A Full House'], give_me_quads: ['🎲', 'Give Me A Four of a Kind'], give_me_straight_flush: ['🌈', 'Give Me A Straight Flush'], give_me_royal_flush: ['👑', 'Give Me A Royal Flush'] };
+  give_me_straight: ['🪜', 'Give Me A Straight'], give_me_flush: ['💧', 'Give Me A Flush'], give_me_full_house: ['🏠', 'Give Me A Full House'], give_me_quads: ['🎲', 'Give Me A Four of a Kind'], give_me_straight_flush: ['🌈', 'Give Me A Straight Flush'], give_me_royal_flush: ['👑', 'Give Me A Royal Flush'], pair_me_up: ['👯', 'Pair Me Up'] };
 const skillBadges = p => (p.skills || []).length ? `<span class="skills" title="${esc(p.skills.map(c => (SKILL_ICONS[c] || ['', c])[1] + (p.target >= 0 && S.players[p.target] ? ' → ' + S.players[p.target].name : '')).join(', '))}">${p.skills.map(c => (SKILL_ICONS[c] || ['🃏'])[0]).join('')}${p.target >= 0 && S.players[p.target] ? '<small>→' + esc(S.players[p.target].name.slice(0, 8)) + '</small>' : ''}</span>` : '';
 const row3 = (p, mine, betting) => p.saved ? `<span class="tag grn">🛡️ +${p.saved}</span>` : p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
   : (t => t ? `<span class="tag ${t[0]}">${t[1]}</span>` : '')(tagOf(p, betting));
@@ -911,7 +927,7 @@ function render() {
       if (isHost && wait.length) h = `<div class="sub">Pemain belum Ready (tidak buka meja?) bisa dikeluarkan dari match:</div><div class="lob">` +
         wait.map(({ p, k }) => `<button class="btn ghost" type="button" data-kick="${k}" onclick="sure(this, () => api('kick', { seat: ${k} }))">Keluarkan ${esc(p.name)}</button>`).join('') + '</div>';
     } else {
-      msg = P.ready ? `Kamu sudah Ready · menunggu pemain lain (${rn}/${n})` : `Tekan Ready kalau sudah siap (${rn}/${n} Ready) · Double Down bisa dipasang lewat 🎒 sebelum mulai`;
+      msg = P.ready ? `Kamu sudah Ready · menunggu pemain lain (${rn}/${n})` : `Tekan Ready kalau sudah siap (${rn}/${n} Ready) · kartu passive (Double Down, Full Counter) bisa dipasang lewat 🎒 sebelum mulai`;
       h = P.ready ? `<div class="row"><button class="btn ghost" onclick="act('unready')">Batal Ready</button></div>`
         : `<div class="row"><button class="btn ghost" onclick="sure(this, leaveMatch)">Out</button><button class="btn green" onclick="act('ready')">Ready</button></div>`;
     }
@@ -961,7 +977,7 @@ function render() {
     ? `<div class="over"><b>Hasil turnamen</b><ol>${ps.slice().sort((a, b) => a.place - b.place).map(p => `<li>${esc(p.name)}</li>`).join('')}</ol></div>`
     : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}</em></span>`).join(''));
 
-  drawBubbles(); syncChatBtn(); drawReveal(); drawAnn();
+  drawBubbles(); syncChatBtn(); drawReveal(); drawAnn(); drawWinner();
   const tagBig = S.big !== undefined && betting, tagDuel = S.duelFine !== undefined && betting && S.players[S.duelFine];
   $('bigTag').hidden = !(tagBig || tagDuel);
   $('bigTag').classList.toggle('duel', !tagBig && !!tagDuel);
@@ -1101,7 +1117,9 @@ setInterval(() => { if (bubbles.size) drawBubbles(); }, 200);
 
 // ---- skill card dari inventory (dibaca lewat Supabase dengan sesi login pemain; RLS hanya memberi kartu miliknya) ----
 const USABLE = {
-  double_down: { icon: '⚡', name: 'Double Down', desc: 'Poin match ini jadi 2× lipat. Pasang sebelum hand pertama dibagi.', passive: true },
+  double_down: { icon: '⚡', name: 'Double Down', desc: 'Poin match ini jadi 2× lipat. Pasang sebelum hand pertama dibagi. Memakai 1 dari 3 jatah kartu.', passive: true, on: 'Poin match ini jadi 2× lipat.' },
+  full_counter: { icon: '🪞', name: 'Full Counter', desc: 'Selama match, Fold Player & Reveal Card yang diarahkan ke kamu berbalik ke penyerangnya. Pasang sebelum hand pertama. Memakai 1 dari 3 jatah kartu.', passive: true, on: 'Fold Player & Reveal Card ke kamu berbalik ke penyerang.' },
+  pair_me_up: { icon: '👯', name: 'Pair Me Up', desc: 'Berlaku di hand berikutnya: dijamin dapat pocket pair (2 kartu tangan kembar).', luck: true },
   you_owe_me: { icon: '💸', name: 'You Owe Me My Money', desc: '☠ Wildcard: ambil 80% chip 1 pemain. Diumumkan & dijalankan setelah hand ini selesai.', target: true, wild: true },
   duel_me: { icon: '⚔️', name: 'Duel Me!', desc: '☠ Wildcard: langsung berlaku di hand ini (sebelum turn). Pilih lawan duel; pemain lain dipaksa fold, lawanmu cuma boleh call/raise (fold = 50% chip ke pot).', target: true, cursed: true },
   get_out: { icon: '💀', name: 'Get The F*ck Out!', desc: '☠ Wildcard: 1 pemain langsung tereliminasi setelah hand ini.', target: true, wild: true },
@@ -1133,6 +1151,15 @@ function drawAnn() {
       revive: `${tg} bangkit kembali dengan ${a.extra} chip ✨ ikut lagi di hand berikutnya`,
       you_owe_me: `80% chip ${tg} (${a.extra}) pindah ke ${by}`, duel_me: 'hand ini jadi duel · pemain lain dipaksa fold',
       get_out: `${tg} langsung tereliminasi` }[a.code] || '';
+    if (a.extra === 'counter') { // Full Counter: hanya penyerang yang disebut, targetnya dirahasiakan
+      annUntil = Date.now() + 5200;
+      el.className = 'counter';
+      el.innerHTML = `<span class="ic">🪞</span><span class="cn">Full Counter!</span><span class="who"><b>${by}</b> terkena Full Counter</span>` +
+        `<span class="sub">${esc(u.name)} berbalik ke arahnya · ${a.code === 'fold_player' ? `${by} yang dipaksa fold` : `kartu ${by} yang diintip balik 👀`}</span>`;
+      if (prevS) { play('allin', 6); if (S.me === a.by && navigator.vibrate) navigator.vibrate([80, 40, 80]); }
+      el.hidden = false;
+      return;
+    }
     el.className = a.code === 'go_big' ? 'wild big' : a.code === 'duel_me' ? 'wild big duel' : u.angel ? 'angel' : u.wild || u.cursed ? 'wild' : '';
     el.innerHTML = `<span class="ic">${u.icon}</span><span class="who"><b>${by}</b> memakai</span><span class="cn">${esc(u.name)}</span>` +
       (tg && a.code !== 'reveal_card' ? `<span class="who">→ <b>${tg}</b></span>` : '') + (sub ? `<span class="sub">${sub}</span>` : '') +
@@ -1173,13 +1200,14 @@ async function openBag() {
   document.body.appendChild(el);
   const cards = await loadBag();
   const c = await sb();
-  const dd = c ? ((await c.from('player_cards').select('id').eq('status', 'armed').eq('match_id', match).eq('card_code', 'double_down')).data || []).length > 0 : false;
+  const armed = c ? ((await c.from('player_cards').select('card_code').eq('status', 'armed').eq('match_id', match)).data || []).map(x => x.card_code).filter(x => USABLE[x]) : [];
+  const dd = armed.length > 0, slots = 3 - armed.length;
   const groups = {}; cards.forEach(c => (groups[c.card_code] = groups[c.card_code] || []).push(c));
   const ok = canPlayCard(), P = S && S.players[S.me];
   // kartu Luck bisa dipasang kapan saja selama masih ikut turnamen (berlaku di hand berikutnya)
   const luckOk = !!P && S.phase !== 'over' && !P.place && P.chips > 0 && !S.luckNext && !S.luckBusy;
   const luckWhy = S.luckNext ? `${USABLE[S.luckNext].icon} ${USABLE[S.luckNext].name} sudah terpasang untuk hand berikutnya.` : S.luckBusy ? 'Pemain lain sudah memasang kartu Luck untuk hand berikutnya.' : '';
-  const ddOk = !!P && S.lobby && !S.countdown && !dd;
+  const ddOk = code => !!P && S.lobby && !S.countdown && !armed.includes(code) && slots > 0;
   const aliveN = S.players.filter(q => q.chips > 0 && !q.place).length;
   const wildOk = !!P && !S.lobby && S.phase !== 'over' && !P.place && P.chips > 0 && aliveN > 2 && !S.wildNext && !S.wildBusy;
   const wildWhy = S.wildNext ? `${USABLE[S.wildNext].icon} ${USABLE[S.wildNext].name} sudah menunggu hand ini selesai.` : S.wildBusy ? 'Ada wildcard lain yang sedang menunggu.'
@@ -1190,14 +1218,15 @@ async function openBag() {
     : S.reviveNext !== undefined ? 'Sudah ada pemain yang menunggu dihidupkan.' : !deadN ? 'Belum ada pemain yang tersingkir.' : '';
   const inHandN = S.players.filter(q => q.inHand && !q.folded).length;
   const duelWhy = S.board.length >= 4 ? 'Hanya sebelum kartu ke-4 (turn) dibuka.' : aliveN <= 2 ? 'Tidak bisa dipakai kalau pemain tinggal 2.' : inHandN <= 2 ? 'Hand ini sudah tinggal berdua.' : '';
-  const can = code => code === 'duel_me' ? ok && !duelWhy : USABLE[code].angel ? !!P && S.phase !== 'over' && !angelWhy : code === 'go_big' ? ok && !bigWhy : USABLE[code].wild ? wildOk : USABLE[code].passive ? ddOk : USABLE[code].luck ? luckOk : ok && !(USABLE[code].preflop && S.phase !== 'preflop');
+  const can = code => code === 'duel_me' ? ok && !duelWhy : USABLE[code].angel ? !!P && S.phase !== 'over' && !angelWhy : code === 'go_big' ? ok && !bigWhy : USABLE[code].wild ? wildOk : USABLE[code].passive ? ddOk(code) : USABLE[code].luck ? luckOk : ok && !(USABLE[code].preflop && S.phase !== 'preflop');
   const why = !P ? '' : (P.skills || []).length ? 'Kamu sudah pakai kartu di hand ini.' : !ok ? 'Bisa dipakai saat kamu ikut hand yang sedang berjalan.' : '';
-  const ddLine = dd ? `<div class="it"><span class="ic">⚡</span><span style="flex:1"><b>Double Down terpasang</b><small>Poin match ini jadi 2× lipat.</small></span>${S.lobby && !S.countdown ? '<button class="btn ghost" type="button" id="ddOff">Lepas</button>' : ''}</div>` : '';
+  const ddLine = armed.map(code => `<div class="it"><span class="ic">${USABLE[code].icon}</span><span style="flex:1"><b>${USABLE[code].name} terpasang</b><small>${USABLE[code].on}</small></span>${S.lobby && !S.countdown ? `<button class="btn ghost" type="button" data-off="${code}">Lepas</button>` : ''}</div>`).join('')
+    + (dd ? `<p class="note">Passive terpasang memakai jatah · sisa ${slots} kartu untuk dipakai di meja</p>` : '');
   $('bagList').innerHTML = ddLine + (Object.keys(groups).length
     ? (why && Object.keys(groups).some(c => !USABLE[c].luck && !USABLE[c].passive && !USABLE[c].wild) ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it${USABLE[code].wild || USABLE[code].cursed ? ' cursed' : USABLE[code].angel ? ' angel' : ''}"><span class="ic">${USABLE[code].icon}</span>
         <span style="flex:1"><b>${USABLE[code].name} ×${list.length}</b><small>${USABLE[code].desc}</small></span>
         <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${can(code) ? '' : 'disabled'}>${USABLE[code].passive ? 'Pasang' : 'Pakai'}</button></div>
-        ${USABLE[code].passive && !dd && !(S.lobby && !S.countdown) ? '<p class="note" style="padding-left:36px">Hanya bisa dipasang sebelum hand pertama</p>' : ''}
+        ${USABLE[code].passive && !armed.includes(code) && !(S.lobby && !S.countdown) ? '<p class="note" style="padding-left:36px">Hanya bisa dipasang sebelum hand pertama</p>' : USABLE[code].passive && !armed.includes(code) && slots <= 0 ? '<p class="note" style="padding-left:36px">Jatah 3 kartu sudah habis</p>' : ''}
         ${USABLE[code].angel && angelWhy ? `<p class="note" style="padding-left:36px">${angelWhy}</p>` : ''}
         ${code === 'duel_me' && ok && duelWhy ? `<p class="note" style="padding-left:36px">${duelWhy}</p>` : ''}
         ${code === 'go_big' && ok && bigWhy ? `<p class="note" style="padding-left:36px">${bigWhy}</p>` : ''}
@@ -1207,7 +1236,7 @@ async function openBag() {
     : dd ? '' : '<p class="note">Belum ada skill card yang bisa dipakai di meja. Beli di Market.</p>');
   // Double Down dipasang/dilepas langsung ke database (bukan lewat meja): berlaku untuk poin match ini
   const ddRpc = async (fn, args, okMsg) => { const { error } = await c.rpc(fn, args); if (error) { toast(error.message); return false; } toast(okMsg, true); el.remove(); return true; };
-  if ($('ddOff')) $('ddOff').onclick = () => ddRpc('disarm_double_down', { p_match: match }, '⚡ Double Down dilepas, kembali ke inventory');
+  $('bagList').querySelectorAll('button[data-off]').forEach(b => b.onclick = () => { const u = USABLE[b.dataset.off]; ddRpc('disarm_passive', { p_match: match, p_code: b.dataset.off }, `${u.icon} ${u.name} dilepas, kembali ke inventory`); });
   const play = async (b, code, target) => {
     b.disabled = true;
     const r = await api('card', { card: b.dataset.id, code, target });
@@ -1219,7 +1248,7 @@ async function openBag() {
   };
   $('bagList').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => {
     const code = b.dataset.code;
-    if (USABLE[code].passive) { b.disabled = true; return ddRpc('arm_double_down', { p_card: b.dataset.id, p_match: match }, '⚡ Double Down terpasang: poin match ini 2×').then(x => { if (!x) b.disabled = false; }); }
+    if (USABLE[code].passive) { b.disabled = true; return ddRpc('arm_passive', { p_card: b.dataset.id, p_match: match }, `${USABLE[code].icon} ${USABLE[code].name} terpasang · ${USABLE[code].on}`).then(x => { if (!x) b.disabled = false; }); }
     if (!USABLE[code].target) return play(b, code);
     // kartu Attack: pilih lawan dulu
     const box = $('bagList').querySelector(`.tg[data-for="${code}"]`), ts = targetsFor(code);
@@ -1309,7 +1338,7 @@ keepAwake();
 // S.revealMs, pemain terakhir (terkuat) tetap disorot sampai hand berikutnya.
 let revealNo = -1, revealAt = 0;
 function drawReveal() {
-  const list = S && S.phase === 'showdown' && S.reveal && S.reveal.length > 1 ? S.reveal : null;
+  const list = S && (S.phase === 'showdown' || S.phase === 'over') && S.reveal && S.reveal.length > 1 ? S.reveal : null;
   const table = $('table'), mineEl = $('mine');
   if (!list) {
     if (revealNo !== -1) { revealNo = -1; $('win').classList.remove('hold'); table.classList.remove('revealing'); mineEl.classList.remove('revealing'); set($('reveal'), ''); document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl')); }
@@ -1317,7 +1346,7 @@ function drawReveal() {
   }
   if (revealNo !== S.no) { revealNo = S.no; revealAt = Date.now() + (prevS ? S.revealLead : 0); }
   const step = Math.floor((Date.now() - revealAt) / S.revealMs);
-  $('win').classList.toggle('hold', step < list.length - 1);
+  $('win').classList.toggle('hold', step < list.length - 1 || (S.phase === 'over' && !winDone()));
   if (step < 0) return;
   const k = Math.min(step, list.length - 1), cur = list[k], best = new Set(cur.best.map(String));
   table.classList.add('revealing');
@@ -1332,7 +1361,29 @@ function drawReveal() {
   const last = k === list.length - 1, who = S.players[cur.i];
   set($('reveal'), `<span>${last ? '🏆 ' : ''}${esc(who ? who.name : '')} · <em>${esc(cur.hand)}</em><small>${k + 1}/${list.length}</small></span>`);
 }
-setInterval(() => { if (S && S.phase === 'showdown') drawReveal(); }, 150);
+// Turnamen selesai: sesudah showdown terakhir selesai diputar, pengumuman besar "Winner" di tengah meja.
+let winAt = 0, winKey = '';
+const WIN_MS = 9000;
+const winDone = () => !!winAt && Date.now() >= winAt + WIN_MS;
+function drawWinner() {
+  const w = S && S.phase === 'over' && S.winner !== undefined ? S.players[S.winner] : null;
+  if (!w) return;
+  const list = S.reveal && S.reveal.length > 1 ? S.reveal : null;
+  if (winKey !== S.no + '|' + S.winner) { winKey = S.no + '|' + S.winner; winAt = list ? revealAt + list.length * S.revealMs : Date.now() + (prevS ? 1200 : 0); }
+  const el = $('ann'), now = Date.now();
+  if (now < winAt) return;
+  if (now >= winAt + WIN_MS) { if (el.classList.contains('winner')) { el.hidden = true; el.className = ''; $('win').classList.remove('hold'); } return; }
+  $('win').classList.add('hold');
+  if (!el.classList.contains('winner')) {
+    el.className = 'winner';
+    el.innerHTML = `<span class="ic">🏆</span><span class="cn">Winner</span><span class="nm">${esc(w.name)}</span><span class="sub">juara match ini · ${w.chips} chip</span>` +
+      [8, 26, 72, 90].map((x, i) => `<i class="conf" style="left:${x}%;top:-8px;animation-delay:${i * .3}s">${['🎉', '✨', '🎊', '⭐'][i]}</i>`).join('');
+    if (prevS) play('win');
+  }
+  annUntil = winAt + WIN_MS;
+  el.hidden = false;
+}
+setInterval(() => { if (S && (S.phase === 'showdown' || S.phase === 'over')) { drawReveal(); drawWinner(); } }, 150);
 
 $('snd').classList.toggle('off', muted);
 $('snd').onclick = () => { muted = !muted; localStorage.setItem('mute', muted ? '1' : '0'); $('snd').classList.toggle('off', muted); play('chips', 3); };

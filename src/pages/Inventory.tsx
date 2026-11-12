@@ -5,7 +5,9 @@ import { formatDate } from '../lib/format'
 import { CardTile } from './Market'
 
 const howToUse: Record<string, string> = {
-  double_down: 'Pasang di halaman match online yang sudah kamu join, sebelum match dimulai.',
+  double_down: 'Pasang di halaman match online yang sudah kamu join, sebelum match dimulai. Memakai 1 dari 3 jatah kartu match itu.',
+  full_counter: 'Pasang di halaman match online yang sudah kamu join, sebelum match dimulai. Aktif sepanjang match; memakai 1 dari 3 jatah kartu.',
+  pair_me_up: 'Pakai di meja online lewat 🎒: hand berikutnya kamu pasti dapat pocket pair.',
   defend_me: 'Pakai di meja poker online lewat tombol 🎒 saat hand berjalan.',
   reveal_card: 'Pakai di meja online lewat tombol 🎒, lalu pilih lawan yang mau diintip.',
   fold_player: 'Pakai di meja online lewat tombol 🎒 sebelum flop, lalu pilih lawan.',

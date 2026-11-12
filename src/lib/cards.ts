@@ -36,7 +36,7 @@ export const KIND_LABELS: Record<CardKind, { label: string; icon: string; tone: 
 
 export const CARD_ICONS: Record<string, string> = { double_down: '⚡', defend_me: '🛡️', reveal_card: '👁️', fold_player: '🚫',
   give_me_straight: '🪜', give_me_flush: '💧', give_me_full_house: '🏠', give_me_quads: '🎲', give_me_straight_flush: '🌈', give_me_royal_flush: '👑',
-  you_owe_me: '💸', duel_me: '⚔️', get_out: '💀', go_big: '🔥', card_reroll: '🔄', revive: '😇' }
+  you_owe_me: '💸', duel_me: '⚔️', get_out: '💀', go_big: '🔥', card_reroll: '🔄', revive: '😇', pair_me_up: '👯', full_counter: '🪞' }
 
 /** Urutan tampil: cursed paling atas, lalu angelic, lalu sisanya. */
 export const kindRank = (k: string | undefined) => (k === 'wildcard' ? 0 : k === 'angelic' ? 1 : 2)

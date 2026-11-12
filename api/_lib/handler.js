@@ -14,9 +14,10 @@
 //   create(match, state, dueAt) -> ver | null
 //   save(match, ver, state, dueAt, out, winner) -> ver baru | null (kalah balapan) ; throw 'match_not_ongoing'
 //   withdraw(match, uid)  -> pemain keluar dari match (hapus dari match_players) ; throw kalau hand pertama sudah dibagi
+//   counters(match) -> [uid] pemilik Full Counter yang terpasang (opsional)
 // }
 import { randomUUID } from 'node:crypto'
-import { Table } from './poker.js'
+import { COUNTERED, Table } from './poker.js'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SEEN_MS = 5000
@@ -75,6 +76,13 @@ async function settleRefunds(db, match, r) {
   for (const x of r.t.refunds) await db.refundCard(match, x.uid, x.card).catch(() => {})
   await mutate(db, match, t => { t.refunds = [] }).catch(() => {})
 }
+
+// Pemilik Full Counter yang terpasang di match ini (dipasang di halaman match sebelum hand pertama). null = tidak tahu.
+async function counters(db, match) {
+  if (!db.counters) return null
+  try { return (await db.counters(match)).slice().sort() } catch { return null }
+}
+const setCounter = (t, list) => { if (list && key(list) !== key(t.counter || [])) t.counter = list }
 
 // Meja dibuat saat ada yang pertama kali membukanya setelah match dimulai.
 async function ensureTable(db, match) {
@@ -137,7 +145,9 @@ async function join(db, match, accessToken) {
   await ensureTable(db, match)
   // Host match (tidak ikut main) mendapat token sendiri supaya tetap dikenali sebagai host (boleh chat) setelah refresh.
   const host = (await db.seats(match))?.match.dealer_id === uid
+  const fc = await counters(db, match)
   const r = await mutate(db, match, t => {
+    if (t.lobby) setCounter(t, fc)
     const p = t.players.find(q => q.uid === uid)
     if (!p && host) { if (!t.hostToken) t.hostToken = randomUUID(); return { token: t.hostToken, host: true } }
     if (!p) return { watch: true }
@@ -165,9 +175,11 @@ async function playCard(db, match, b) {
   if (pre) return { error: pre }
   let used
   try { used = await db.useCard(match, p0.uid, cardId) } catch (e) { return { error: String(e.message).replace(/^.*?: /, '') } }
+  const fc = COUNTERED.includes(used) ? await counters(db, match) : null
   let r
   try {
     r = await mutate(db, match, t => {
+      setCounter(t, fc)
       const p = t.find(token)
       const err = p ? t.useCard(t.players.indexOf(p), used, target, cardId) : 'Sesi meja tidak ditemukan'
       return err ? { error: err } : { ok: true, used }
@@ -219,9 +231,11 @@ async function act(db, match, b) {
   if (b.type === 'card') return playCard(db, match, b)
   if (b.type === 'out' || b.type === 'kick') return leave(db, match, b)
   const token = String(b.token || '')
+  const fc = b.type === 'ready' ? await counters(db, match) : null // Full Counter yang baru dipasang sebelum Ready
   const r = await mutate(db, match, t => {
     const p = t.find(token)
     if (!p) return { error: 'Sesi meja tidak ditemukan, buka ulang dari halaman match', gone: true }
+    if (t.lobby) setCounter(t, fc)
     p.seen = t.now
     if (['fold', 'check', 'call', 'raise'].includes(b.type)) p.sitOut = false // pemain yang beraksi berarti sudah kembali
     const i = t.players.indexOf(p)

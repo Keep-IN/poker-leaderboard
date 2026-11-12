@@ -195,7 +195,7 @@ create table if not exists public.skill_cards (
 alter table public.skill_cards drop constraint if exists skill_cards_kind_check;
 alter table public.skill_cards add constraint skill_cards_kind_check check (kind in ('passive', 'attack', 'luck', 'defend', 'wildcard', 'angelic'));
 insert into public.skill_cards (code, name, kind, description, price, stock, on_sale, sort) values
-  ('double_down', 'Double Down', 'passive', 'Poin dari match online ini jadi 2× lipat. Aktifkan di halaman match sebelum match dimulai.', 70, 10, true, 1),
+  ('double_down', 'Double Down', 'passive', 'Poin dari match online ini jadi 2× lipat. Aktifkan di halaman match sebelum match dimulai. Memakai 1 jatah dari 3 kartu per match.', 70, 10, true, 1),
   ('defend_me', 'Defend Me', 'defend', 'Kalau kalah di hand ini, setengah chip yang kamu taruhkan kembali.', 40, 10, true, 2),
   ('reveal_card', 'Reveal Card', 'attack', 'Intip 2 kartu satu lawan pilihanmu sampai hand ini selesai. Lawan baru tahu saat kartu dibuka.', 35, 10, true, 3),
   ('fold_player', 'Fold Player', 'attack', 'Paksa satu lawan fold sebelum flop. Chip yang sudah dia taruh tetap di pot. Tidak bisa ke pemain all-in.', 130, 5, true, 4),
@@ -213,6 +213,8 @@ insert into public.skill_cards (code, name, kind, description, price, stock, on_
   -- Defend termurah: tukar 2 kartu tangan dengan kartu baru dari bandar
   ('card_reroll', 'Card Reroll', 'defend', 'Pakai di tengah hand: 2 kartu tanganmu dikembalikan ke bandar dan diganti 2 kartu baru. Diumumkan ke semua pemain.', 20, 10, true, 2),
   -- Angelic: kebalikan cursed, belum dijual sampai dealer membukanya di Market
+  ('pair_me_up', 'Pair Me Up', 'luck', 'Pasang untuk hand berikutnya: dijamin dapat pocket pair (2 kartu tangan kembar). Satu kartu Luck per hand di seluruh meja.', 45, 5, true, 5),
+  ('full_counter', 'Full Counter', 'passive', 'Pasang di halaman match sebelum match dimulai: selama match, Fold Player dan Reveal Card yang diarahkan ke kamu berbalik ke penyerangnya. Memakai 1 jatah dari 3 kartu per match.', 250, 3, true, 1),
   ('revive', 'Revive Card', 'angelic', 'Hidupkan lagi 1 pemain yang sudah tersingkir (boleh dirimu sendiri) dengan chip awal match. Diumumkan, ikut lagi mulai hand berikutnya. Tidak bisa dipakai kalau pemain tersisa tinggal 2.', 1200, 1, false, 0)
 on conflict (code) do update set name = excluded.name, kind = excluded.kind, description = excluded.description, sort = excluded.sort;
 
@@ -1297,7 +1299,7 @@ begin
      and exists (select 1 from public.player_cards c
                   where c.match_id = p_match and c.player_id = mp.player_id and c.card_code = 'double_down' and c.status = 'armed');
   update public.player_cards set status = 'used', used_at = now()
-   where match_id = p_match and card_code = 'double_down' and status = 'armed';
+   where match_id = p_match and status = 'armed'; -- semua passive (Double Down, Full Counter) habis dipakai
   insert into public.coin_ledger (player_id, amount, reason, ref)
   select player_id, public.match_coins(placement), 'match', p_match::text
     from public.match_players where match_id = p_match and placement is not null
@@ -1516,6 +1518,57 @@ begin
 end;
 $$;
 
+-- Passive (Double Down, Full Counter): boleh beberapa passive berbeda di satu match, masing-masing satu,
+-- tiap passive memakai 1 jatah dari 3 skill card per match.
+create or replace function public.arm_passive(p_card uuid, p_match uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  c public.player_cards;
+begin
+  if not public.online_not_dealt(p_match) then
+    raise exception 'Passive hanya bisa dipasang sebelum hand pertama dibagi';
+  end if;
+  if not exists (select 1 from public.match_players where match_id = p_match and player_id = auth.uid()) then
+    raise exception 'Join match ini dulu sebelum memasang passive';
+  end if;
+  select * into c from public.player_cards
+   where id = p_card and player_id = auth.uid() and status = 'owned'
+     and card_code in (select code from public.skill_cards where kind = 'passive')
+   for update;
+  if c.id is null then
+    raise exception 'Kartu passive tidak ada di inventory kamu';
+  end if;
+  if exists (select 1 from public.player_cards where match_id = p_match and player_id = auth.uid() and card_code = c.card_code and status = 'armed') then
+    raise exception 'Kartu ini sudah terpasang di match ini';
+  end if;
+  if (select count(*) from public.player_cards where match_id = p_match and player_id = auth.uid() and status in ('used', 'armed')) >= 3 then
+    raise exception 'Jatah 3 skill card per match sudah habis';
+  end if;
+  update public.player_cards set status = 'armed', match_id = p_match where id = c.id;
+  return c.card_code;
+end;
+$$;
+
+create or replace function public.disarm_passive(p_match uuid, p_code text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.player_cards set status = 'owned', match_id = null
+   where match_id = p_match and player_id = auth.uid() and card_code = p_code and status = 'armed'
+     and public.online_not_dealt(p_match);
+  if not found then
+    raise exception 'Passive hanya bisa dilepas sebelum hand pertama dibagi';
+  end if;
+end;
+$$;
+
 -- Dipakai server meja (secret key): tandai kartu milik player sebagai terpakai di match ini.
 -- Maksimal 3 kartu per player per match. Mengembalikan kode kartu.
 create or replace function public.meja_use_card(p_match uuid, p_player uuid, p_card uuid)
@@ -1530,11 +1583,12 @@ begin
   if not exists (select 1 from public.matches where id = p_match and mode = 'online' and status = 'ongoing') then
     raise exception 'match_not_ongoing';
   end if;
-  if (select count(*) from public.player_cards where match_id = p_match and player_id = p_player and status = 'used') >= 3 then
-    raise exception 'Maksimal 3 skill card per match';
+  -- passive yang dipasang sebelum match (status armed) ikut memakai jatah
+  if (select count(*) from public.player_cards where match_id = p_match and player_id = p_player and status in ('used', 'armed')) >= 3 then
+    raise exception 'Jatah 3 skill card per match sudah habis (termasuk passive yang dipasang)';
   end if;
   update public.player_cards set status = 'used', used_at = now(), match_id = p_match
-   where id = p_card and player_id = p_player and status = 'owned' and (card_code in ('defend_me', 'reveal_card', 'fold_player', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive') or card_code like 'give\_me\_%')
+   where id = p_card and player_id = p_player and status = 'owned' and (card_code in ('defend_me', 'reveal_card', 'fold_player', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive', 'pair_me_up') or card_code like 'give\_me\_%')
   returning card_code into code;
   if code is null then
     raise exception 'Kartu tidak ada di inventory atau tidak bisa dipakai di meja';
@@ -1560,6 +1614,18 @@ begin
    where match_id = p_match and player_id = p_player and status = 'armed';
   delete from public.match_players where match_id = p_match and player_id = p_player;
 end;
+$$;
+
+-- Dipakai server meja: pemain yang memasang Full Counter di match ini (passive, berbalik ke penyerang).
+create or replace function public.meja_counters(p_match uuid)
+returns uuid[]
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(array_agg(player_id), '{}') from public.player_cards
+   where match_id = p_match and card_code = 'full_counter' and status = 'armed';
 $$;
 
 -- Kartu yang sudah ditandai terpakai tapi gagal dipakai di meja (misalnya target keburu fold) dikembalikan.
@@ -1823,11 +1889,13 @@ revoke all on function public.claimable_coins(uuid) from public, anon, authentic
 revoke all on function public.meja_use_card(uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.meja_podium() from public, anon, authenticated;
 revoke all on function public.meja_refund_card(uuid, uuid, uuid) from public, anon, authenticated;
+revoke all on function public.meja_counters(uuid) from public, anon, authenticated;
 revoke all on function public.meja_withdraw(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.online_not_dealt(uuid) from public, anon, authenticated;
 grant execute on function public.meja_withdraw(uuid, uuid) to service_role;
 grant execute on function public.meja_use_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_refund_card(uuid, uuid, uuid) to service_role;
+grant execute on function public.meja_counters(uuid) to service_role;
 grant execute on function public.meja_podium() to service_role;
 
 do $$
@@ -1869,6 +1937,8 @@ begin
     'public.set_card_listing(text, int, int, boolean)',
     'public.arm_double_down(uuid, uuid)',
     'public.disarm_double_down(uuid)',
+    'public.arm_passive(uuid, uuid)',
+    'public.disarm_passive(uuid, text)',
     'public.update_my_name(text)',
     'public.current_role_name()',
     'public.set_match_timer(uuid, timestamptz)',

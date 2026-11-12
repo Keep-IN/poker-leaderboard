@@ -90,6 +90,8 @@ export const SKILLS = {
   give_me_quads: { name: 'Give Me A Four of a Kind', icon: '🎲', luck: { cat: 7 }, chance: 40 },
   give_me_straight_flush: { name: 'Give Me A Straight Flush', icon: '🌈', luck: { cat: 8 }, chance: 30 },
   give_me_royal_flush: { name: 'Give Me A Royal Flush', icon: '👑', luck: { cat: 8, royal: true }, chance: 15 },
+  // Pair Me Up: pasti dapat pocket pair (2 kartu tangan rank sama) di hand berikutnya; kartu meja dibagi biasa.
+  pair_me_up: { name: 'Pair Me Up', icon: '👯', luck: { pair: true }, chance: 100 },
   // Wildcard: menarget pemain lain yang masih bertahan; dijalankan sesudah hand berjalan selesai, didahului jeda
   // pengumuman di tengah meja. Tidak bisa dipakai (dan batal, kartu dikembalikan) kalau pemain tersisa tinggal 2.
   you_owe_me: { name: 'You Owe Me My Money', icon: '💸', wild: true },
@@ -107,6 +109,8 @@ export const SKILLS = {
   // Langsung diumumkan; pemain itu ikut lagi mulai hand berikutnya. Tidak bisa dipakai kalau pemain tersisa tinggal 2.
   revive: { name: 'Revive Card', icon: '😇', angel: true },
 }
+/** Kartu Attack yang dipantulkan Full Counter (passive yang dipasang sebelum match: t.counter = daftar uid pemiliknya). */
+export const COUNTERED = ['fold_player', 'reveal_card']
 /** Jeda pengumuman wildcard sebelum hand berikutnya dibagi. */
 export const WILD_MS = env('WILD_MS', 5000)
 /** Bagian chip target yang diambil You Owe Me My Money. */
@@ -145,7 +149,7 @@ export function rigLuck(t) {
   return null
 }
 // Jeda tambahan sebelum hand berikutnya: tiap kombinasi pemain disorot bergantian di layar.
-export const REVEAL_MS = env('REVEAL_MS', 1500), REVEAL_LEAD_MS = 900
+export const REVEAL_MS = env('REVEAL_MS', 3000), REVEAL_LEAD_MS = 900
 
 export class Table {
   constructor() {
@@ -217,7 +221,7 @@ export class Table {
     if (this.startedAt === null) this.startedAt = this.now
     this.lobby = false
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false })
     this.handNo++
     this.deck = this.newDeck(); this.board = []; this.phase = 'preflop'; this.bet = this.bb; this.minRaise = this.bb
     this.dealer = this.after(this.dealer, p => p.inHand)
@@ -314,7 +318,7 @@ export class Table {
     // hitung hand AFK: masih istirahat di akhir hand = AFK; beraksi atau menekan "Main lagi" = mulai dari 0
     for (const p of this.players) if (p.inHand && !p.place) p.afk = p.sitOut ? (p.afk || 0) + 1 : 0
     this.eliminate()
-    if (this.alive().length < 2) return this.end()
+    if (this.alive().length < 2) { this.lastShow = this.handNo; return this.end() } // showdown terakhir tetap diputar di layar
     this.defer('next', Math.max(NEXT_MS, REVEAL_LEAD_MS + this.showdownOrder().length * REVEAL_MS + 2500))
   }
   // Pemain yang chip-nya habis di hand ini tersingkir. Kalau beberapa sekaligus, yang stack awal hand-nya lebih
@@ -447,6 +451,7 @@ export class Table {
       return
     }
     p.skills = [...(p.skills || []), code]
+    if (COUNTERED.includes(code) && this.hasCounter(j)) return this.counterHit(i, code, j)
     if (SKILLS[code].target) p.target = j
     if (SKILLS[code].open) this.announce(i, code, SKILLS[code].secret ? -1 : j) // kartu Attack langsung diumumkan di tengah meja
     if (code === 'go_big') this.big = i
@@ -456,6 +461,17 @@ export class Table {
     }
     if (code === 'fold_player') this.forceFold(j)
     if (code === 'duel_me') this.duelNow(i, j)
+  }
+  hasCounter(j) { const q = this.players[j]; return !!q && (this.counter || []).includes(q.uid) }
+  // Full Counter: serangan i ke j berbalik ke i. Pengumumannya hanya menyebut penyerang (target dirahasiakan).
+  // Fold Player: penyerang yang dipaksa fold. Reveal Card: target yang melihat kartu penyerang sampai hand selesai.
+  counterHit(i, code, j) {
+    const p = this.players[i], q = this.players[j]
+    p.countered = true
+    this.counters = (this.counters || 0) + 1
+    this.announce(i, code, -1, 'counter')
+    if (code === 'reveal_card') q.peekAt = i
+    if (code === 'fold_player') this.forceFold(i)
   }
   // Duel Me!: semua pemain selain i dan j dipaksa fold sekaligus, lalu permainan lanjut seperti forceFold.
   duelNow(i, j) {
@@ -536,6 +552,14 @@ export class Table {
     o.skills = [L.code]
     o.lucky = false
     if (R(100) >= SKILLS[L.code].chance) return
+    if (SKILLS[L.code].luck.pair) { // pocket pair: pemain lain dan kartu meja dari sisa dek yang diacak ulang
+      const rank = 2 + R(13), [a, b] = shuffle([0, 1, 2, 3])
+      const hole = [card(rank, a), card(rank, b)]
+      this.deck = this.newDeck().filter(c => !hole.includes(c))
+      for (const p of el) p.cards = p === o ? hole : [this.deck.pop(), this.deck.pop()]
+      o.lucky = true
+      return
+    }
     const r = rigLuck(SKILLS[L.code].luck)
     if (!r) return
     // bagi ulang: pemilik mendapat kartu susunan, pemain lain dari sisa dek, lalu kartu meja ditaruh di ujung dek
@@ -589,7 +613,8 @@ export class Table {
 
   // Pemain yang membuka kartu di showdown, dari kombinasi terlemah sampai terkuat (seri: urutan kursi).
   showdownOrder() {
-    if (this.phase !== 'showdown' || this.board.length < 5) return []
+    const last = this.phase === 'over' && this.lastShow === this.handNo
+    if ((this.phase !== 'showdown' && !last) || this.board.length < 5) return []
     return this.players.map((q, i) => ({ q, i })).filter(({ q }) => q.inHand && !q.folded && q.show && q.score)
       .sort((a, b) => a.q.score - b.q.score || a.i - b.i)
   }
@@ -600,7 +625,7 @@ export class Table {
   view(me, hostView = false) {
     const i = me ? this.players.indexOf(me) : -1, N = this.players
     // Reveal Card: pemakainya melihat kartu targetnya sampai hand selesai
-    const peek = q => !!me && (me.skills || []).includes('reveal_card') && N[me.target] === q && q.inHand && !q.folded
+    const peek = q => !!me && (((me.skills || []).includes('reveal_card') && N[me.target] === q) || (me.peekAt >= 0 && N[me.peekAt] === q)) && q.inHand && !q.folded
     const hand = q => (q === me ? q.inHand && !q.folded : (q.show || peek(q)) && !q.folded) && this.board.length > 2 ? handName(q.cards, this.board) : ''
     const seen = q => q === me || !this.betting || (q.skills || []).some(c => SKILLS[c]?.open)
     const lvl = this.level(), nextSb = LEVELS[Math.min(LEVELS.length - 1, lvl + 1)]
@@ -624,7 +649,7 @@ export class Table {
         online: this.online(q), ready: !!q.ready, killed: !!q.killed, revived: q.revived || 0, won: q.won, fined: q.fined || 0, hand: hand(q), last: q.last, place: q.place, afk: q.afk || 0, afkOut: !!q.afkOut,
         // skill card yang dipakai hand ini: pemiliknya selalu tahu, pemain lain baru tahu saat kartu dibuka (showdown)
         skills: seen(q) ? q.skills || [] : [], target: q.target >= 0 && (q === me || (seen(q) && !(q.skills || []).some(c => SKILLS[c]?.secret))) ? q.target : -1, saved: q.saved || 0,
-        forced: !!q.forced, peek: peek(q),
+        forced: !!q.forced, peek: peek(q), countered: !!q.countered,
         cards: q === me || q.show || peek(q) ? q.cards : q.inHand && !q.folded ? [-1, -1] : [],
       })),
     }
@@ -642,6 +667,8 @@ export class Table {
     if (i >= 0) v.luckBusy = !!this.luck && this.luck.i !== i // pemain lain sudah memasang kartu Luck
     // hasil kartu Luck baru diberitahu sesudah hand selesai (kalau sebelumnya, pemiliknya tahu kartu meja akan cocok)
     if (me && !this.betting && me.lucky !== null && me.lucky !== undefined && (me.skills || []).some(c => SKILLS[c]?.luck)) v.lucky = me.lucky
+    if (me && (this.counter || []).includes(me.uid)) v.counter = true // Full Counter saya aktif (hanya pemiliknya yang tahu)
+    if (this.phase === 'over' && this.winner) v.winner = this.players.findIndex(p => p.uid === this.winner)
     if (hostView) v.hostView = true
     return v
   }

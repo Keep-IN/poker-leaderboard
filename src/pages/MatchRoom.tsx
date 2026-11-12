@@ -189,7 +189,7 @@ export default function MatchRoom() {
         </p>
       )}
 
-      {online && match.status === 'open' && me && profile.role === 'player' && <DoubleDownPicker matchId={id} />}
+      {online && match.status === 'open' && me && profile.role === 'player' && <PassivePicker matchId={id} />}
 
       {/* Online table */}
       {online && match.status === 'ongoing' && (
@@ -462,42 +462,59 @@ function SmallButton({
   )
 }
 
-/** Pasang/lepas Double Down untuk match online ini (sebelum dimulai). Tidak tampil kalau tidak punya kartunya. */
-function DoubleDownPicker({ matchId }: { matchId: string }) {
+const PASSIVES = [
+  { code: 'double_down', icon: '⚡', name: 'Double Down', on: 'Poin kamu dari match ini jadi 2× lipat.', off: 'Poin dari match ini jadi 2×.' },
+  { code: 'full_counter', icon: '🪞', name: 'Full Counter', on: 'Fold Player & Reveal Card ke kamu berbalik ke penyerangnya.', off: 'Fold Player & Reveal Card ke kamu berbalik ke penyerang.' },
+]
+
+/**
+ * Pasang/lepas kartu passive untuk match online ini (sebelum dimulai). Boleh beberapa passive sekaligus; tiap passive
+ * memakai 1 dari 3 jatah skill card per match. Tidak tampil kalau tidak punya kartu passive.
+ */
+function PassivePicker({ matchId }: { matchId: string }) {
   const { cards, reload } = useMyCards()
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   if (!cards) return null
-  const armed = cards.find((c) => c.card_code === 'double_down' && c.status === 'armed' && c.match_id === matchId)
-  const spare = cards.find((c) => c.card_code === 'double_down' && c.status === 'owned')
-  if (!armed && !spare) return null
+  const rows = PASSIVES.map((p) => ({
+    ...p,
+    armed: cards.find((c) => c.card_code === p.code && c.status === 'armed' && c.match_id === matchId),
+    spare: cards.find((c) => c.card_code === p.code && c.status === 'owned'),
+  })).filter((r) => r.armed || r.spare)
+  if (!rows.length) return null
+  const used = rows.filter((r) => r.armed).length
 
-  async function run(fn: string, args: Record<string, unknown>) {
-    setBusy(true)
+  async function run(code: string, fn: string, args: Record<string, unknown>) {
+    setBusy(code)
     setError('')
     const { error } = await supabase.rpc(fn, args)
     if (error) setError(errorMessage(error))
     await reload()
-    setBusy(false)
+    setBusy('')
   }
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-3">
-        <div className="min-w-0 text-sm">
-          <p className="font-semibold">⚡ Double Down {armed ? 'terpasang' : 'tersedia'}</p>
-          <p className="text-xs text-slate-400">{armed ? 'Poin kamu dari match ini jadi 2× lipat.' : 'Pasang sebelum match dimulai: poin dari match ini jadi 2×.'}</p>
+      {rows.map((r) => (
+        <div key={r.code} className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/40 bg-amber-500/10 px-4 py-3">
+          <div className="min-w-0 text-sm">
+            <p className="font-semibold">{r.icon} {r.name} {r.armed ? 'terpasang' : 'tersedia'}</p>
+            <p className="text-xs text-slate-400">{r.armed ? r.on : `Pasang sebelum match dimulai: ${r.off}`}</p>
+          </div>
+          {r.armed ? (
+            <Button variant="ghost" className="min-h-9 shrink-0 px-3 text-xs" loading={busy === r.code} onClick={() => run(r.code, 'disarm_passive', { p_match: matchId, p_code: r.code })}>
+              Lepas
+            </Button>
+          ) : (
+            <Button className="min-h-9 shrink-0 px-3 text-xs" loading={busy === r.code} onClick={() => run(r.code, 'arm_passive', { p_card: r.spare!.id, p_match: matchId })}>
+              Pasang
+            </Button>
+          )}
         </div>
-        {armed ? (
-          <Button variant="ghost" className="min-h-9 shrink-0 px-3 text-xs" loading={busy} onClick={() => run('disarm_double_down', { p_match: matchId })}>
-            Lepas
-          </Button>
-        ) : (
-          <Button className="min-h-9 shrink-0 px-3 text-xs" loading={busy} onClick={() => run('arm_double_down', { p_card: spare!.id, p_match: matchId })}>
-            Pasang
-          </Button>
-        )}
-      </div>
+      ))}
+      <p className="px-1 text-xs text-slate-400">
+        Tiap passive yang dipasang memakai 1 dari 3 jatah skill card match ini{used ? ` · sisa jatah di meja: ${3 - used}` : ''}.
+      </p>
       <ErrorText>{error}</ErrorText>
     </div>
   )

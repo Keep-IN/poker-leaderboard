@@ -236,7 +236,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
 }
 
 { // kartu Luck: susunan selalu membentuk kombinasinya, dan kombinasinya tidak cuma dari kartu meja
-  for (const [code, sk] of Object.entries(SKILLS).filter(([, x]) => x.luck)) for (let k = 0; k < 150; k++) {
+  for (const [code, sk] of Object.entries(SKILLS).filter(([, x]) => x.luck && !x.luck.pair)) for (let k = 0; k < 150; k++) {
     const r = rigLuck(sk.luck), all = r.hole.concat(r.board)
     assert.equal(new Set(all).size, 7, code)
     assert(all.every(c => c >= 0 && c < 52))
@@ -463,6 +463,53 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.deepEqual(t.board, deck.slice(-3).reverse(), 'flop tetap kartu yang sama')
 }
 
+{ // Pair Me Up: hand berikutnya pemiliknya pasti pocket pair; hasilnya baru terlihat sesudah hand selesai
+  for (let k = 0; k < 30; k++) {
+    const t = mk([1000, 1000, 1000]); begin(t)
+    assert.equal(t.useCard(2, 'pair_me_up', -1), undefined)
+    assert.equal(typeof t.useCard(0, 'give_me_flush', -1), 'string', 'satu kartu Luck per meja')
+    while (t.betting) ok(t, t.turn, 'fold')
+    nxt(t)
+    const [a, b] = t.players[2].cards
+    assert.equal(a % 13, b % 13, 'pocket pair'); assert.notEqual(a, b)
+    const all = t.players.flatMap(p => p.cards).concat(t.deck)
+    assert.equal(new Set(all).size, 52, 'dek tetap 52 kartu unik')
+    assert.equal(t.players[2].lucky, true)
+  }
+}
+{ // Full Counter: Fold Player / Reveal Card ke pemiliknya berbalik ke penyerang; target tidak diumumkan
+  const t = mk([1000, 1000, 1000, 1000]); t.counter = ['u2']; begin(t)
+  // giliran pertama P3 (UTG); P1 menyerang P2 di luar giliran
+  assert.equal(t.useCard(1, 'fold_player', 2), undefined)
+  assert(t.players[1].folded && t.players[1].forced, 'penyerang yang fold')
+  assert(!t.players[2].folded, 'pemilik Full Counter tetap main')
+  assert.equal(t.ann.extra, 'counter'); assert.equal(t.ann.by, 1); assert.equal(t.ann.target, -1)
+  const v0 = t.view(t.players[0])
+  assert.equal(v0.players[1].target, -1, 'target dirahasiakan'); assert.equal(v0.players[1].countered, true)
+  assert.equal(t.view(t.players[2]).counter, true); assert.equal(v0.counter, undefined, 'hanya pemiliknya yang tahu')
+  // Reveal Card ke pemilik Full Counter: justru dia yang melihat kartu penyerang
+  assert.equal(t.useCard(3, 'reveal_card', 2), undefined)
+  const v2 = t.view(t.players[2]), v3 = t.view(t.players[3])
+  assert.deepEqual(v2.players[3].cards, t.players[3].cards, 'pemilik counter melihat kartu penyerang')
+  assert.deepEqual(v3.players[2].cards, [-1, -1], 'penyerang tidak melihat apa-apa')
+  assert.equal(t.ann.extra, 'counter'); assert.equal(t.ann.target, -1)
+  // kartu lain dan target lain tidak terpengaruh
+  assert.equal(t.useCard(0, 'fold_player', 3), undefined)
+  assert(t.players[3].folded); assert.notEqual(t.ann.extra, 'counter')
+  // hand berikutnya: intip balik tidak terbawa
+  while (t.betting) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  nxt(t); assert.equal(t.players[2].peekAt, -1)
+}
+{ // showdown terakhir (penentu juara) tetap punya daftar sorotan; juara diumumkan lewat view.winner
+  const t = mk([1000, 500]); rig(t, 'As Ah 2c 7d Kd Kc Ks Qh Jh'); begin(t)
+  while (t.betting && t.turn >= 0) { const c = t.ctl(t.turn); ok(t, t.turn, c.raise ? 'raise' : 'call', c.maxTo) }
+  drain(t)
+  assert.equal(t.phase, 'over')
+  const v = t.view(t.players[1])
+  assert.equal(v.reveal.length, 2); assert.equal(v.winner, 0)
+  assert.equal(REVEAL_MS, 3000)
+}
+
 { // Revive Card: pemain tersingkir hidup lagi dengan chip awal di hand berikutnya; peringkat disusun ulang
   const fin = u => { while (u.betting) ok(u, u.turn, u.ctl(u.turn).call ? 'call' : 'check') }
   // tersingkir di antara hand (seperti bust): chip ke `forfeited` supaya total chip tetap tercatat
@@ -501,6 +548,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   for (let round = 0; round < 300; round++) {
     const n = 3 + (round % 6), R = k => Math.random() * k | 0
     let t = mk(Array.from({ length: n }, () => 200 + R(800)), { level_minutes: 1 + R(3) })
+    if (round % 2) t.counter = [t.players[R(n)].uid]
     const total = t.players.reduce((s, p) => s + p.chips, 0)
     begin(t)
     let g = 0
@@ -509,7 +557,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
       if (t.turn >= 0) {
         const i = t.turn, c = t.ctl(i), r = Math.random()
         if (r < .03) { // boleh gagal (fold/sudah pakai/target salah): tidak mengubah apa-apa
-          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive'][R(11)]
+          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive', 'pair_me_up'][R(12)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
         if (r < .05) run(t, TURN_MS)

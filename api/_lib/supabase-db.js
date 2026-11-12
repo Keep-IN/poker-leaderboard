@@ -33,6 +33,7 @@ export function supabaseDb(url, secret) {
       const r = await one(`/rest/v1/online_tables?match_id=eq.${match}&select=state,ver,match:matches(status)`)
       return r && { state: r.state, ver: r.ver, status: r.match.status }
     },
+    counters: match => rpc('meja_counters', { p_match: match }),
     create: (match, state, dueAt) => rpc('meja_create', { p_match: match, p_state: state, p_due: dueAt }),
     useCard: (match, player, card) => rpc('meja_use_card', { p_match: match, p_player: player, p_card: card }),
     withdraw: (match, player) => rpc('meja_withdraw', { p_match: match, p_player: player }),
