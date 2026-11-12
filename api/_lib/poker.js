@@ -239,7 +239,7 @@ export class Table {
     if (this.startedAt === null) this.startedAt = this.now
     this.lobby = false
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false, boost: 0 })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false, boost: 0, pre: null })
     this.handNo++
     this.deck = this.newDeck(); this.board = []; this.phase = 'preflop'; this.bet = this.bb; this.minRaise = this.bb
     this.dealer = this.after(this.dealer, p => p.inHand)
@@ -264,7 +264,29 @@ export class Table {
   }
   // Pemain yang tidak aktif cuma diberi waktu singkat supaya turnamen tidak tertahan.
   turnMs() { return this.speed === this.handNo ? SPEED_MS : TURN_MS } // Speed Round (host): waktu giliran lebih singkat
-  setTurn(i) { this.turn = i; const p = this.players[i]; this.defer('turn', p.sitOut || !this.online(p) ? Math.min(AWAY_MS, this.turnMs()) : this.turnMs()) }
+  setTurn(i) {
+    this.turn = i; const p = this.players[i]; this.defer('turn', p.sitOut || !this.online(p) ? Math.min(AWAY_MS, this.turnMs()) : this.turnMs())
+    if (p.pre) this.autoAct(i)
+  }
+  // ---- pre-action: dipilih pemain sebelum gilirannya, disimpan di server (tetap jalan walau koneksinya putus) ----
+  // fold = check/fold (check kalau gratis, fold kalau ada taruhan; batal kalau fold kena denda Go Big/Duel)
+  // check = check selama tidak ada bet (mati sendiri begitu ada yang bet/raise) ; call = call berapa pun (any call)
+  // Berlaku sampai hand selesai atau dimatikan pemain.
+  setPre(i, v) {
+    const p = this.players[i]
+    if (!['', 'fold', 'check', 'call'].includes(v)) return 'Pilihan tidak dikenal'
+    if (v && (!this.betting || !p.inHand || p.folded || p.allIn)) return 'Hanya selama kamu masih ikut hand'
+    if (v === 'check' && this.bet > p.bet) return 'Sudah ada taruhan, Auto Check tidak bisa dipakai'
+    p.pre = v || null
+    if (v && this.turn === i) this.autoAct(i) // dipilih tepat saat gilirannya: langsung jalan
+  }
+  autoAct(i) {
+    const p = this.players[i], toCall = this.bet - p.bet, pre = p.pre
+    if (pre === 'call') return this.act(i, toCall ? 'call' : 'check')
+    if (!toCall) return this.act(i, 'check')
+    if (pre === 'fold' && !this.bigFine(i)) return this.act(i, 'fold')
+    p.pre = null // auto check bertemu taruhan / fold kena denda: pemain memutuskan sendiri
+  }
   timeout() {
     const p = this.players[this.turn]
     if (!p) return
@@ -293,6 +315,7 @@ export class Table {
       if (full) { this.minRaise = to - this.bet; for (const q of this.players) q.acted = q.noRaise = false }
       else for (const q of this.players) { if (q.acted) q.noRaise = true; q.acted = false } // all-in pendek tidak membuka raise lagi
       this.bet = to
+      for (const q of this.players) if (q !== p && q.pre === 'check') q.pre = null // ada bet/raise: Auto Check mati
     } else return 'Aksi tidak dikenal'
     p.acted = true
     this.step(i)
@@ -768,6 +791,7 @@ export class Table {
       })),
     }
     if (i >= 0 && this.turn === i) v.ctl = this.ctl(i)
+    if (me?.pre) v.pre = me.pre // pre-action saya (hanya terlihat sendiri)
     if (i >= 0 && this.luck?.i === i) v.luckNext = this.luck.code // kartu Luck saya menunggu hand berikutnya
     if (me && this.wild?.by === me.uid) v.wildNext = this.wild.code // wildcard saya menunggu hand ini selesai
     if (i >= 0) v.wildBusy = !!this.wild && this.wild.by !== me.uid

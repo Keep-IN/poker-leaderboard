@@ -300,6 +300,11 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 .seat.peek .cards{position:relative}
 .seat.peek .cards .card{outline:2px dashed #71c5eb;outline-offset:1px}
 .seat.peek .cards::after{content:'👁️';position:absolute;top:-10px;right:-8px;font-size:13px}
+/* pre-action: tombol toggle sebelum giliran */
+.prerow .btn.pre{flex:1;padding:7px 6px;font-size:13px;line-height:1.15}
+.prerow .btn.pre small{display:block;margin-top:2px;font-size:9.5px;letter-spacing:.04em;opacity:.75;text-transform:none}
+.prerow .btn.pre.on{background:var(--gold);border-color:var(--gold);color:var(--ink);box-shadow:inset 0 0 0 2px #0003}
+.prerow .btn.pre.on::before{content:"✓ "}
 #bagSheet .tg{display:flex;flex-wrap:wrap;gap:6px;padding:4px 0 10px 36px}
 #bagSheet .tg .btn{padding:6px 10px;font-size:13px;box-shadow:none}
 .skills{position:absolute;left:-10px;top:-12px;z-index:3;padding:1px 4px;border-radius:999px;background:#04122b;border:1.5px solid var(--gold);font-size:12px;line-height:16px;box-shadow:1px 1px 0 #000}
@@ -976,6 +981,12 @@ function doneR(el, go) {
   if (go && v >= S.ctl.minTo) { el.blur(); act('raise', raiseTo); }
 }
 
+// Pre-action sebelum giliran: disimpan di server, jadi tetap jalan walau koneksi putus atau AFK.
+function preButtons(P) {
+  const owe = Math.max(...S.players.map(q => q.bet)) - P.bet, pre = S.pre || '';
+  const b = (v, label, sub, dis) => `<button class="btn ghost pre${pre === v ? ' on' : ''}" type="button" aria-pressed="${pre === v}" ${dis ? 'disabled' : ''} onclick="api('pre', { pre: '${pre === v ? '' : v}' })">${label}<small>${sub}</small></button>`;
+  return `<div class="row prerow">${b('fold', 'Auto Fold', owe ? 'fold saat giliran' : 'check kalau gratis')}${b('check', 'Auto Check', owe ? 'ada taruhan' : 'mati kalau ada raise', owe && pre !== 'check')}${b('call', 'Any Call', owe ? 'call ' + Math.min(owe, P.chips) + '+' : 'call berapa pun')}</div>`;
+}
 function controls(c, P) {
   const key = S.phase + c.bet + c.minTo + S.board.length;
   if (key !== rkey) { rkey = key; raiseTo = c.minTo; }
@@ -1103,7 +1114,10 @@ function render() {
   else if (S.ctl) { msg = 'Giliran kamu'; h = controls(S.ctl, P); }
   else if (P.sitOut) msg = `Kamu AFK · kartu otomatis check/fold · keluar setelah ${S.afkLimit} putaran AFK (${P.afk}/${S.afkLimit}) · tekan Main lagi`;
   else if (betting && S.duel && (!P.inHand || (P.folded && P.forced))) msg = `Hand ini duel ${esc(ps[S.duel[0]].name)} vs ${esc(ps[S.duel[1]].name)} · kamu jadi penonton`;
-  else if (betting) msg = S.turn >= 0 ? 'Giliran ' + esc(ps[S.turn].name) + (P.folded ? ' · kamu fold' : '') : 'Membuka kartu…';
+  else if (betting) {
+    msg = S.turn >= 0 ? 'Giliran ' + esc(ps[S.turn].name) + (P.folded ? ' · kamu fold' : '') : 'Membuka kartu…';
+    if (S.turn >= 0 && P.inHand && !P.folded && !P.allIn) h = preButtons(P);
+  }
   else if (phase === 'showdown') msg = 'Hand berikutnya sebentar lagi';
   else msg = 'Hand pertama dimulai <span id="st"></span>';
   if (!P && phase !== 'over') { if (betting && S.turn >= 0) msg += ' · giliran ' + esc(ps[S.turn].name); }

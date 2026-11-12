@@ -560,6 +560,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
           const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive', 'pair_me_up'][R(12)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
+        if (r > .96 && r <= .97) { t.setPre(R(n), ['fold', 'check', 'call', ''][R(4)]); continue } // pre-action (bisa langsung jalan)
         if (r > .97) { const hc = Object.keys(HOST_SKILLS)[R(11)]; if (t.useHost(hc, R(n)) === undefined) continue } // skill host
         if (r < .05) run(t, TURN_MS)
         else if (r < .2) ok(t, i, 'fold')
@@ -641,6 +642,33 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.equal(t.ann.target, 2); assert(t.players[2].chips > low)
   t.hostUsed = -1; assert.equal(t.useHost('lucky_spin'), undefined); assert(SKILLS[t.luck.code].luck)
   assert.equal(typeof t.useHost('lucky_spin'), 'string') // luck sudah menunggu (dan 1 per hand)
+}
+
+{ // pre-action: Auto Fold (check kalau gratis), Auto Check (mati saat ada bet), Any Call
+  const t = mk([1000, 1000, 1000, 1000]); begin(t)
+  // dealer P0, SB P1, BB P2, giliran P3
+  assert.equal(t.turn, 3)
+  assert.match(t.setPre(2, 'check') || '', /^$/) // BB: belum ada raise, boleh
+  assert.equal(t.setPre(0, 'call'), undefined); assert.equal(t.setPre(1, 'fold'), undefined)
+  assert.equal(t.view(t.players[0]).pre, 'call'); assert.equal(t.view(t.players[1]).pre, 'fold'); assert(!JSON.stringify(t.view(t.players[0]).players).includes('pre'))
+  ok(t, 3, 'raise', 60)
+  assert.equal(t.players[2].pre, null) // ada raise: Auto Check BB mati
+  // P0 any call langsung call, P1 auto fold langsung fold, giliran berhenti di P2 (manual)
+  assert.equal(t.players[0].bet, 60); assert(t.players[1].folded); assert.equal(t.turn, 2)
+  ok(t, 2, 'call')
+  // flop: P2 manual; P3 pasang auto check, P0 masih any call
+  assert.equal(t.phase, 'flop'); assert.equal(t.turn, 2)
+  t.setPre(3, 'check'); ok(t, 2, 'check')
+  assert.equal(t.phase, 'turn') // P3 auto check & P0 any call (check) jalan sendiri, ronde selesai
+  // pre dipilih tepat saat giliran: langsung jalan (auto fold = check karena gratis), lalu yang lain ikut otomatis
+  assert.equal(t.turn, 2); t.setPre(2, 'fold'); assert.equal(t.phase, 'showdown'); assert(!t.players[2].folded) // semua pre jalan sampai showdown
+  nxt(t); drain(t); nxt(t)
+  assert(t.players.every(p => !p.pre)) // hand baru: semua pre-action direset
+}
+{ // Auto Fold tidak jalan kalau fold kena denda Go Big
+  const t = mk([1000, 1000, 1000, 1000]); begin(t)
+  t.big = 3; t.setPre(0, 'fold'); ok(t, 3, 'raise', 60)
+  assert.equal(t.turn, 0); assert(!t.players[0].folded); assert.equal(t.players[0].pre, null)
 }
 
 console.log('semua tes lulus')

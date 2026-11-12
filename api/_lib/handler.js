@@ -3,6 +3,7 @@
 //   GET  /api/meja?match=&watch=1&v=         -> state untuk penonton (tanpa kartu tertutup)
 //   POST /api/meja {match, type:'join', access_token}       -> {token} untuk pemain match ini
 //   POST /api/meja {match, token, type, amount}             -> fold | check | call | raise | sitin | ready | unready
+//   POST /api/meja {match, token, type:'pre', pre}          -> pre-action: fold | check | call | '' (mati)
 //   POST /api/meja {match, token, type:'out'}               -> keluar dari match di lobi (sebelum hand pertama)
 //   POST /api/meja {match, token: host, type:'kick', seat}  -> host mengeluarkan pemain di lobi
 //   POST /api/meja {match, token: host, type:'host', code, target} -> host memakai skill card host (HOST_SKILLS)
@@ -254,7 +255,7 @@ async function act(db, match, b) {
     p.seen = t.now
     if (['fold', 'check', 'call', 'raise'].includes(b.type)) p.sitOut = false // pemain yang beraksi berarti sudah kembali
     const i = t.players.indexOf(p)
-    const err = b.type === 'sitin' ? t.sitIn(i) : b.type === 'ready' || b.type === 'unready' ? t.setReady(i, b.type === 'ready') : t.act(i, b.type, b.amount)
+    const err = b.type === 'pre' ? t.setPre(i, String(b.pre || '')) : b.type === 'sitin' ? t.sitIn(i) : b.type === 'ready' || b.type === 'unready' ? t.setReady(i, b.type === 'ready') : t.act(i, b.type, b.amount)
     return err ? { error: err } : { ok: true }
   })
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
