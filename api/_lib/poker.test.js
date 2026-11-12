@@ -561,7 +561,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
         if (r > .96 && r <= .97) { t.setPre(R(n), ['fold', 'check', 'call', ''][R(4)]); continue } // pre-action (bisa langsung jalan)
-        if (r > .97) { const hc = Object.keys(HOST_SKILLS)[R(11)]; if (t.useHost(hc, R(n)) === undefined) continue } // skill host
+        if (r > .97) { const hk = Object.keys(HOST_SKILLS), hc = hk[R(hk.length)]; if (t.useHost(hc, R(n), R(n)) === undefined) continue } // skill host
         if (r < .05) run(t, TURN_MS)
         else if (r < .2) ok(t, i, 'fold')
         else if (r < .6 || !c.raise) ok(t, i, c.call ? 'call' : 'check')
@@ -669,6 +669,51 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   const t = mk([1000, 1000, 1000, 1000]); begin(t)
   t.big = 3; t.setPre(0, 'fold'); ok(t, 3, 'raise', 60)
   assert.equal(t.turn, 0); assert(!t.players[0].folded); assert.equal(t.players[0].pre, null)
+}
+
+{ // skill host batch 2: Double or Nothing, Split Pot, Insurance, Spotlight, Freeze, Shot Clock, Leader Tax, Mystery Box
+  const t = mk([1000, 300, 1000]); rig(t, 'As Ah 7c 2d Ks Kh 3s 8h 9c Jd 4d'); begin(t)
+  assert.equal(t.useHost('insurance'), undefined)
+  ok(t, 0, 'raise', 300); ok(t, 1, 'call'); ok(t, 2, 'fold') // P1 (72o) all-in 300 vs AA
+  drain(t)
+  assert.equal(t.players[1].chips, 75); assert.equal(t.players[1].place, 0) // kalah all-in: kembali 25% dari 300, tetap hidup
+  assert.equal(t.view(null).players[1].insured, 75)
+  nxt(t)
+  t.useHost('spotlight', t.turn)
+  const sp = t.view(null).players[t.turn]; assert.equal(sp.cards.filter(c => c >= 0).length, 1); assert(sp.spot >= 0)
+  t.hostUsed = -1; const fz = t.turn; t.useHost('freeze', fz)
+  assert.equal(t.ctl(fz).raise, false); assert.match(t.act(fz, 'raise', 500), /Freeze/)
+  t.hostUsed = -1; t.useHost('shot_clock', 0, 2)
+  assert.equal(t.turnMs(0), 5000); assert.equal(t.turnMs(1), TURN_MS)
+  t.hostUsed = -1; const before = stacks(t); t.useHost('leader_tax')
+  assert.equal(stacks(t).reduce((a, b) => a + b), before.reduce((a, b) => a + b)) // pajak cuma pindah chip
+  t.hostUsed = -1; t.useHost('mystery_box'); assert.equal(t.gifts.length, 1); assert(t.ann.extra)
+}
+{ // Split Pot: dua kombinasi terbaik bagi rata; Double or Nothing: total chip tetap konsisten
+  const t = mk([1000, 1000, 1000]); rig(t, 'As Ah 7c 2d Ks Kh 3s 8h 9c Jd 4d'); begin(t)
+  t.useHost('split_pot')
+  ok(t, 0, 'call'); ok(t, 1, 'call'); ok(t, 2, 'check')
+  while (t.betting && t.turn >= 0) ok(t, t.turn, 'check')
+  drain(t)
+  assert.equal(t.players[0].won, 30); assert.equal(t.players[2].won, 30) // AA & KK bagi pot 60
+  nxt(t); t.useHost('double_or_nothing')
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  assert.equal(t.ann.code, 'don_result')
+  assert.equal(stacks(t).reduce((a, b) => a + b) + (t.forfeited || 0), 3000 + (t.minted || 0))
+}
+{ // Hot Seat & Seat Shuffle & Final Table
+  const t = mk([1000, 1000, 1000]); rig(t, 'As Ah 7c 2d Ks Kh 3s 8h 9c Jd 4d'); begin(t)
+  t.useHost('hot_seat', 0)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  assert.equal(t.ann.code, 'hot_seat_hit'); assert.equal(t.players[0].chips, 1000 + 40 + 40) // menang 40 + 2x big blind
+  t.useHost('seat_shuffle'); assert.equal(typeof t.useHost('final_table'), 'string') // 1 per hand
+  const uids = t.players.map(p => p.uid).join(); nxt(t)
+  assert.equal(t.players.length, 3); assert.equal(new Set(t.players.map(p => p.uid)).size, 3)
+  assert(!t.shuffleNext)
+  t.useHost('final_table'); assert(t.view(null).finalTable)
+  void uids
 }
 
 console.log('semua tes lulus')

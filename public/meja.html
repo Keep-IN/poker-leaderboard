@@ -300,6 +300,10 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 .seat.peek .cards{position:relative}
 .seat.peek .cards .card{outline:2px dashed #71c5eb;outline-offset:1px}
 .seat.peek .cards::after{content:'👁️';position:absolute;top:-10px;right:-8px;font-size:13px}
+/* Final Table (skill host): bingkai meja menyala merah-emas */
+body.final #felt{animation:ftGlow 2.2s ease-in-out infinite}
+@keyframes ftGlow{0%,100%{box-shadow:0 0 0 3px #ffcf4d66,0 0 34px #ff3b5c55}50%{box-shadow:0 0 0 5px #ffcf4daa,0 0 70px #ff3b5c99}}
+#ann.host .big i{font-style:normal;font-family:var(--mono);font-size:13px;color:#c9a2ff;margin:0 6px}
 /* pre-action: tombol toggle sebelum giliran */
 .prerow .btn.pre{flex:1;padding:7px 6px;font-size:13px;line-height:1.15}
 .prerow .btn.pre small{display:block;margin-top:2px;font-size:9.5px;letter-spacing:.04em;opacity:.75;text-transform:none}
@@ -673,7 +677,7 @@ const SND = {
 
 // ---- BGM: jazz kasino (trio: walking bass, Rhodes, brush drum + vibraphone sesekali), digenerate terus-menerus ----
 const JAZZ = (() => {
-  const BPM = 104, B = 60 / BPM;
+  let B = 60 / 104;
   const Q = { m9: [3, 7, 10, 14], maj9: [4, 7, 11, 14], d13: [4, 9, 10, 14], d7b9: [4, 7, 10, 13], alt: [4, 10, 13, 15], m7b5: [3, 6, 10, 13], maj6: [4, 7, 9, 14] };
   const SC = { m9: [0, 2, 3, 5, 7, 9, 10], maj9: [0, 2, 4, 7, 9, 11], d13: [0, 2, 4, 7, 9, 10], d7b9: [0, 1, 4, 7, 10], alt: [0, 1, 3, 4, 8, 10], m7b5: [0, 3, 5, 6, 10], maj6: [0, 2, 4, 7, 9] };
   const ROOT = { C: 0, Db: 1, D: 2, Eb: 3, E: 4, F: 5, Gb: 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
@@ -767,6 +771,8 @@ const JAZZ = (() => {
     // BGM mengecil sebentar saat ada efek besar (all-in, menang, Revive)
     duck(sec = 2) { if (!on) return; const g = out.gain, n = c.currentTime; g.cancelScheduledValues(n); g.setTargetAtTime(this.vol * .3, n, .05); g.setTargetAtTime(this.vol, n + sec, .5); },
     vol: .55,
+    // Final Table: tempo naik & sedikit lebih keras
+    hype(on) { const nb = 60 / (on ? 128 : 104); if (nb === B) return; B = nb; this.vol = on ? .68 : .55; if (this.on) { out.gain.setTargetAtTime(this.vol, c.currentTime, .5); } },
   };
 })();
 
@@ -839,7 +845,7 @@ const tagOf = (p, betting) => S.lobby ? (p.ready ? ['grn', '✓ ready'] : ['', '
 const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'], reveal_card: ['👁️', 'Reveal Card'], fold_player: ['🚫', 'Fold Player'], go_big: ['🔥', 'Go Big or Go Home!'], duel_me: ['⚔️', 'Duel Me!'], card_reroll: ['🔄', 'Card Reroll'],
   give_me_straight: ['🪜', 'Give Me A Straight'], give_me_flush: ['💧', 'Give Me A Flush'], give_me_full_house: ['🏠', 'Give Me A Full House'], give_me_quads: ['🎲', 'Give Me A Four of a Kind'], give_me_straight_flush: ['🌈', 'Give Me A Straight Flush'], give_me_royal_flush: ['👑', 'Give Me A Royal Flush'], pair_me_up: ['👯', 'Pair Me Up'] };
 const skillBadges = p => (p.skills || []).length ? `<span class="skills" title="${esc(p.skills.map(c => (SKILL_ICONS[c] || ['', c])[1] + (p.target >= 0 && S.players[p.target] ? ' → ' + S.players[p.target].name : '')).join(', '))}">${p.skills.map(c => (SKILL_ICONS[c] || ['🃏'])[0]).join('')}${p.target >= 0 && S.players[p.target] ? '<small>→' + esc(S.players[p.target].name.slice(0, 8)) + '</small>' : ''}</span>` : '';
-const row3 = (p, mine, betting) => p.saved ? `<span class="tag grn">🛡️ +${p.saved}</span>` : p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
+const row3 = (p, mine, betting) => p.insured && !betting ? `<span class="tag grn">🏦 +${p.insured}</span>` : p.saved ? `<span class="tag grn">🛡️ +${p.saved}</span>` : p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
   : (t => t ? `<span class="tag ${t[0]}">${t[1]}</span>` : '')(tagOf(p, betting));
 
 const toast = (m, good) => { const t = $('toast'); t.textContent = m; t.classList.toggle('good', !!good); t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2500); };
@@ -1145,7 +1151,7 @@ function render() {
     seats += `<div data-k="${k}" class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}${p.podium ? ' pod' + p.podium : ''}${p.peek ? ' peek' : ''}${S.reviveNext === k || (p.revived && !p.place) ? ' revived' : ''}" style="left:${x}%;top:${y}%">
       <div class="cards">${cs}</div>
       <div class="plate"${p.podium ? ` data-pod="${p.podium}" title="#${p.podium} all time"` : ''}>${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}${skillBadges(p)}${p.podium === 1 ? '<i class="spark" style="right:-12px;top:30%">✦</i><i class="spark" style="left:30%;bottom:-13px;animation-delay:1.2s">✦</i>' : ''}
-        <div class="nm">${S.bounty && S.bounty.i === k ? `<span class="bounty" title="Bounty ${S.bounty.chips} chip">🎯</span>` : ''}${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : p.podium === 1 ? '<span class="crown" title="#1 all time">👑</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
+        <div class="nm">${S.bounty && S.bounty.i === k ? `<span class="bounty" title="Bounty ${S.bounty.chips} chip">🎯</span>` : ''}${S.hot === k ? '<span class="bounty" title="Hot Seat">🔥</span>' : ''}${S.freeze === k ? '<span class="bounty" title="Freeze: tidak bisa raise">🧊</span>' : ''}${S.shot && S.shot.includes(k) ? '<span class="bounty" title="Shot Clock: 5 detik">🎤</span>' : ''}${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : p.podium === 1 ? '<span class="crown" title="#1 all time">👑</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
         ${k === S.turn ? '<div class="tm"><b></b></div>' : ''}</div>${narrow && p.bet ? `<div class="sbet">${chip1(p.bet)}${p.bet}</div>` : ''}</div>`;
     if (p.bet) { sumBets += p.bet; if (!narrow) bets += `<div class="bet" style="left:${x + (50 - x) * .45}%;top:${y + (50 - y) * .45}%">${chips(p.bet)}<span>${p.bet}</span></div>`; }
   });
@@ -1159,7 +1165,9 @@ function render() {
 
   drawBubbles(); syncChatBtn(); drawReveal(); drawAnn(); drawWinner();
   const tagBig = S.big !== undefined && betting, tagDuel = S.duelFine !== undefined && betting && S.players[S.duelFine];
-  const hostTags = [S.silence && '🤐 Silence · skill card dikunci', S.speed && '⏱️ Speed Round · 10 detik per giliran'].filter(Boolean).join(' · ');
+  const hostTags = [S.silence && '🤐 Silence · skill card dikunci', S.speed && '⏱️ Speed Round · 10 detik per giliran', S.don && '🎲 Double or Nothing',
+    S.split && '💥 Split Pot', S.insure && '🏦 Insurance all-in 25%', S.shuffleNext && '🔀 kursi diacak hand berikutnya'].filter(Boolean).join(' · ');
+  document.body.classList.toggle('final', !!S.finalTable); JAZZ.hype(!!S.finalTable);
   $('bigTag').hidden = !(tagBig || tagDuel || hostTags);
   $('bigTag').classList.toggle('duel', !tagBig && !!tagDuel);
   set($('bigTag'), [tagBig ? '🔥 Go Big or Go Home · fold = −50% chip' : tagDuel ? `⚔️ Duel · ${esc(S.players[S.duelFine].name)} fold = −50% chip` : '', hostTags].filter(Boolean).join('<br>'));
@@ -1334,7 +1342,9 @@ function drawAnn() {
       you_owe_me: `80% chip ${tg} (${a.extra}) pindah ke ${by}`, duel_me: 'hand ini jadi duel · pemain lain dipaksa fold',
       get_out: `${tg} langsung tereliminasi` }[a.code] || '';
     if (a.by === -1 || a.code === 'bounty_claim') { // skill host: diumumkan besar dengan cap HOST
-      const h = HOSTCARDS[a.code === 'bounty_claim' ? 'bounty' : a.code], x = a.extra, nx = x === 'next' ? 'hand berikutnya' : 'hand ini';
+      const base = { bounty_claim: 'bounty', don_result: 'double_or_nothing', hot_seat_hit: 'hot_seat' }[a.code] || a.code;
+      const h = HOSTCARDS[base] || { icon: '🎩', name: a.code }, x = a.extra || '', nx = /next$/.test(x) ? 'hand berikutnya' : 'hand ini';
+      const [x1, x2] = x.split(':'), card = USABLE[x] || { icon: '🃏', name: x };
       const line = {
         double_payout: [`Pot jadi <b>${x}</b>`, 'pot dikali 2 · menang = dapat dobel'],
         jackpot: [`+${x} chip ke pot`, 'bonus dari bandar untuk pemenang hand ini'],
@@ -1348,12 +1358,26 @@ function drawAnn() {
         silence: ['🤐 Skill card dikunci', `tidak ada yang bisa pakai skill card di ${nx}`],
         charity: [`${tg} +${x}`, 'suntikan chip untuk pemain dengan chip paling sedikit'],
         lucky_spin: [`🎡 ${tg}`, 'dapat kartu Luck misterius untuk hand berikutnya'],
+        double_or_nothing: ['50 : 50', 'pemenang hand ini dapat pot dobel… atau cuma setengah'],
+        don_result: x1 === 'win' ? [`DOUBLE! Pot ${x2}`, 'koin jatuh ke DOUBLE 🎉 pot dikali 2'] : [`NOTHING… Pot ${x2}`, 'koin jatuh ke NOTHING · separuh pot hangus'],
+        split_pot: ['Pot dibagi dua', 'dua kombinasi terbaik di hand ini bagi rata pot'],
+        insurance: ['🏦 Asuransi aktif', 'yang kalah all-in di hand ini dapat kembali 25%'],
+        spotlight: [`🔦 ${tg}`, 'satu kartu tangannya dibuka ke semua orang'],
+        freeze: [`🧊 ${tg}`, `tidak bisa raise di ${nx}`],
+        hot_seat: [`🔥 ${tg}`, `kalau ${tg} menang di ${nx}, semua pemain bayar dia 1 big blind`],
+        hot_seat_hit: [`${tg} +${x}`, 'Hot Seat menang! semua pemain bayar 1 big blind'],
+        shot_clock: [`${tg} <i>VS</i> ${S.players[+x1] ? esc(S.players[+x1].name) : '?'}`, `giliran mereka cuma 5 detik di ${nx}`],
+        leader_tax: [`${tg} −${x}`, 'chip leader bayar pajak 10%, dibagi ke pemain lain'],
+        seat_shuffle: ['Kursi diacak!', 'semua pemain pindah kursi mulai hand berikutnya'],
+        mystery_box: [`${card.icon} ${tg}`, `dapat ${esc(card.name)} gratis ke inventory 🎁`],
+        final_table: ['FINAL TABLE', 'tinggal 3 pemain · siapa juaranya?'],
       }[a.code] || ['', ''];
       annUntil = Date.now() + 5200;
       el.className = 'host';
-      el.innerHTML = `<span class="ic">${a.code === 'bounty_claim' ? '💥' : h.icon}</span><span class="cn">${a.code === 'bounty_claim' ? 'Bounty diklaim!' : esc(h.name)}</span>` +
+      const title = { bounty_claim: 'Bounty diklaim!', hot_seat_hit: 'Hot Seat!', don_result: x1 === 'win' ? 'Double!' : 'Nothing…' }[a.code] || h.name;
+      el.innerHTML = `<span class="ic">${a.code === 'bounty_claim' ? '💥' : a.code === 'don_result' ? (x1 === 'win' ? '🤑' : '💸') : h.icon}</span><span class="cn">${esc(title)}</span>` +
         `<span class="big">${line[0]}</span><span class="sub">${line[1]}</span>`;
-      if (prevS) play(a.code === 'double_payout' || a.code === 'jackpot' || a.code === 'bounty_claim' ? 'win' : 'allin', 6);
+      if (prevS) play(['double_payout', 'jackpot', 'bounty_claim', 'hot_seat_hit', 'mystery_box'].includes(a.code) || (a.code === 'don_result' && x1 === 'win') ? 'win' : 'allin', 6);
       el.hidden = false;
       return;
     }
@@ -1477,12 +1501,25 @@ const HOSTCARDS = {
   bounty: { icon: '🎯', name: 'Bounty', desc: 'Tandai 1 pemain. Yang menyingkirkannya dapat bonus 50% chip awal.', target: true },
   charity: { icon: '🎁', name: 'Charity', desc: 'Pemain dengan chip paling sedikit dapat 50% chip awal.' },
   lucky_spin: { icon: '🎡', name: 'Lucky Spin', desc: '1 pemain acak dapat kartu Luck gratis untuk hand berikutnya.' },
+  double_or_nothing: { icon: '🎲', name: 'Double or Nothing', desc: 'Pemenang hand ini 50:50 dapat pot dobel atau cuma setengah (sisanya hangus).', now: true },
+  split_pot: { icon: '💥', name: 'Split Pot', desc: 'Pot hand ini dibagi rata ke 2 kombinasi terbaik di showdown.', now: true },
+  insurance: { icon: '🏦', name: 'Insurance', desc: 'Yang kalah all-in di hand ini dapat kembali 25% chip yang dipertaruhkan.', now: true },
+  spotlight: { icon: '🔦', name: 'Spotlight', desc: '1 kartu tangan pemain pilihanmu dibuka ke semua orang.', now: true, target: 'hand' },
+  freeze: { icon: '🧊', name: 'Freeze', desc: '1 pemain tidak bisa raise di hand ini (atau hand berikutnya).', target: 'hand' },
+  hot_seat: { icon: '🔥', name: 'Hot Seat', desc: 'Tandai 1 pemain. Kalau dia menang hand itu, semua pemain lain bayar dia 1 big blind.', target: 'hand' },
+  shot_clock: { icon: '🎤', name: 'Shot Clock Duel', desc: '2 pemain pilihanmu cuma punya 5 detik per giliran di hand ini (atau berikutnya).', target: 'two' },
+  leader_tax: { icon: '👑', name: 'Chip Leader Tax', desc: 'Pemain dengan chip terbanyak bayar 10% chip-nya, dibagi rata ke pemain lain.' },
+  seat_shuffle: { icon: '🔀', name: 'Seat Shuffle', desc: 'Semua pemain pindah kursi acak mulai hand berikutnya.' },
+  mystery_box: { icon: '🎁', name: 'Mystery Box', desc: '1 pemain acak dapat 1 skill card gratis langsung ke inventory-nya.' },
+  final_table: { icon: '🎆', name: 'Final Table', desc: 'Saat pemain tinggal 3: meja & musik jadi lebih intens sampai juara ditemukan.' },
 };
 function openHostBag() {
   const el = document.createElement('div'); el.id = 'bagSheet';
   const betting = ['preflop', 'flop', 'turn', 'river'].includes(S.phase);
   const why = code => S.hostUsed ? 'Sudah pakai skill host di hand ini.' : HOSTCARDS[code].now && !betting ? 'Hanya selama hand berjalan.'
-    : code === 'board_reroll' && S.board.length < 3 ? 'Setelah flop dibuka.' : code === 'all_in_madness' && S.madness ? 'Sudah menunggu hand berikutnya.' : '';
+    : code === 'board_reroll' && S.board.length < 3 ? 'Setelah flop dibuka.' : code === 'all_in_madness' && S.madness ? 'Sudah menunggu hand berikutnya.'
+    : code === 'final_table' && S.finalTable ? 'Sudah aktif.' : code === 'final_table' && S.players.filter(q => q.chips > 0 && !q.place).length > 3 ? 'Saat pemain tinggal 3.'
+    : code === 'seat_shuffle' && S.shuffleNext ? 'Sudah menunggu hand berikutnya.' : code === 'double_or_nothing' && S.don ? 'Sudah aktif.' : '';
   el.innerHTML = `<div class="in"><h3>🎩 Skill host</h3><p class="note">Gratis & tanpa batas · maks 1 per hand · selalu diumumkan</p>
     ${S.hostUsed ? '<p class="note">Kamu sudah pakai skill host di hand ini. Tunggu hand berikutnya.</p>' : ''}
     <div id="bagList">${Object.entries(HOSTCARDS).map(([code, h]) => `<div class="it host"><span class="ic">${h.icon}</span>
@@ -1491,18 +1528,26 @@ function openHostBag() {
     <button class="btn ghost close" type="button">Tutup</button></div>`;
   el.onclick = e => { if (e.target === el || e.target.classList.contains('close')) el.remove(); };
   document.body.appendChild(el);
-  const go = async (b, code, target) => {
+  const go = async (b, code, target, target2) => {
     b.disabled = true;
-    const r = await api('host', { code, target });
+    const r = await api('host', { code, target, target2 });
     if (r && r.ok) { toast(HOSTCARDS[code].icon + ' ' + HOSTCARDS[code].name + ' dipakai', true); el.remove(); } else b.disabled = false;
   };
   el.querySelectorAll('button[data-code]').forEach(b => b.onclick = () => {
     const code = b.dataset.code;
     if (!HOSTCARDS[code].target) return go(b, code);
-    const box = el.querySelector(`.tg[data-for="${code}"]`), ts = S.players.map((q, k) => ({ q, k })).filter(({ q }) => q.chips > 0 && !q.place);
+    const tt = HOSTCARDS[code].target, box = el.querySelector(`.tg[data-for="${code}"]`);
+    const ts = S.players.map((q, k) => ({ q, k })).filter(({ q }) => tt === 'hand' && betting ? q.inHand && !q.folded && !(code === 'spotlight' && q.spot >= 0) : q.chips > 0 && !q.place);
     box.hidden = !box.hidden;
-    box.innerHTML = '<p class="note" style="width:100%;margin:0">Pasang bounty ke siapa?</p>' + ts.map(({ q, k }) => `<button class="btn" type="button" data-k="${k}">${esc(q.name)}</button>`).join('');
-    box.querySelectorAll('button[data-k]').forEach(t => t.onclick = () => { t.disabled = true; go(b, code, +t.dataset.k); });
+    const ask = { bounty: 'Pasang bounty ke siapa?', spotlight: 'Buka kartu siapa?', freeze: 'Bekukan siapa?', hot_seat: 'Siapa yang duduk di Hot Seat?', shot_clock: 'Pilih 2 pemain:' }[code];
+    box.innerHTML = `<p class="note" style="width:100%;margin:0">${ask}</p>` + ts.map(({ q, k }) => `<button class="btn" type="button" data-k="${k}">${esc(q.name)}</button>`).join('');
+    let first = -1;
+    box.querySelectorAll('button[data-k]').forEach(t => t.onclick = () => {
+      const k = +t.dataset.k;
+      if (tt !== 'two') { t.disabled = true; return go(b, code, k); }
+      if (first < 0) { first = k; t.disabled = true; t.textContent = '✓ ' + t.textContent; return; }
+      box.querySelectorAll('button').forEach(x => x.disabled = true); go(b, code, first, k);
+    });
   });
 }
 $('bag').onclick = () => S && S.me < 0 && isHost ? openHostBag() : openBag();

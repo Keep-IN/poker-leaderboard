@@ -153,8 +153,19 @@ Detailnya:
   | 🎯 Bounty | Kapan saja | Tandai 1 pemain (ikon 🎯 di kursinya). Pemain yang menang chip terbanyak di hand saat dia tersingkir dapat bonus 50% chip awal. |
   | 🎁 Charity | Kapan saja | Pemain dengan chip paling sedikit dapat 50% chip awal. |
   | 🎡 Lucky Spin | Kapan saja | 1 pemain acak dapat kartu Luck gratis (acak) untuk hand berikutnya, kalau belum ada kartu Luck yang menunggu. |
+  | 🎲 Double or Nothing | Saat hand berjalan | Saat hand selesai, undian 50:50: pot dikali 2, atau tinggal setengah (separuhnya hangus). Hasilnya diumumkan. |
+  | 💥 Split Pot | Saat hand berjalan | Kalau sampai showdown, pot dibagi rata ke 2 kombinasi terbaik (tanpa side pot). |
+  | 🏦 Insurance | Saat hand berjalan | Pemain yang kalah all-in di hand ini dapat kembali 25% chip yang dipertaruhkan (bisa menyelamatkan dari tersingkir). |
+  | 🔦 Spotlight | Saat hand berjalan | 1 kartu tangan pemain pilihan host dibuka ke semua orang. |
+  | 🧊 Freeze | Kapan saja | 1 pemain tidak bisa raise di hand ini (atau hand berikutnya). |
+  | 🔥 Hot Seat | Kapan saja | Kalau pemain yang ditandai menang chip di hand itu, tiap pemain lain bayar dia 1 big blind. |
+  | 🎤 Shot Clock Duel | Kapan saja | 2 pemain pilihan host cuma punya 5 detik per giliran di hand itu. |
+  | 👑 Chip Leader Tax | Kapan saja | Pemain dengan chip terbanyak bayar 10% chip-nya, dibagi rata ke pemain lain yang masih bertahan. |
+  | 🔀 Seat Shuffle | Kapan saja | Semua pemain pindah kursi acak (dealer juga acak) mulai hand berikutnya. |
+  | 🎁 Mystery Box | Kapan saja | 1 pemain acak dapat 1 skill card acak gratis, langsung masuk inventory-nya. |
+  | 🎆 Final Table | Pemain tinggal 3 | Meja menyala merah-emas dan musik jazz makin cepat sampai juara ditemukan. |
 
-  Chip bonus dari Double Payout, Jackpot, Bounty, dan Charity dibuat oleh bandar (menambah total chip di meja).
+  Chip bonus dari Double Payout, Jackpot, Bounty, Charity, Double or Nothing (kalau menang), dan Insurance dibuat oleh bandar (menambah total chip di meja).
 - Meja poker diadaptasi dari [Meja Hold'em](https://github.com/ragila/meja-holdem) karya Ragil.
 
 ### 🏆 Leaderboard

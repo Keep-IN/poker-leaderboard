@@ -6,7 +6,7 @@
 //   POST /api/meja {match, token, type:'pre', pre}          -> pre-action: fold | check | call | '' (mati)
 //   POST /api/meja {match, token, type:'out'}               -> keluar dari match di lobi (sebelum hand pertama)
 //   POST /api/meja {match, token: host, type:'kick', seat}  -> host mengeluarkan pemain di lobi
-//   POST /api/meja {match, token: host, type:'host', code, target} -> host memakai skill card host (HOST_SKILLS)
+//   POST /api/meja {match, token: host, type:'host', code, target, target2} -> host memakai skill card host (HOST_SKILLS)
 //
 // db: {
 //   user(accessToken) -> uid | null
@@ -17,6 +17,7 @@
 //   save(match, ver, state, dueAt, out, winner) -> ver baru | null (kalah balapan) ; throw 'match_not_ongoing'
 //   withdraw(match, uid)  -> pemain keluar dari match (hapus dari match_players) ; throw kalau hand pertama sudah dibagi
 //   counters(match) -> [uid] pemilik Full Counter yang terpasang (opsional)
+//   grantCard(match, uid, code) -> skill card gratis ke inventory pemain (Mystery Box, opsional)
 // }
 import { randomUUID } from 'node:crypto'
 import { COUNTERED, Table } from './poker.js'
@@ -77,6 +78,13 @@ async function settleRefunds(db, match, r) {
   if (!r?.t?.refunds?.length || !db.refundCard) return
   for (const x of r.t.refunds) await db.refundCard(match, x.uid, x.card).catch(() => {})
   await mutate(db, match, t => { t.refunds = [] }).catch(() => {})
+}
+
+// Mystery Box (skill host): kartu yang dicatat meja di t.gifts dimasukkan ke inventory pemainnya, lalu catatannya dihapus.
+async function settleGifts(db, match, r) {
+  if (!r?.t?.gifts?.length || !db.grantCard) return
+  for (const g of r.t.gifts) await db.grantCard(match, g.uid, g.code).catch(() => {})
+  await mutate(db, match, t => { t.gifts = [] }).catch(() => {})
 }
 
 // Pemilik Full Counter yang terpasang di match ini (dipasang di halaman match sebelum hand pertama). null = tidak tahu.
@@ -231,14 +239,15 @@ async function leave(db, match, b) {
 
 // Skill card host: gratis & tanpa batas (maks 1 per hand), hanya untuk token host match ini.
 async function hostCard(db, match, b) {
-  const token = String(b.token || ''), target = b.target === undefined || b.target === null ? -1 : Number(b.target)
+  const token = String(b.token || ''), num = v => v === undefined || v === null ? -1 : Number(v)
   const r = await mutate(db, match, t => {
     if (!token || token !== t.hostToken) return { error: 'Hanya host match ini yang bisa memakai skill host' }
-    const err = t.useHost(String(b.code || ''), target)
+    const err = t.useHost(String(b.code || ''), num(b.target), num(b.target2))
     return err ? { error: err } : { ok: true }
   })
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
   if (r.status) return ended(r.status)
+  await settleGifts(db, match, r)
   return withPodium(db, r.t, { ...r.out, v: r.ver, s: hostView(match, r.t) })
 }
 

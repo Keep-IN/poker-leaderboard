@@ -1639,6 +1639,19 @@ as $$
    where id = p_card and player_id = p_player and match_id = p_match and status = 'used';
 $$;
 
+-- Skill host Mystery Box: 1 skill card gratis untuk pemain match ini, langsung masuk inventory (dipanggil server meja).
+create or replace function public.meja_grant_card(p_match uuid, p_player uuid, p_code text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into public.player_cards (player_id, card_code, price)
+  select p_player, c.code, 0 from public.skill_cards c
+   where c.code = p_code
+     and exists (select 1 from public.match_players mp where mp.match_id = p_match and mp.player_id = p_player);
+$$;
+
 create or replace function public.update_my_name(p_name text)
 returns void
 language plpgsql
@@ -1890,12 +1903,14 @@ revoke all on function public.meja_use_card(uuid, uuid, uuid) from public, anon,
 revoke all on function public.meja_podium() from public, anon, authenticated;
 revoke all on function public.meja_refund_card(uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.meja_counters(uuid) from public, anon, authenticated;
+revoke all on function public.meja_grant_card(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.meja_withdraw(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.online_not_dealt(uuid) from public, anon, authenticated;
 grant execute on function public.meja_withdraw(uuid, uuid) to service_role;
 grant execute on function public.meja_use_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_refund_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_counters(uuid) to service_role;
+grant execute on function public.meja_grant_card(uuid, uuid, text) to service_role;
 grant execute on function public.meja_podium() to service_role;
 
 do $$

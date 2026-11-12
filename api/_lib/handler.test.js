@@ -29,6 +29,7 @@ function fakeDb() {
     withdrawn: [],
     async withdraw(_, uid) { await yieldTurn(); this.withdrawn.push(uid); players.splice(players.findIndex(p => p.uid === uid), 1) },
     async refundCard(_, player, card) { const c = this.cards[card]; if (c && c.owner === player) c.used = false },
+    granted: [], async grantCard(_, player, code) { this.granted.push(player + ':' + code) },
     async create(_, state, due) { await yieldTurn(); if (row) return null; row = { state, ver: 1, due_at: due }; return 1 },
     async save(_, ver, state, due, out, winner) {
       await yieldTurn()
@@ -133,6 +134,11 @@ assert((await post({ token: a.token, type: 'host', code: 'double_payout' })).err
 const pot0 = hs.pot, dp = await post({ token: hst.token, type: 'host', code: 'double_payout' })
 assert(dp.ok && dp.s.hostView && dp.s.hostUsed && dp.s.pot === pot0 * 2 && dp.s.ann.code === 'double_payout' && dp.s.ann.by === -1, JSON.stringify(dp.error))
 assert((await post({ token: hst.token, type: 'host', code: 'jackpot' })).error, 'maks 1 per hand')
+// Mystery Box: kartu gratis masuk inventory lewat db.grantCard, catatan di meja dibersihkan
+offset += 60000; await get({ token: a.token }) // biarkan hand berjalan (timeout) supaya slot skill host terbuka lagi
+for (let g = 0; g < 40 && (await get({ token: hst.token })).s.hostUsed; g++) { offset += 30000; await get({ token: a.token }) }
+const mb = await post({ token: hst.token, type: 'host', code: 'mystery_box' })
+assert(mb.ok && db.granted.length === 1 && mb.s.ann.code === 'mystery_box', JSON.stringify(mb.error))
 
 // tiap giliran: pemain yang sedang giliran all-in; ulangi sampai turnamen selesai
 let guard = 0

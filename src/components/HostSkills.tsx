@@ -14,6 +14,17 @@ export const HOST_SKILLS = [
   { code: 'bounty', icon: '🎯', name: 'Bounty', when: 'Kapan saja', desc: 'Tandai 1 pemain. Yang menyingkirkannya dapat bonus 50% chip awal.' },
   { code: 'charity', icon: '🎁', name: 'Charity', when: 'Kapan saja', desc: 'Pemain dengan chip paling sedikit dapat 50% chip awal.' },
   { code: 'lucky_spin', icon: '🎡', name: 'Lucky Spin', when: 'Kapan saja', desc: '1 pemain acak dapat kartu Luck gratis untuk hand berikutnya.' },
+  { code: 'double_or_nothing', icon: '🎲', name: 'Double or Nothing', when: 'Saat hand berjalan', desc: 'Pemenang hand ini 50:50 dapat pot dobel atau cuma setengah (sisanya hangus).' },
+  { code: 'split_pot', icon: '💥', name: 'Split Pot', when: 'Saat hand berjalan', desc: 'Pot dibagi rata ke 2 kombinasi terbaik di showdown.' },
+  { code: 'insurance', icon: '🏦', name: 'Insurance', when: 'Saat hand berjalan', desc: 'Yang kalah all-in dapat kembali 25% chip yang dipertaruhkan.' },
+  { code: 'spotlight', icon: '🔦', name: 'Spotlight', when: 'Saat hand berjalan', desc: '1 kartu tangan pemain pilihanmu dibuka ke semua orang.' },
+  { code: 'freeze', icon: '🧊', name: 'Freeze', when: 'Kapan saja', desc: '1 pemain tidak bisa raise di hand ini (atau hand berikutnya).' },
+  { code: 'hot_seat', icon: '🔥', name: 'Hot Seat', when: 'Kapan saja', desc: 'Kalau pemain yang ditandai menang hand itu, semua pemain lain bayar dia 1 big blind.' },
+  { code: 'shot_clock', icon: '🎤', name: 'Shot Clock Duel', when: 'Kapan saja', desc: '2 pemain pilihanmu cuma punya 5 detik per giliran.' },
+  { code: 'leader_tax', icon: '👑', name: 'Chip Leader Tax', when: 'Kapan saja', desc: 'Chip leader bayar 10% chip-nya, dibagi rata ke pemain lain.' },
+  { code: 'seat_shuffle', icon: '🔀', name: 'Seat Shuffle', when: 'Kapan saja', desc: 'Semua pemain pindah kursi acak mulai hand berikutnya.' },
+  { code: 'mystery_box', icon: '🎁', name: 'Mystery Box', when: 'Kapan saja', desc: '1 pemain acak dapat 1 skill card gratis langsung ke inventory.' },
+  { code: 'final_table', icon: '🎆', name: 'Final Table', when: 'Pemain tinggal 3', desc: 'Meja menyala & musik makin cepat sampai juara ditemukan.' },
 ]
 
 export function HostSkillList() {
