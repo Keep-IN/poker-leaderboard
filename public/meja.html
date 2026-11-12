@@ -558,7 +558,7 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
       <rect x="91" y="89" width="10" height="14" rx="1.5" fill="#0857c3" stroke="#fbfcff" transform="rotate(12 96 96)"/>
     </g>
   </svg>
-    <span class="btns"><button id="snd" title="Nyalakan/matikan suara">Suara</button><a id="leave" href="/matches">Keluar</a>
+    <span class="btns"><button id="sfx" title="Nyalakan/matikan efek suara">SFX</button><button id="bgm" title="Nyalakan/matikan musik jazz">BGM</button><a id="leave" href="/matches">Keluar</a>
       <div id="hostOdds" hidden></div></span>
   </div>
   <div id="table">
@@ -591,39 +591,60 @@ const ANIM = 900; // ms: lama animasi kartu terpanjang
 const esc = s => s.replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
 const set = (el, h) => { if (el._h !== h) { el.innerHTML = h; el._h = h; } }; // jangan bongkar DOM kalau isinya sama (animasi/drag tidak putus)
 
-// ---------- efek suara: disintesis dengan Web Audio (tanpa file audio) ----------
+// ---------- suara: SFX & BGM disintesis dengan Web Audio (tanpa file audio) ----------
+// Jalur: SFX -> kompresor -> speaker (+ kirim ke reverb ruangan); BGM jazz -> speaker. Masing-masing bisa dimatikan.
 const NB = new WeakMap();
 const noiseBuf = c => { if (!NB.has(c)) { const b = c.createBuffer(1, c.sampleRate, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; NB.set(c, b); } return NB.get(c); };
+let REV = null; // input reverb (diisi saat AudioContext dibuat)
+const send = (c, g, amt) => { if (amt && REV) { const s = c.createGain(); s.gain.value = amt; g.connect(s); s.connect(REV); } };
+const pan = (c, out, p) => { if (!c.createStereoPanner || !p) return out; const s = c.createStereoPanner(); s.pan.value = Math.max(-1, Math.min(1, p)); s.connect(out); return s; };
 // desis/gesekan: bising lewat filter dengan envelope cepat (f -> f2 = filter menyapu)
-function burst(c, out, t, dur, { type = 'bandpass', f = 3000, f2, q = 1, gain = .3 }) {
+function burst(c, out, t, dur, { type = 'bandpass', f = 3000, f2, q = 1, gain = .3, rev = 0, atk } = {}) {
   const s = c.createBufferSource(), fl = c.createBiquadFilter(), g = c.createGain();
   s.buffer = noiseBuf(c); fl.type = type; fl.Q.value = q; fl.frequency.setValueAtTime(f, t);
   if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur);
-  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + Math.min(.008, dur / 3)); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  s.connect(fl); fl.connect(g); g.connect(out); s.start(t, Math.random() * .5); s.stop(t + dur + .02);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + (atk ?? Math.min(.006, dur / 3))); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(fl); fl.connect(g); g.connect(out); send(c, g, rev); s.start(t, Math.random() * .5); s.stop(t + dur + .02);
 }
-function tone(c, out, t, f, dur, { type = 'sine', gain = .2, f2 } = {}) {
+function tone(c, out, t, f, dur, { type = 'sine', gain = .2, f2, rev = 0, atk = .003 } = {}) {
   const o = c.createOscillator(), g = c.createGain();
   o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
-  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + .02);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + atk); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(out); send(c, g, rev); o.start(t); o.stop(t + dur + .02);
 }
-// satu denting chip keramik: dua nada tinggi yang cepat hilang + bising tipis; nadanya diacak sedikit supaya tidak terdengar robotik
-const clink = (c, o, t, v = 1) => {
-  const p = .9 + Math.random() * .25;
-  tone(c, o, t, 2300 * p, .07, { gain: .09 * v, type: 'triangle' }); tone(c, o, t, 3700 * p, .05, { gain: .05 * v });
-  burst(c, o, t, .03, { type: 'highpass', f: 5500, gain: .12 * v });
+// lonceng/vibraphone: nada dasar + parsial tinggi yang cepat hilang
+const bell = (c, o, t, f, dur = 1.2, gain = .1, rev = .5) => { tone(c, o, t, f, dur, { gain, rev }); tone(c, o, t, f * 4, dur * .25, { gain: gain * .25, rev }); tone(c, o, t, f * 2.76, dur * .15, { gain: gain * .12 }); };
+// satu chip clay/keramik beradu: klik tajam + dua-tiga nada resonan + "tok" badan chip; nada & posisi kiri-kanan diacak
+const clack = (c, o, t, v = 1) => {
+  const p = .9 + Math.random() * .2, out = pan(c, o, (Math.random() - .5) * .7);
+  burst(c, out, t, .016, { f: 4300 * p, q: 2.2, gain: .32 * v });
+  tone(c, out, t, 1900 * p, .07, { gain: .075 * v }); tone(c, out, t, 3050 * p, .05, { gain: .045 * v }); tone(c, out, t, 5200 * p, .028, { gain: .022 * v });
+  tone(c, out, t, 640 * p, .04, { type: 'triangle', gain: .07 * v });
 };
+// tumpukan chip: dentingan makin rapat (chip jatuh lalu "settle"), yang terakhir paling pelan
+const stack = (c, o, t, n, v = 1) => { let d = 0; for (let i = 0; i < n; i++) { clack(c, o, t + d, v * (.65 + Math.random() * .45) * (i === n - 1 ? .6 : 1)); d += Math.max(.018, (.07 - i * .006)) * (.7 + Math.random() * .6); } return d; };
 const SND = {
-  deal: (c, o, t) => { burst(c, o, t, .1, { f: 4200, f2: 1800, q: 1.2, gain: .22 }); tone(c, o, t + .08, 170, .05, { gain: .1 }); }, // kartu meluncur di kain
-  flip: (c, o, t) => { burst(c, o, t, .05, { type: 'highpass', f: 2800, gain: .25 }); tone(c, o, t, 800, .03, { f2: 450, gain: .06, type: 'triangle' }); }, // kartu dibalik
-  chips: (c, o, t, n = 3) => { for (let i = 0; i < n; i++) clink(c, o, t + i * (.03 + Math.random() * .05), .6 + Math.random() * .5); }, // taruhan: makin besar makin banyak denting
-  sweep: (c, o, t) => { for (let i = 0; i < 6; i++) clink(c, o, t + i * .035, .5); burst(c, o, t, .25, { f: 2500, f2: 1200, gain: .08 }); }, // taruhan ditarik ke pot
-  knock: (c, o, t) => { for (const d of [0, .12]) { tone(c, o, t + d, 150, .07, { f2: 90, gain: .3 }); burst(c, o, t + d, .03, { type: 'lowpass', f: 900, gain: .2 }); } }, // check: ketuk meja dua kali
-  fold: (c, o, t) => burst(c, o, t, .17, { f: 3500, f2: 900, q: .8, gain: .2 }), // kartu dibuang
-  ding: (c, o, t) => { tone(c, o, t, 880, .5, { gain: .14 }); tone(c, o, t + .09, 1320, .55, { gain: .1 }); }, // giliranmu
-  tick: (c, o, t) => tone(c, o, t, 1500, .03, { type: 'square', gain: .05 }), // hitung mundur lima detik terakhir
-  allin: (c, o, t) => { SND.chips(c, o, t, 12); tone(c, o, t, 90, .25, { f2: 55, gain: .25 }); },
+  // kartu meluncur di kain lalu "tap" mendarat
+  deal: (c, o, t) => { burst(c, o, t, .09, { type: 'highpass', f: 5200, f2: 2200, gain: .16 }); burst(c, o, t + .075, .02, { f: 2300, q: 1.6, gain: .3 }); tone(c, o, t + .075, 150, .05, { gain: .12, type: 'triangle' }); },
+  // kartu dibalik: "snap" renyah + hembusan
+  flip: (c, o, t) => { burst(c, o, t, .03, { type: 'highpass', f: 3200, gain: .3 }); burst(c, o, t + .028, .04, { f: 1600, q: 1.4, gain: .22 }); tone(c, o, t + .028, 900, .035, { f2: 520, gain: .07, type: 'triangle' }); },
+  chips: (c, o, t, n = 3) => { stack(c, o, t, n, 1.3); burst(c, o, t, .05, { type: 'lowpass', f: 1500, gain: .08 }); },
+  // taruhan ditarik ke pot: chip digeser di kain lalu bertumpuk
+  sweep: (c, o, t) => { burst(c, o, t, .32, { f: 1900, f2: 800, q: .7, gain: .16, atk: .06 }); stack(c, o, t + .22, 7, 1.1); },
+  // check: ketuk meja kayu dua kali
+  knock: (c, o, t) => { [[0, 1], [.13, .8]].forEach(([d, v]) => { tone(c, o, t + d, 220, .09, { f2: 140, gain: .32 * v, type: 'triangle' }); tone(c, o, t + d, 470, .035, { gain: .08 * v }); burst(c, o, t + d, .025, { type: 'lowpass', f: 1300, gain: .25 * v }); }); },
+  // fold: kartu dilempar pelan ke tengah
+  fold: (c, o, t) => { burst(c, o, t, .2, { f: 3200, f2: 700, q: .8, gain: .17, atk: .03 }); burst(c, o, t + .17, .05, { type: 'lowpass', f: 900, gain: .14 }); },
+  // giliranmu: dua nada vibraphone dengan gaung
+  ding: (c, o, t) => { bell(c, o, t, 659.25, 1.1, .12); bell(c, o, t + .11, 987.77, 1.3, .1); },
+  // hitung mundur: woodblock
+  tick: (c, o, t) => { tone(c, o, t, 1250, .045, { type: 'triangle', gain: .12 }); burst(c, o, t, .012, { f: 2600, q: 3, gain: .12 }); },
+  // all-in: dentuman berat + longsoran chip + gaung
+  allin: (c, o, t) => {
+    tone(c, o, t, 120, .7, { f2: 38, gain: .5, rev: .3 }); burst(c, o, t, .35, { type: 'lowpass', f: 400, f2: 80, gain: .3 });
+    tone(c, o, t, 55, .9, { gain: .25 });
+    stack(c, o, t + .05, 16, .9); burst(c, o, t + .05, .5, { f: 2200, f2: 900, q: .6, gain: .07, atk: .05 });
+  },
   // Revive: paduan suara "aaah" (akor mayor lembut, vibrato) + denting lonceng surgawi naik
   angel: (c, o, t) => {
     [[523.25, 0], [659.25, .05], [783.99, .1], [1046.5, .15]].forEach(([f, d]) => {
@@ -632,21 +653,143 @@ const SND = {
         os.type = 'sine'; os.frequency.value = f; os.detune.value = det; lfo.frequency.value = 5.2; lg.gain.value = 6;
         lfo.connect(lg); lg.connect(os.detune);
         g.gain.setValueAtTime(.0001, t + d); g.gain.exponentialRampToValueAtTime(.035, t + d + .5); g.gain.setValueAtTime(.035, t + d + 1.6); g.gain.exponentialRampToValueAtTime(.0001, t + d + 2.8);
-        os.connect(g); g.connect(o); os.start(t + d); lfo.start(t + d); os.stop(t + d + 2.9); lfo.stop(t + d + 2.9);
+        os.connect(g); g.connect(o); send(c, g, .6); os.start(t + d); lfo.start(t + d); os.stop(t + d + 2.9); lfo.stop(t + d + 2.9);
       }
     });
-    [1568, 2093, 2637, 3136, 4186].forEach((f, i) => tone(c, o, t + .25 + i * .12, f, 1.2, { gain: .05 }));
+    [1568, 2093, 2637, 3136, 4186].forEach((f, i) => bell(c, o, t + .25 + i * .12, f, 1.2, .045, .7));
   },
-  win: (c, o, t) => { SND.chips(c, o, t, 14); [523, 659, 784, 1047].forEach((f, i) => tone(c, o, t + .08 + i * .11, f, .45, { type: 'triangle', gain: .12 })); },
+  // menang: air terjun chip + arpeggio lonceng naik + kilau
+  win: (c, o, t) => {
+    stack(c, o, t, 18, .85);
+    [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => bell(c, o, t + .1 + i * .09, f, 1.4, .1, .6));
+    for (let i = 0; i < 6; i++) tone(c, pan(c, o, Math.random() * 1.4 - .7), t + .55 + Math.random() * .6, 3000 + Math.random() * 2500, .25, { gain: .025, rev: .8 });
+  },
 };
-let AC, OUT, unlocked = false, muted = localStorage.getItem('mute') === '1';
+
+// ---- BGM: jazz kasino (trio: walking bass, Rhodes, brush drum + vibraphone sesekali), digenerate terus-menerus ----
+const JAZZ = (() => {
+  const BPM = 104, B = 60 / BPM;
+  const Q = { m9: [3, 7, 10, 14], maj9: [4, 7, 11, 14], d13: [4, 9, 10, 14], d7b9: [4, 7, 10, 13], alt: [4, 10, 13, 15], m7b5: [3, 6, 10, 13], maj6: [4, 7, 9, 14] };
+  const SC = { m9: [0, 2, 3, 5, 7, 9, 10], maj9: [0, 2, 4, 7, 9, 11], d13: [0, 2, 4, 7, 9, 10], d7b9: [0, 1, 4, 7, 10], alt: [0, 1, 3, 4, 8, 10], m7b5: [0, 3, 5, 6, 10], maj6: [0, 2, 4, 7, 9] };
+  const ROOT = { C: 0, Db: 1, D: 2, Eb: 3, E: 4, F: 5, Gb: 6, G: 7, Ab: 8, A: 9, Bb: 10, B: 11 };
+  // tiap bar: satu atau dua akor ("Dm9" / "Em7b5 A7b9")
+  const ch = s => { const [, r, q] = s.match(/^([A-G]b?)(.*)$/); return { r: ROOT[r], q: { m9: 'm9', m7: 'm9', maj9: 'maj9', '13': 'd13', '7b9': 'd7b9', '7alt': 'alt', m7b5: 'm7b5', '6': 'maj6' }[q] }; };
+  const FORM = [
+    'Dm9|G13|Cmaj9|A7b9|Dm9|G13|Em7 A7alt|Dm9 G13',
+    'Dm9|G13|Cmaj9|A7b9|Dm9|G7alt|C6|Bm7b5 E7b9',
+    'Am9|D13|Gmaj9|Cmaj9|Fmaj9|Bb13|Em7 A7b9|Dm9 G7alt',
+    'Dm9|G13|Em7|A7b9|Dm9|G13|Cmaj9|Cmaj9',
+  ].flatMap(s => s.split('|').map(b => b.split(' ').map(ch)));
+  if (FORM.flat().some(x => !Q[x.q])) console.warn('akor BGM tidak dikenal');
+  const hz = m => 440 * 2 ** ((m - 69) / 12);
+  let c, out, rh, timer = 0, bar = 0, tBar = 0, lastMel = 74, on = false;
+  const swing = (t, e) => t + Math.floor(e / 2) * B + (e % 2 ? B * .66 : 0) + (Math.random() - .5) * .012; // e = 1/8 ke-e dalam bar
+  // walking bass: plucked upright (sine + harmonik, filter menutup)
+  function bass(t, m, v = 1) {
+    const o = c.createOscillator(), o2 = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain();
+    o.frequency.value = hz(m); o2.type = 'triangle'; o2.frequency.value = hz(m) * 2;
+    f.type = 'lowpass'; f.frequency.setValueAtTime(1100, t); f.frequency.exponentialRampToValueAtTime(260, t + .25);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.32 * v, t + .012); g.gain.exponentialRampToValueAtTime(.12 * v, t + .18); g.gain.exponentialRampToValueAtTime(.0001, t + B * 1.05);
+    const g2 = c.createGain(); g2.gain.value = .25; o2.connect(g2); g2.connect(f); o.connect(f); f.connect(g); g.connect(out);
+    o.start(t); o2.start(t); o.stop(t + B * 1.1); o2.stop(t + B * 1.1);
+  }
+  // Rhodes: FM sederhana (bunyi "tine" di awal lalu lembut)
+  function rhodes(t, m, dur, v = 1) {
+    const car = c.createOscillator(), mod = c.createOscillator(), mg = c.createGain(), g = c.createGain(), f = hz(m);
+    car.frequency.value = f; mod.frequency.value = f; mg.gain.setValueAtTime(f * 1.6, t); mg.gain.exponentialRampToValueAtTime(f * .08, t + .35);
+    mod.connect(mg); mg.connect(car.frequency);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.045 * v, t + .008); g.gain.exponentialRampToValueAtTime(.02 * v, t + .5); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    car.connect(g); g.connect(rh); send(c, g, .15); car.start(t); mod.start(t); car.stop(t + dur + .05); mod.stop(t + dur + .05);
+  }
+  function vibes(t, m, v = 1) { bell(c, out, t, hz(m), 1.6, .045 * v, .35); }
+  const ride = (t, v) => { burst(c, out, t, .28, { type: 'highpass', f: 7000, gain: .028 * v, atk: .002 }); [3150, 4720, 5900].forEach(f => tone(c, out, t, f * (.99 + Math.random() * .02), .22, { type: 'square', gain: .0035 * v })); };
+  const brush = (t, v) => { burst(c, out, t, .2, { f: 2600, q: .7, gain: .045 * v, atk: .012 }); };
+  const swish = t => burst(c, out, t, B * 1.9, { type: 'bandpass', f: 3400, f2: 2200, q: .5, gain: .012, atk: B * .8 });
+  const chick = t => burst(c, out, t, .045, { type: 'highpass', f: 6500, gain: .03 });
+  const kick = t => tone(c, out, t, 70, .18, { f2: 45, gain: .09 });
+  // pola comping Rhodes per bar (dalam 1/8 swing): Charleston, antisipasi, dsb.
+  const COMP = [[0, 3], [3, 6], [1, 4], [0, 5], [2, 7], [3], [0, 4, 7], [1, 6]];
+  function playBar(i, t) {
+    const chords = FORM[i % FORM.length], nextC = FORM[(i + 1) % FORM.length][0], per = 4 / chords.length;
+    chords.forEach((C, k) => {
+      const t0 = t + k * per * B, r = 36 + ((C.r + 5) % 12) - 5 + 4; // akar di sekitar E1..A2
+      const tones = Q[C.q].map(x => r + x);
+      for (let b = 0; b < per; b++) { // walking: akar, nada akor, lalu pendekatan kromatis ke akor berikutnya
+        const lastBeat = b === per - 1, nxt = k + 1 < chords.length ? chords[k + 1] : nextC, nr = 36 + ((nxt.r + 5) % 12) - 5 + 4;
+        const m = b === 0 ? r : lastBeat ? nr + (Math.random() < .5 ? 1 : -1) : [r + 7, tones[0], tones[2] - 12, r + 12][(b + i) % 4];
+        bass(swing(t0, b * 2), m, b === 0 ? 1 : .85);
+      }
+      // voicing di tengah (C4 sekitar), dipusatkan supaya tidak melompat jauh
+      const voice = Q[C.q].map(x => { let n = 48 + C.r + x; while (n > 71) n -= 12; while (n < 52) n += 12; return n; }).sort((a, b) => a - b);
+      const pat = per === 4 ? COMP[Math.floor(Math.random() * COMP.length)] : [[0], [1], [3]][Math.floor(Math.random() * 3)];
+      pat.forEach(e => { const st = swing(t0, e), long = e % 2 === 0 ? B * 1.4 : B * .8; voice.forEach((n, j) => rhodes(st + j * .006, n, long, e === 0 ? .9 : .75)); });
+      // vibraphone: frase pendek sesekali dari nada skala akor
+      if (Math.random() < (per === 4 ? .42 : .25)) {
+        const sc = SC[C.q], start = Math.floor(Math.random() * 3) * 2 + (Math.random() < .5 ? 1 : 0), len = 2 + Math.floor(Math.random() * 4);
+        for (let e = start; e < Math.min(per * 2, start + len); e++) {
+          let best = lastMel, d = Infinity;
+          for (let o = 60; o <= 86; o++) { const pc = ((o - C.r) % 12 + 12) % 12; if (!sc.includes(pc)) continue; const dist = Math.abs(o - (lastMel + (Math.random() * 8 - 4))); if (dist < d && o !== lastMel) { d = dist; best = o; } }
+          lastMel = best; vibes(swing(t0, e), best, e % 2 ? .75 : 1);
+        }
+      }
+    });
+    // drum: ride "ding, ding-ga", brush & hi-hat di 2 dan 4, swish terus-menerus, kick sangat pelan
+    for (let b = 0; b < 4; b++) {
+      ride(swing(t, b * 2), b % 2 ? 1 : .8);
+      if (b % 2) { ride(swing(t, b * 2 + 1), .55); brush(swing(t, b * 2), 1); chick(swing(t, b * 2)); }
+      if (b % 2 === 0) { swish(t + b * B); kick(swing(t, b * 2)); }
+    }
+  }
+  function pump() { while (tBar < c.currentTime + .8) { playBar(bar++, tBar); tBar += 4 * B; } }
+  return {
+    attach(ctx, dest) {
+      c = ctx; out = c.createGain(); out.gain.value = 0; out.connect(dest);
+      // Rhodes lewat filter hangat + tremolo stereo
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600; rh = lp;
+      const pn = pan(c, out, .01) || out; lp.connect(pn);
+      if (pn.pan) { const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 3.2; lg.gain.value = .35; lfo.connect(lg); lg.connect(pn.pan); lfo.start(); }
+    },
+    get on() { return on; },
+    start() {
+      if (!c || on) return; on = true;
+      tBar = c.currentTime + .15; pump(); timer = setInterval(pump, 120);
+      out.gain.cancelScheduledValues(c.currentTime); out.gain.setTargetAtTime(this.vol, c.currentTime, .6);
+    },
+    stop() {
+      if (!on) return; on = false; clearInterval(timer);
+      out.gain.cancelScheduledValues(c.currentTime); out.gain.setTargetAtTime(0, c.currentTime, .15);
+    },
+    // BGM mengecil sebentar saat ada efek besar (all-in, menang, Revive)
+    duck(sec = 2) { if (!on) return; const g = out.gain, n = c.currentTime; g.cancelScheduledValues(n); g.setTargetAtTime(this.vol * .3, n, .05); g.setTargetAtTime(this.vol, n + sec, .5); },
+    vol: .55,
+  };
+})();
+
+let AC, OUT, unlocked = false;
+// SFX: dulu satu tombol "Suara" (kunci 'mute'), sekarang SFX dan BGM terpisah
+let muted = localStorage.getItem('mute') === '1', bgmOff = localStorage.getItem('bgm') === '0';
 function unlock() { // browser baru mengizinkan suara setelah ada tap/ketikan pemain
   unlocked = true;
-  if (!AC) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return; AC = new C(); OUT = AC.createGain(); OUT.gain.value = .8; OUT.connect(AC.destination); }
+  if (!AC) {
+    const C = window.AudioContext || window.webkitAudioContext; if (!C) return; AC = new C();
+    const comp = AC.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = .003; comp.release.value = .2; comp.connect(AC.destination);
+    OUT = AC.createGain(); OUT.gain.value = .9; OUT.connect(comp);
+    // reverb ruangan kasino: impuls bising stereo yang meluruh
+    const len = AC.sampleRate * 1.6, ir = AC.createBuffer(2, len, AC.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3; }
+    const cv = AC.createConvolver(), wet = AC.createGain(); cv.buffer = ir; wet.gain.value = .35; cv.connect(wet); wet.connect(comp); REV = cv;
+    JAZZ.attach(AC, AC.destination);
+  }
   if (AC.state === 'suspended') AC.resume();
+  syncBgm();
 }
+function syncBgm() { if (!AC) return; if (!bgmOff && unlocked && !document.hidden) JAZZ.start(); else JAZZ.stop(); }
+document.addEventListener('visibilitychange', syncBgm); // tab disembunyikan: musik berhenti (timer browser melambat)
 ['pointerdown', 'keydown'].forEach(e => addEventListener(e, unlock, { passive: true }));
-const play = (k, ...a) => { if (muted || !unlocked || !AC) return; try { SND[k](AC, OUT, AC.currentTime + .01, ...a); } catch (e) { console.warn('suara gagal', e); } };
+const play = (k, ...a) => {
+  if (muted || !unlocked || !AC) return;
+  try { SND[k](AC, OUT, AC.currentTime + .01, ...a); if (k === 'win' || k === 'allin' || k === 'angel') JAZZ.duck(k === 'angel' ? 3 : 2.2); } catch (e) { console.warn('suara gagal', e); }
+};
 const later = (ms, k, ...a) => setTimeout(() => play(k, ...a), Math.max(0, ms));
 
 // ---- match dari URL (/meja.html?m=<id>); token meja disimpan per match ----
@@ -1475,8 +1618,10 @@ function drawWinner() {
 }
 setInterval(() => { if (S && (S.phase === 'showdown' || S.phase === 'over')) { drawReveal(); drawWinner(); } }, 150);
 
-$('snd').classList.toggle('off', muted);
-$('snd').onclick = () => { muted = !muted; localStorage.setItem('mute', muted ? '1' : '0'); $('snd').classList.toggle('off', muted); play('chips', 3); };
+$('sfx').classList.toggle('off', muted);
+$('sfx').onclick = () => { muted = !muted; localStorage.setItem('mute', muted ? '1' : '0'); $('sfx').classList.toggle('off', muted); $('sfx').setAttribute('aria-pressed', !muted); play('chips', 4); };
+$('bgm').classList.toggle('off', bgmOff);
+$('bgm').onclick = () => { bgmOff = !bgmOff; localStorage.setItem('bgm', bgmOff ? '0' : '1'); $('bgm').classList.toggle('off', bgmOff); $('bgm').setAttribute('aria-pressed', !bgmOff); unlock(); };
 // ---- mulai: di akhir skrip, setelah semua variabel (termasuk bagian chat) sudah dideklarasikan ----
 // Sudah punya token meja: langsung lanjut. Belum tahu alamat chat (mis. meja dibuka sebelum chat ada): masuk ulang
 // lewat enter(), yang mengembalikan token yang sama beserta alamat chat.
