@@ -109,6 +109,24 @@ export const SKILLS = {
   // Langsung diumumkan; pemain itu ikut lagi mulai hand berikutnya. Tidak bisa dipakai kalau pemain tersisa tinggal 2.
   revive: { name: 'Revive Card', icon: '😇', angel: true },
 }
+// ---- skill card khusus host (bandar): tanpa batas & gratis, tapi maks 1 per hand; setiap pemakaian diumumkan ----
+// now: hanya selama hand berjalan. target: pilih 1 pemain yang masih bertahan.
+export const HOST_SKILLS = {
+  double_payout: { name: 'Double Payout', icon: '💰', now: true },
+  jackpot: { name: 'Jackpot Hand', icon: '🎰', now: true },
+  blind_up: { name: 'Blind Up', icon: '📈' },
+  speed_round: { name: 'Speed Round', icon: '⏱️' },
+  all_in_madness: { name: 'All-in Madness', icon: '🤯' },
+  open_hand: { name: 'Open Hand', icon: '🃏', now: true },
+  board_reroll: { name: 'Board Reroll', icon: '🌀', now: true },
+  bounty: { name: 'Bounty', icon: '🎯', target: true },
+  silence: { name: 'Silence', icon: '🤐' },
+  charity: { name: 'Charity', icon: '🎁' },
+  lucky_spin: { name: 'Lucky Spin', icon: '🎡' },
+}
+export const SPEED_MS = env('SPEED_MS', 10000)
+/** Jackpot Hand: chip bonus = JACKPOT_BB x big blind. Charity & Bounty: bagian dari chip awal match. */
+export const JACKPOT_BB = 10, CHARITY_SHARE = 0.5, BOUNTY_SHARE = 0.5
 /** Kartu Attack yang dipantulkan Full Counter (passive yang dipasang sebelum match: t.counter = daftar uid pemiliknya). */
 export const COUNTERED = ['fold_player', 'reveal_card']
 /** Jeda pengumuman wildcard sebelum hand berikutnya dibagi. */
@@ -192,7 +210,7 @@ export class Table {
   after(i, f) { const n = this.players.length; for (let k = 1; k <= n; k++) { const j = (i + k + n) % n; if (f(this.players[j])) return j } return -1 }
 
   /** Level blind saat ini (dihitung dari waktu mulai), sebagai [sb, bb]. */
-  level() { return Math.min(LEVELS.length - 1, this.level0 + (this.startedAt === null ? 0 : Math.floor((this.now - this.startedAt) / this.levelMs))) }
+  level() { return Math.min(LEVELS.length - 1, this.level0 + (this.levelUp || 0) + (this.startedAt === null ? 0 : Math.floor((this.now - this.startedAt) / this.levelMs))) }
   blinds() { const sb = LEVELS[this.level()]; return [sb, sb * 2] }
 
   // Hanya satu event terjadwal pada satu waktu; yang terbaru menggantikan yang lama.
@@ -221,7 +239,7 @@ export class Table {
     if (this.startedAt === null) this.startedAt = this.now
     this.lobby = false
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false, boost: 0 })
     this.handNo++
     this.deck = this.newDeck(); this.board = []; this.phase = 'preflop'; this.bet = this.bb; this.minRaise = this.bb
     this.dealer = this.after(this.dealer, p => p.inHand)
@@ -230,6 +248,12 @@ export class Table {
     this.applyLuck(el)
     this.put(this.players[sb], this.sb); this.put(this.players[bb], this.bb)
     this.players[sb].last = 'sb'; this.players[bb].last = 'bb'
+    if (this.madness) { // All-in Madness (host): semua yang dibagi kartu langsung all-in, kartu dibuka, board dibuka bertahap
+      this.madness = false
+      for (const p of el) { this.put(p, p.chips); p.last = 'all-in' }
+      this.bet = Math.max(...el.map(p => p.bet))
+      return this.advance()
+    }
     this.step(bb)
   }
   put(p, a) { a = Math.min(a, p.chips); p.chips -= a; p.bet += a; p.total += a; if (!p.chips) p.allIn = true }
@@ -239,7 +263,8 @@ export class Table {
     return { call: Math.min(call, p.chips), bet: this.bet, minTo: Math.min(this.bet + this.minRaise, max), maxTo: max, raise: !p.noRaise && p.chips > call }
   }
   // Pemain yang tidak aktif cuma diberi waktu singkat supaya turnamen tidak tertahan.
-  setTurn(i) { this.turn = i; const p = this.players[i]; this.defer('turn', p.sitOut || !this.online(p) ? AWAY_MS : TURN_MS) }
+  turnMs() { return this.speed === this.handNo ? SPEED_MS : TURN_MS } // Speed Round (host): waktu giliran lebih singkat
+  setTurn(i) { this.turn = i; const p = this.players[i]; this.defer('turn', p.sitOut || !this.online(p) ? Math.min(AWAY_MS, this.turnMs()) : this.turnMs()) }
   timeout() {
     const p = this.players[this.turn]
     if (!p) return
@@ -301,6 +326,8 @@ export class Table {
     // taruhan yang tidak ada yang menyamai dikembalikan dulu (bukan "kemenangan")
     const [a, b] = [...this.players].sort((x, y) => y.total - x.total)
     if (b && a.total > b.total && a.inHand && !a.folded) { const r = a.total - b.total; a.chips += r; a.total -= r }
+    // Double Payout / Jackpot (host): chip bonus ditambahkan ke kontribusi tiap pemain, jadi ikut dibagi per (side) pot
+    for (const p of this.players) if (p.boost) p.total += p.boost
     const n = this.players.length, all = this.players.filter(p => p.total > 0)
     const levels = [...new Set(con.map(p => p.total))].sort((x, y) => x - y), seat = p => (this.players.indexOf(p) - this.dealer - 1 + n) % n
     let prev = 0
@@ -318,6 +345,7 @@ export class Table {
     // hitung hand AFK: masih istirahat di akhir hand = AFK; beraksi atau menekan "Main lagi" = mulai dari 0
     for (const p of this.players) if (p.inHand && !p.place) p.afk = p.sitOut ? (p.afk || 0) + 1 : 0
     this.eliminate()
+    this.payBounty()
     if (this.alive().length < 2) { this.lastShow = this.handNo; return this.end() } // showdown terakhir tetap diputar di layar
     this.defer('next', Math.max(NEXT_MS, REVEAL_LEAD_MS + this.showdownOrder().length * REVEAL_MS + 2500))
   }
@@ -387,6 +415,7 @@ export class Table {
   canUseCard(i, code, j) {
     const p = this.players[i], sk = SKILLS[code]
     if (!sk) return 'Kartu ini tidak bisa dipakai di meja'
+    if (this.silenced()) return '🤐 Silence dari host: skill card dikunci di hand ini'
     if (sk.angel) {
       if (this.phase === 'over' || !p) return 'Match sudah selesai'
       if (this.lobby || !this.handNo) return 'Revive baru bisa dipakai setelah ada pemain yang tersingkir'
@@ -569,6 +598,91 @@ export class Table {
     this.deck.push(...r.board.slice().reverse()) // pop() berikutnya = board[0], board[1], ...
     o.lucky = true
   }
+  // ---- skill card host ----
+  silenced() { return this.betting && this.silence === this.handNo }
+  // Hand yang kena efek "hand ini / hand berikutnya": selama hand berjalan = hand ini, di antara hand = hand berikutnya.
+  nextNo() { return this.betting ? this.handNo : this.handNo + 1 }
+  canHost(code, j) {
+    const h = HOST_SKILLS[code]
+    if (!h) return 'Skill host tidak dikenal'
+    if (this.phase === 'over') return 'Match sudah selesai'
+    if (this.lobby || !this.handNo) return 'Skill host baru bisa dipakai setelah hand pertama dibagi'
+    if (this.hostUsed === this.handNo) return 'Maksimal 1 skill host per hand, tunggu hand berikutnya'
+    if (h.now && !this.betting) return 'Hanya bisa dipakai selama hand berjalan'
+    const con = this.players.filter(p => p.inHand && !p.folded)
+    if (h.now && con.length < 2) return 'Hand ini sudah selesai'
+    if (code === 'board_reroll' && this.board.length < 3) return 'Board Reroll baru bisa dipakai setelah flop dibuka'
+    if (code === 'board_reroll' && con.every(p => p.allIn) && this.turn < 0) return 'Kartu meja sedang dibuka otomatis'
+    if (code === 'open_hand' && con.every(p => p.show)) return 'Kartu semua pemain sudah terbuka'
+    if (code === 'all_in_madness' && this.madness) return 'All-in Madness sudah menunggu hand berikutnya'
+    if (code === 'blind_up' && this.level() >= LEVELS.length - 1) return 'Blind sudah di level tertinggi'
+    if (code === 'lucky_spin' && this.luck) return 'Sudah ada kartu Luck yang menunggu hand berikutnya'
+    if (code === 'charity' && this.alive().length < 2) return 'Pemain tinggal 1'
+    if (h.target) {
+      const q = this.players[j]
+      if (!Number.isInteger(j) || !q) return 'Pilih pemain'
+      if (q.place || !q.chips) return `${q.name} sudah tersingkir`
+      if (this.alive().length <= 2) return 'Bounty tidak bisa dipasang kalau pemain tinggal 2'
+    }
+  }
+  useHost(code, j) {
+    const err = this.canHost(code, j)
+    if (err) return err
+    this.hostUsed = this.handNo
+    let extra = ''
+    if (code === 'double_payout' || code === 'jackpot') {
+      const con = this.players.filter(p => p.inHand && !p.folded)
+      if (code === 'double_payout') { // pot sekarang x2: tiap kontribusi digandakan
+        let add = 0
+        for (const p of this.players) if (p.total) { const x = p.total + (p.boost || 0); p.boost = (p.boost || 0) + x; add += x }
+        extra = String(this.players.reduce((s, p) => s + p.total + (p.boost || 0), 0))
+        this.minted = (this.minted || 0) + add
+      } else { // jackpot: bonus dibagi rata ke pemain yang masih bertahan (masuk pot utama mereka)
+        const bonus = JACKPOT_BB * this.bb, each = Math.floor(bonus / con.length)
+        con.forEach((p, k) => p.boost = (p.boost || 0) + each + (k < bonus - each * con.length ? 1 : 0))
+        this.minted = (this.minted || 0) + bonus
+        extra = String(bonus)
+      }
+    } else if (code === 'blind_up') {
+      this.levelUp = (this.levelUp || 0) + 1
+      extra = this.blinds().join('/')
+    } else if (code === 'speed_round') {
+      this.speed = this.nextNo(); extra = this.betting ? 'now' : 'next'
+    } else if (code === 'silence') {
+      this.silence = this.nextNo(); extra = this.betting ? 'now' : 'next'
+    } else if (code === 'all_in_madness') this.madness = true
+    else if (code === 'open_hand') { for (const p of this.players) if (p.inHand && !p.folded) p.show = true }
+    else if (code === 'board_reroll') { this.board = this.board.map(() => this.deck.pop()); this.rr = (this.rr || 0) + 1 }
+    else if (code === 'bounty') {
+      const chips = Math.round(this.startChipsOf() * BOUNTY_SHARE)
+      this.bounty = { uid: this.players[j].uid, chips }
+      extra = String(chips)
+    } else if (code === 'charity') {
+      const alive = this.alive(), low = Math.min(...alive.map(p => p.chips)), q = alive.find(p => p.chips === low)
+      const chips = Math.round(this.startChipsOf() * CHARITY_SHARE)
+      q.chips += chips; this.minted = (this.minted || 0) + chips
+      j = this.players.indexOf(q); extra = String(chips)
+    } else if (code === 'lucky_spin') {
+      const alive = this.alive(), q = alive[R(alive.length)], lucks = Object.keys(SKILLS).filter(c => SKILLS[c].luck)
+      j = this.players.indexOf(q)
+      this.luck = { i: j, code: lucks[R(lucks.length)] }
+    }
+    this.announce(-1, code, Number.isInteger(j) ? j : -1, extra)
+    if (!this.betting && this.due?.kind === 'next') this.defer('next', Math.max(this.due.at - this.now, 4500)) // beri waktu pengumumannya
+  }
+  // Bounty: pemain yang ditandai tersingkir di hand ini -> pemenang chip terbanyak hand ini mendapat hadiahnya.
+  payBounty() {
+    const b = this.bounty
+    if (!b) return
+    const q = this.players.find(p => p.uid === b.uid)
+    if (!q) { this.bounty = null; return }
+    if (q.chips > 0 && !q.place) return
+    this.bounty = null
+    const hunter = this.players.filter(p => p !== q && p.won > 0 && p.chips > 0).sort((x, y) => y.won - x.won)[0]
+    if (!hunter) return
+    hunter.chips += b.chips; this.minted = (this.minted || 0) + b.chips
+    this.announce(this.players.indexOf(hunter), 'bounty_claim', this.players.indexOf(q), String(b.chips))
+  }
   // Fold di luar giliran. Kalau korbannya sedang giliran, sama seperti dia fold sendiri; kalau bukan, giliran tetap
   // di pemain yang sekarang, kecuali ronde taruhan jadi selesai karena dia keluar.
   forceFold(j) {
@@ -583,7 +697,7 @@ export class Table {
   // Defend Me: pemain yang rugi di hand ini mendapat kembali setengah kerugiannya, diambil dari pemain yang untung
   // (sebanding dengan keuntungannya), jadi jumlah chip di meja tetap.
   defend() {
-    const net = p => p.won - p.total
+    const net = p => p.won - (p.total - (p.boost || 0)) // chip bonus host bukan kerugian pemain
     const losers = this.players.filter(p => (p.skills || []).includes('defend_me') && net(p) < 0)
     if (!losers.length) return
     const gainers = this.players.filter(p => net(p) > 0)
@@ -632,13 +746,13 @@ export class Table {
     const [sb, bb] = this.betting || this.phase === 'showdown' ? [this.sb, this.bb] : this.blinds()
     const v = {
       me: i, phase: this.phase, board: this.board, started: this.started, dealer: this.dealer, turn: this.turn,
-      ms: TURN_MS, sb, bb, no: this.handNo, level: lvl - this.level0 + 1,
+      ms: this.turnMs(), sb, bb, no: this.handNo, level: lvl - this.level0 + 1,
       // ms sampai blind naik (berlaku di hand berikutnya sesudahnya); 0 = sudah level terakhir
       nextIn: this.startedAt === null || nextSb === LEVELS[lvl] ? 0 : Math.max(0, this.startedAt + (lvl - this.level0 + 1) * this.levelMs - this.now),
       next: [nextSb, nextSb * 2],
       startIn: this.startedAt === null && this.due ? Math.max(0, this.due.at - this.now) : 0,
       lobby: !!this.lobby, countdown: this.counting(),
-      pot: this.betting ? N.reduce((s, q) => s + q.total, 0) : 0,
+      pot: this.betting ? N.reduce((s, q) => s + q.total + (q.boost || 0), 0) : 0,
       left: this.turn >= 0 && this.due ? Math.max(0, this.due.at - this.now) : 0,
       // showdown: kombinasi tiap pemain untuk disorot bergantian, terlemah dulu, pemenang terakhir
       reveal: this.showdownOrder().map(({ q, i }) => ({ i, best: bestFive(q.cards.concat(this.board)), hand: handName(q.cards, this.board) })),
@@ -669,7 +783,10 @@ export class Table {
     if (me && !this.betting && me.lucky !== null && me.lucky !== undefined && (me.skills || []).some(c => SKILLS[c]?.luck)) v.lucky = me.lucky
     if (me && (this.counter || []).includes(me.uid)) v.counter = true // Full Counter saya aktif (hanya pemiliknya yang tahu)
     if (this.phase === 'over' && this.winner) v.winner = this.players.findIndex(p => p.uid === this.winner)
-    if (hostView) v.hostView = true
+    if (hostView) { v.hostView = true; v.hostUsed = this.hostUsed === this.handNo; if (this.madness) v.madness = true }
+    if (this.bounty) v.bounty = { i: this.players.findIndex(p => p.uid === this.bounty.uid), chips: this.bounty.chips }
+    if (this.silenced()) v.silence = true
+    if (this.speed === this.handNo && this.betting) v.speed = true
     return v
   }
 }

@@ -113,6 +113,7 @@ Detailnya:
 - Tombol **Buat Match Baru**.
 - Daftar **misi** yang sedang berjalan (jumlah player yang sudah selesai dan sisa waktunya), tombol **Buat misi**, dan tombol untuk membatalkan misi.
 - Daftar match aktif dan riwayat hosting beserta pemenangnya.
+- Daftar **🎩 Skill Bandar**: skill card khusus host yang bisa dipakai di meja online (lihat Match Online).
 
 ### 🃏 Match
 - Daftar **match yang sedang aktif** dan **match yang baru selesai**, bisa dilihat semua user.
@@ -135,6 +136,23 @@ Detailnya:
 - **Peluang menang**: tiap pemain hanya melihat peluang menang tangannya sendiri, dalam persen, di kiri bawah meja (kartu di tangan + kartu meja melawan kartu acak sebanyak lawan yang masih main). Host match melihat peluang menang semua pemain yang masih main di pojok kanan atas. Peluang untuk host dihitung di server, jadi kartu tertutup pemain tidak pernah dikirim ke host.
 - **Sorotan showdown**: saat kartu dibuka, kombinasi 5 kartu terbaik tiap pemain yang belum fold disorot bergantian (kartu naik dan menyala, kartu lain meredup), mulai dari kombinasi terlemah sampai pemenang. Cap "Menang" baru muncul di giliran pemenang. Tiap pemain disorot **3 detik**. Showdown hand terakhir (penentu juara) juga diputar, lalu muncul pengumuman besar **🏆 Winner: nama juara** di tengah meja sebelum daftar hasil turnamen.
 - **Chat bubble**: pemain bisa kirim pesan singkat atau emoji (tombol 💬 di kanan panel bawah; kolom ketik tertutup lagi setelah pesan terkirim). Pesan muncul sebagai bubble di atas kursi pengirim lalu hilang sendiri. Chat tidak disimpan di database (lewat Supabase Realtime), maksimal 60 huruf, jeda 2 detik, dan maksimal 5 pesan per 30 detik supaya tidak bisa spam. Host match juga bisa chat (bubble-nya muncul di dekat bandar dengan label HOST). Penonton lain bisa membaca tapi tidak bisa mengirim.
+- **🎩 Skill Bandar**: host match online (yang tidak ikut main) punya skill card sendiri lewat tombol 🎩 di meja. Gratis dan tanpa batas, tapi **maksimal 1 per hand**, dan setiap pemakaian diumumkan besar di tengah meja dengan cap HOST.
+
+  | Skill | Kapan | Efek |
+  |---|---|---|
+  | 💰 Double Payout | Saat hand berjalan | Pot saat itu **langsung dikali 2** (tiap side pot ikut digandakan). |
+  | 🎰 Jackpot Hand | Saat hand berjalan | Tambah 10× big blind ke pot. |
+  | 🃏 Open Hand | Saat hand berjalan | Semua kartu pemain di hand ini terbuka untuk semua orang. |
+  | 🌀 Board Reroll | Setelah flop | Kartu meja yang sudah terbuka diganti kartu baru. |
+  | ⏱️ Speed Round | Kapan saja | Waktu giliran 10 detik di hand ini (atau hand berikutnya kalau dipakai di antara hand). |
+  | 🤐 Silence | Kapan saja | Skill card pemain dikunci di hand ini (atau hand berikutnya). |
+  | 📈 Blind Up | Kapan saja | Blind naik 1 level, berlaku mulai hand berikutnya. |
+  | 🤯 All-in Madness | Kapan saja | Hand berikutnya semua pemain otomatis all-in, kartu dibuka, board dibuka bertahap. |
+  | 🎯 Bounty | Kapan saja | Tandai 1 pemain (ikon 🎯 di kursinya). Pemain yang menang chip terbanyak di hand saat dia tersingkir dapat bonus 50% chip awal. |
+  | 🎁 Charity | Kapan saja | Pemain dengan chip paling sedikit dapat 50% chip awal. |
+  | 🎡 Lucky Spin | Kapan saja | 1 pemain acak dapat kartu Luck gratis (acak) untuk hand berikutnya, kalau belum ada kartu Luck yang menunggu. |
+
+  Chip bonus dari Double Payout, Jackpot, Bounty, dan Charity dibuat oleh bandar (menambah total chip di meja).
 - Meja poker diadaptasi dari [Meja Hold'em](https://github.com/ragila/meja-holdem) karya Ragil.
 
 ### 🏆 Leaderboard

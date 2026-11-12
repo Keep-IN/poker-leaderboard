@@ -128,6 +128,11 @@ assert(hs.players.every(q => q.cards.every(c => c === -1)))
 assert.equal(hs.odds.length, 3)
 assert(Math.abs(hs.odds.reduce((x, o) => x + o.p, 0) - 1) < 1e-9)
 assert.equal(s.odds, undefined) // pemain tidak menerima peluang orang lain
+// skill host: hanya token host; Double Payout langsung menggandakan pot dan diumumkan
+assert((await post({ token: a.token, type: 'host', code: 'double_payout' })).error, 'pemain bukan host')
+const pot0 = hs.pot, dp = await post({ token: hst.token, type: 'host', code: 'double_payout' })
+assert(dp.ok && dp.s.hostView && dp.s.hostUsed && dp.s.pot === pot0 * 2 && dp.s.ann.code === 'double_payout' && dp.s.ann.by === -1, JSON.stringify(dp.error))
+assert((await post({ token: hst.token, type: 'host', code: 'jackpot' })).error, 'maks 1 per hand')
 
 // tiap giliran: pemain yang sedang giliran all-in; ulangi sampai turnamen selesai
 let guard = 0

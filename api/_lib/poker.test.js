@@ -1,6 +1,6 @@
 // Tes mesin turnamen: `node api/_lib/poker.test.js` (mencetak "semua tes lulus").
 import assert from 'node:assert'
-import { AFK_HANDS, BIG_SHARE, COUNTDOWN_MS, WILD_MS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
+import { HOST_SKILLS, JACKPOT_BB, SPEED_MS, AFK_HANDS, BIG_SHARE, COUNTDOWN_MS, WILD_MS, LEVELS, REVEAL_MS, SKILLS, TURN_MS, Table, best, bestFive, equities, handName, rigLuck } from './poker.js'
 
 const C = s => s.split(' ').map(x => 'shdc'.indexOf(x[1]) * 13 + '23456789TJQKA'.indexOf(x[0]))
 const S = s => best(C(s))
@@ -560,6 +560,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
           const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive', 'pair_me_up'][R(12)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
+        if (r > .97) { const hc = Object.keys(HOST_SKILLS)[R(11)]; if (t.useHost(hc, R(n)) === undefined) continue } // skill host
         if (r < .05) run(t, TURN_MS)
         else if (r < .2) ok(t, i, 'fold')
         else if (r < .6 || !c.raise) ok(t, i, c.call ? 'call' : 'check')
@@ -577,6 +578,69 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
     // peringkat cocok dengan urutan tersingkir
     t.out.forEach((uid, k) => assert.equal(t.players.find(p => p.uid === uid).place, n - k))
   }
+}
+
+{ // skill host: Double Payout langsung menggandakan pot, maks 1 per hand, diumumkan
+  const t = mk([1000, 1000, 1000]); begin(t)
+  assert.equal(typeof t.useHost('double_payout'), 'undefined')
+  assert.equal(t.view(null).pot, 60) // blind 10+20 -> 60
+  assert.equal(t.ann.by, -1); assert.equal(t.ann.code, 'double_payout'); assert.equal(t.ann.extra, '60')
+  assert.equal(typeof t.useHost('jackpot'), 'string') // maks 1 per hand
+  const i = t.turn; ok(t, i, 'fold'); ok(t, t.turn, 'fold') // BB menang sendirian
+  assert.deepEqual(stacks(t).sort((a, b) => a - b), [990, 1000, 1040]) // BB dapat 60 (30 asli + 30 bonus)
+  assert.equal(stacks(t).reduce((a, b) => a + b), 3000 + t.minted)
+  nxt(t)
+  assert.equal(typeof t.useHost('jackpot'), 'undefined') // hand baru: boleh lagi
+  assert.equal(t.view(null).pot, 30 + JACKPOT_BB * t.bb)
+}
+{ // Double Payout dengan side pot
+  const t = mk([100, 1000, 1000]); rig(t, 'As Ah 2c 7d Ks Kh 3s 8h 9c Jd 4d'); begin(t)
+  ok(t, 0, 'raise', 100) // P0 dealer/UTG all-in 100
+  ok(t, 1, 'raise', 300); ok(t, 2, 'call')
+  t.useHost('double_payout') // pot 100+300+300 = 700 -> 1400
+  assert.equal(t.view(null).pot, 1400)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, 'check')
+  drain(t)
+  // P0 AA menang pot utama 3x100x2 = 600; side pot 2x200x2 = 800 ke KK (P2) karena P1 72o
+  assert.equal(t.players[0].chips, 600); assert.equal(t.players[2].chips, 700 + 800); assert.equal(t.players[1].chips, 700)
+}
+{ // Blind Up, Speed Round, Silence, Open Hand, Board Reroll, All-in Madness
+  const t = mk([1000, 1000, 1000]); begin(t)
+  assert.equal(typeof t.useHost('board_reroll'), 'string') // belum flop
+  t.useHost('blind_up'); assert.deepEqual([t.sb, t.bb], [10, 20]); assert.deepEqual(t.blinds(), [15, 30]) // berlaku hand berikutnya
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t); nxt(t); assert.deepEqual([t.sb, t.bb], [15, 30])
+  t.useHost('speed_round'); assert.equal(t.view(null).ms, SPEED_MS); assert.equal(t.due.at - t.now, SPEED_MS)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t); nxt(t); assert.equal(t.view(null).ms, TURN_MS)
+  t.useHost('silence'); assert.match(t.useCard(t.turn, 'defend_me'), /Silence/)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t); nxt(t); assert.equal(t.useCard(t.turn, 'defend_me'), undefined)
+  t.useHost('open_hand'); assert(t.view(t.players[0]).players.every((q, k) => q.cards[0] >= 0))
+  while (t.phase === 'preflop') ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t); nxt(t)
+  ok(t, t.turn, 'call'); ok(t, t.turn, 'call'); ok(t, t.turn, 'check')
+  const old = t.board.slice(); t.useHost('board_reroll')
+  assert.equal(t.board.length, 3); assert(t.board.every(c => !old.includes(c)))
+  while (t.betting && t.turn >= 0) ok(t, t.turn, 'check')
+  drain(t); assert.match(t.useHost('all_in_madness'), /Maksimal 1/); t.hostUsed = -1; t.useHost('all_in_madness'); nxt(t)
+  assert(t.players.every(p => p.allIn || !p.chips)); assert.equal(t.turn, -1)
+  drain(t)
+  assert.equal(stacks(t).reduce((a, b) => a + b, 0) + t.forfeited, 3000 + (t.minted || 0))
+}
+{ // Bounty, Charity, Lucky Spin
+  const t = mk([1000, 200, 1000]); rig(t, 'As Ah 7c 2d Ks Kh 3s 8h 9c Jd 4d'); begin(t)
+  assert.equal(typeof t.useHost('bounty', 1), 'undefined'); assert.equal(t.view(null).bounty.i, 1)
+  const bounty = t.bounty.chips
+  ok(t, 0, 'raise', 1000); ok(t, 1, 'call'); ok(t, 2, 'fold')
+  drain(t)
+  assert.equal(t.players[1].place, 3); assert.equal(t.players[0].chips, 1000 + 200 + 20 + bounty)
+  assert.equal(t.ann.code, 'bounty_claim'); assert.equal(t.bounty, null)
+  nxt(t)
+  t.hostUsed = -1; const low = t.players[2].chips; t.useHost('charity')
+  assert.equal(t.ann.target, 2); assert(t.players[2].chips > low)
+  t.hostUsed = -1; assert.equal(t.useHost('lucky_spin'), undefined); assert(SKILLS[t.luck.code].luck)
+  assert.equal(typeof t.useHost('lucky_spin'), 'string') // luck sudah menunggu (dan 1 per hand)
 }
 
 console.log('semua tes lulus')

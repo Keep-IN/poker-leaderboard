@@ -5,6 +5,7 @@
 //   POST /api/meja {match, token, type, amount}             -> fold | check | call | raise | sitin | ready | unready
 //   POST /api/meja {match, token, type:'out'}               -> keluar dari match di lobi (sebelum hand pertama)
 //   POST /api/meja {match, token: host, type:'kick', seat}  -> host mengeluarkan pemain di lobi
+//   POST /api/meja {match, token: host, type:'host', code, target} -> host memakai skill card host (HOST_SKILLS)
 //
 // db: {
 //   user(accessToken) -> uid | null
@@ -227,8 +228,22 @@ async function leave(db, match, b) {
   return { ...r.out, left: true } // pemain yang keluar tidak punya kursi lagi
 }
 
+// Skill card host: gratis & tanpa batas (maks 1 per hand), hanya untuk token host match ini.
+async function hostCard(db, match, b) {
+  const token = String(b.token || ''), target = b.target === undefined || b.target === null ? -1 : Number(b.target)
+  const r = await mutate(db, match, t => {
+    if (!token || token !== t.hostToken) return { error: 'Hanya host match ini yang bisa memakai skill host' }
+    const err = t.useHost(String(b.code || ''), target)
+    return err ? { error: err } : { ok: true }
+  })
+  if (r.missing) return { error: 'Meja belum dibuka', missing: true }
+  if (r.status) return ended(r.status)
+  return withPodium(db, r.t, { ...r.out, v: r.ver, s: hostView(match, r.t) })
+}
+
 async function act(db, match, b) {
   if (b.type === 'card') return playCard(db, match, b)
+  if (b.type === 'host') return hostCard(db, match, b)
   if (b.type === 'out' || b.type === 'kick') return leave(db, match, b)
   const token = String(b.token || '')
   const fc = b.type === 'ready' ? await counters(db, match) : null // Full Counter yang baru dipasang sebelum Ready

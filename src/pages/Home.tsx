@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { DealerDuelSections, PlayerDuelSections } from '../components/DuelSections'
 import { DealerBounties, PlayerBounties } from '../components/BountySections'
 import GiftInbox from '../components/GiftInbox'
+import { HostSkillList } from '../components/HostSkills'
 import { DealerMissions, PlayerMissions } from '../components/MissionSections'
 import { ACTIVE_DUEL_STATUSES, DUEL_SELECT, type Duel, type DuelStatus } from '../lib/duels'
 import { Avatar, Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
@@ -366,6 +367,7 @@ function DealerHome({ profile }: { profile: Profile }) {
         🎁 Kirim Gift ke Player
       </Link>
 
+      <HostSkillList />
       <DealerDuelSections me={profile.id} />
       <DealerMissions />
       <DealerBounties />
