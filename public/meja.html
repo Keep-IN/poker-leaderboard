@@ -765,7 +765,7 @@ function drawMine() {
   const P = S.players[S.me], m = masked();
   set($('mine'), P.cards.length ? P.cards.map((c, j) => card(m ? -1 : c, 'c' + S.me + '.' + j)).join('') : '<div class="card empty"></div><div class="card empty"></div>');
   // nama tangan (mis. "Straight") juga ikut disembunyikan, karena membocorkan kekuatan kartu
-  set($('msg'), (P.hand && !m ? `<div class="hn">${P.hand}</div>` : '') + `<div class="sub">${curMsg}</div>` + (m && P.cards.length ? '<div class="hint">tahan kartu untuk mengintip</div>' : ''));
+  set($('msg'), (P.hand && !m ? `<div class="hn">${P.hand}</div>` : '') + `<div class="sub">${curMsg}</div>` + (m && P.cards.length ? `<div class="hint">tahan kartu${matchMedia('(pointer: fine)').matches ? ' atau Spasi' : ''} untuk mengintip</div>` : ''));
   $('eye').classList.toggle('on', hideCards);
   $('eye').setAttribute('aria-pressed', hideCards);
   $('eye').title = hideCards ? 'Tampilkan kartu' : 'Sembunyikan kartu';
@@ -775,6 +775,15 @@ $('eye').onclick = () => { hideCards = !hideCards; peek = false; localStorage.se
 $('mine').addEventListener('pointerdown', e => { if (hideCards) { e.preventDefault(); peek = true; drawMine(); } });
 $('mine').addEventListener('contextmenu', e => { if (hideCards) e.preventDefault(); }); // tekan lama di Android jangan memunculkan menu
 ['pointerup', 'pointercancel'].forEach(t => addEventListener(t, () => { if (peek) { peek = false; drawMine(); } })); // lepas di mana pun: tutup lagi
+// Di PC/laptop: tahan Spasi untuk mengintip kartu (kecuali sedang mengetik di kolom chat/angka).
+const typing = e => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target.isContentEditable;
+addEventListener('keydown', e => {
+  if (e.code !== 'Space' || !hideCards || typing(e)) return;
+  e.preventDefault(); // jangan menggulir halaman / menekan tombol yang sedang fokus
+  if (!peek) { peek = true; drawMine(); }
+});
+addEventListener('keyup', e => { if (e.code === 'Space' && peek && !typing(e)) { e.preventDefault(); peek = false; drawMine(); } });
+addEventListener('blur', () => { if (peek) { peek = false; drawMine(); } }); // pindah jendela sambil menahan Spasi: tutup lagi
 
 // Slider taruhan: 1000 posisi dengan kurva kuadrat (bet kecil lebih presisi), dibulatkan ke kelipatan small blind;
 // ujung kanan = all-in. Kolom angka bisa diketik bebas, tapi tidak bisa di bawah taruhan minimum (min-raise / big blind).
