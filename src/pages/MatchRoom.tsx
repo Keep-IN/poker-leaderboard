@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import ConfirmSheet, { type Confirmation } from '../components/ConfirmSheet'
+import { TimerBanner, TimerEditor } from '../components/MatchTimer'
 import { Avatar, Button, Card, EmptyState, ErrorText, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { BOUNTY_SELECT, type Bounty } from '../lib/bounties'
@@ -240,7 +241,12 @@ export default function MatchRoom() {
         )
       )}
 
+      {match.status === 'open' && match.start_at && (
+        <TimerBanner startAt={match.start_at} players={players.length} minPlayers={MIN_MATCH_PLAYERS} onStarted={load} />
+      )}
+
       {/* Dealer controls */}
+      {isDealer && match.status === 'open' && <TimerEditor matchId={id} startAt={match.start_at} onSaved={load} />}
       {isDealer && match.status === 'open' && (
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <Button

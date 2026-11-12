@@ -12,7 +12,7 @@ export function shareToWhatsApp(text: string) {
 
 const link = (path: string) => `${window.location.origin}${path}`
 
-type ShareMatch = Pick<Match, 'id' | 'title' | 'status' | 'mode' | 'online_config' | 'max_players'> & {
+type ShareMatch = Pick<Match, 'id' | 'title' | 'status' | 'mode' | 'online_config' | 'max_players'> & Partial<Pick<Match, 'start_at'>> & {
   dealer: { name: string; role: string } | null
 }
 
@@ -31,6 +31,7 @@ export function matchMessage(match: ShareMatch, players: MatchPlayer[]) {
       `${host} · maks ${match.max_players} pemain`,
       players.length ? `Sudah join (${players.length}): ${names.join(', ')}` : 'Belum ada yang join, ayo jadi yang pertama!',
       left > 0 ? `Sisa ${left} kursi.` : 'Kursi sudah penuh.',
+      ...(match.start_at ? [`⏱ Mulai otomatis: ${formatDateTime(match.start_at)}`] : []),
       '',
       `Join di sini 👉 ${url}`,
     ].join('\n')

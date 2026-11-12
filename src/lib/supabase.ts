@@ -38,6 +38,8 @@ export interface Match {
   created_at: string
   started_at: string | null
   finished_at: string | null
+  /** waktu mulai otomatis yang diatur host (match open) */
+  start_at: string | null
 }
 
 export interface MatchPlayer {

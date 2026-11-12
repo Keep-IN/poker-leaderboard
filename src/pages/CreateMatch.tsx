@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { TimerPicker, timerDate, type TimerChoice } from '../components/MatchTimer'
 import { Button, Card, ErrorText, PageLoader, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { formatDate } from '../lib/format'
+import { formatDate, formatDateTime } from '../lib/format'
 import {
   MATCH_CREATION_COST,
   MIN_MATCH_PLAYERS,
@@ -26,6 +27,7 @@ export default function CreateMatch() {
   const [sb, setSb] = useState(10)
   const [startChips, setStartChips] = useState(1500)
   const [levelMinutes, setLevelMinutes] = useState(10)
+  const [timer, setTimer] = useState<TimerChoice>({ kind: 'off' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -46,8 +48,14 @@ export default function CreateMatch() {
       p_mode: mode,
       p_config: online ? config : null,
     })
+    if (error) {
+      setLoading(false)
+      return setError(errorMessage(error))
+    }
+    // timer dihitung saat match benar-benar dibuat ("15 menit" = 15 menit dari sekarang)
+    const at = timerDate(timer)
+    if (at) await supabase.rpc('set_match_timer', { p_match: data, p_start_at: at.toISOString() })
     setLoading(false)
-    if (error) return setError(errorMessage(error))
     navigate(`/matches/${data}`, { replace: true })
   }
 
@@ -79,6 +87,9 @@ export default function CreateMatch() {
             <SummaryRow label="Mode">{online ? '🌐 Online (turnamen)' : '🃏 Offline'}</SummaryRow>
             <SummaryRow label="Maksimal player">{maxPlayers} player</SummaryRow>
             {online && <SummaryRow label="Meja">{onlineConfigText(config)}</SummaryRow>}
+            {timer.kind !== 'off' && (
+              <SummaryRow label="Mulai otomatis">{timer.kind === 'in' ? `${timer.min} menit setelah dibuat` : formatDateTime(new Date(timer.local).toISOString())}</SummaryRow>
+            )}
           </div>
           <div className="rounded-xl bg-surface-950/60 p-4">
             <p className="text-xs uppercase tracking-wider text-slate-400">Biaya</p>
@@ -260,11 +271,21 @@ export default function CreateMatch() {
               </div>
             </>
           )}
+
+          <div>
+            <span className="mb-1.5 block text-sm font-medium text-slate-300">⏱ Mulai otomatis <span className="font-normal text-slate-500">(opsional)</span></span>
+            <TimerPicker value={timer} onChange={setTimer} />
+            <p className="mt-1.5 text-xs text-slate-400">
+              {timer.kind === 'off'
+                ? 'Tanpa timer: kamu yang menekan Mulai Match.'
+                : `Match mulai sendiri saat waktunya tiba kalau sudah ada min. ${MIN_MATCH_PLAYERS} player; kalau belum, langsung mulai begitu cukup. Kamu tetap bisa mulai lebih awal atau mengubah timer.`}
+            </p>
+          </div>
         </Card>
 
         <ErrorText>{error}</ErrorText>
 
-        <Button type="submit" loading={loading} disabled={!enoughPoints || (online && !chipsOk)} className="min-h-13 w-full text-base">
+        <Button type="submit" loading={loading} disabled={!enoughPoints || (online && !chipsOk) || timerDate(timer) === undefined} className="min-h-13 w-full text-base">
           {isPlayer ? 'Lanjut' : 'Buat Match'}
         </Button>
         <Button type="button" variant="ghost" onClick={() => navigate(-1)} className="w-full">

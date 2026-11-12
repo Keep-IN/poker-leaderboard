@@ -38,6 +38,10 @@ alter table public.matches drop constraint if exists matches_mode_check;
 alter table public.matches add constraint matches_mode_check
   check ((mode = 'offline' and online_config is null) or (mode = 'online' and online_config is not null));
 
+-- Timer mulai otomatis dari host: match open dengan start_at yang sudah lewat dimulai oleh start_due_matches()
+-- (dipanggil halaman web siapa pun yang sedang membuka match, dan tiap menit oleh pg_cron kalau aktif).
+alter table public.matches add column if not exists start_at timestamptz;
+
 create index if not exists matches_status_idx      on public.matches (status);
 create index if not exists matches_finished_at_idx on public.matches (finished_at);
 create index if not exists matches_dealer_idx      on public.matches (dealer_id);
@@ -461,6 +465,63 @@ begin
     raise exception 'Butuh minimal 3 player untuk memulai';
   end if;
   update public.matches set status = 'ongoing', started_at = now() where id = p_match;
+end;
+$$;
+
+-- Host mengatur (atau menghapus, p_start_at null) waktu mulai otomatis match yang masih open.
+create or replace function public.set_match_timer(p_match uuid, p_start_at timestamptz)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  m public.matches := public.lock_own_match(p_match);
+begin
+  if m.status <> 'open' then
+    raise exception 'Timer hanya bisa diatur sebelum match dimulai';
+  end if;
+  if p_start_at is not null and (p_start_at < now() + interval '1 minute' or p_start_at > now() + interval '14 days') then
+    raise exception 'Waktu mulai minimal 1 menit dari sekarang dan maksimal 14 hari lagi';
+  end if;
+  update public.matches set start_at = p_start_at where id = p_match;
+end;
+$$;
+
+-- Mulai semua match open yang waktunya sudah tiba dan pemainnya cukup (minimal 3). Yang pemainnya belum cukup
+-- tetap open dan langsung dimulai begitu cukup (pemanggilan berikutnya). Aman dipanggil siapa saja, kapan saja.
+create or replace function public.start_due_matches()
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  n int := 0;
+  m record;
+begin
+  for m in
+    select id from public.matches
+     where status = 'open' and start_at is not null and start_at <= now()
+     for update skip locked
+  loop
+    if (select count(*) from public.match_players where match_id = m.id) >= 3 then
+      update public.matches set status = 'ongoing', started_at = now() where id = m.id;
+      n := n + 1;
+    end if;
+  end loop;
+  return n;
+end;
+$$;
+
+-- pg_cron (kalau extension-nya aktif di project Supabase): cek tiap menit supaya match tetap mulai walau tidak ada
+-- yang sedang membuka website.
+do $$
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(jobid) from cron.job where jobname = 'start-due-matches';
+    perform cron.schedule('start-due-matches', '* * * * *', 'select public.start_due_matches()');
+  end if;
 end;
 $$;
 
@@ -1809,7 +1870,12 @@ begin
     'public.arm_double_down(uuid, uuid)',
     'public.disarm_double_down(uuid)',
     'public.update_my_name(text)',
-    'public.current_role_name()'
+    'public.current_role_name()',
+    'public.set_match_timer(uuid, timestamptz)',
+    'public.start_due_matches()',
+    'public.send_gift(uuid[], int, text, int, text)',
+    'public.cancel_gift(uuid, boolean)',
+    'public.claim_gift(uuid)'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
     execute format('grant execute on function %s to authenticated', fn);

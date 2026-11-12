@@ -11,6 +11,7 @@ interface MatchListRow {
   status: MatchStatus
   mode: MatchMode
   max_players: number
+  start_at: string | null
   created_at: string
   finished_at: string | null
   dealer: { name: string; role: string } | null
@@ -19,7 +20,7 @@ interface MatchListRow {
 }
 
 const SELECT =
-  'id, title, status, mode, max_players, created_at, finished_at, dealer:profiles!matches_dealer_id_fkey(name, role), winner:profiles!matches_winner_id_fkey(name), players:match_players(count)'
+  'id, title, status, mode, max_players, start_at, created_at, finished_at, dealer:profiles!matches_dealer_id_fkey(name, role), winner:profiles!matches_winner_id_fkey(name), players:match_players(count)'
 
 export default function Matches() {
   const { profile } = useAuth()
@@ -27,6 +28,7 @@ export default function Matches() {
   const [recent, setRecent] = useState<MatchListRow[]>([])
 
   const load = useCallback(async () => {
+    await supabase.rpc('start_due_matches') // match yang timernya sudah lewat dimulai dulu
     const [a, r] = await Promise.all([
       supabase.from('matches').select(SELECT).in('status', ['open', 'ongoing']).order('created_at', { ascending: false }),
       supabase.from('matches').select(SELECT).eq('status', 'finished').order('finished_at', { ascending: false }).limit(10),
@@ -115,6 +117,7 @@ function MatchCard({ m }: { m: MatchListRow }) {
             <p className="text-xs text-slate-400">
               {m.mode === 'online' ? '🌐 Online' : '🃏 Offline'} · {m.dealer?.role === 'player' ? 'Host' : 'Dealer'}: {m.dealer?.name ?? '-'}
             </p>
+            {m.status === 'open' && m.start_at && <p className="mt-0.5 text-xs font-semibold text-brand-300">⏱ Mulai otomatis {formatDateTime(m.start_at)}</p>}
           </div>
           <StatusBadge status={m.status} />
         </div>
