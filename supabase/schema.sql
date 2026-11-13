@@ -1670,6 +1670,19 @@ as $$
    where id = p_card and player_id = p_player and match_id = p_match and status = 'used';
 $$;
 
+-- Skill host Coin Drop & Prediction: hadiah koin dari meja untuk pemain match ini (maks 100 per hadiah, sekali per ref).
+create or replace function public.meja_grant_coins(p_match uuid, p_player uuid, p_amount int, p_ref text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into public.coin_ledger (player_id, amount, reason, ref)
+  select p_player, least(greatest(p_amount, 0), 100), 'table', p_match::text || ':' || p_ref
+   where p_amount > 0 and exists (select 1 from public.match_players mp where mp.match_id = p_match and mp.player_id = p_player)
+  on conflict (player_id, reason, ref) do nothing;
+$$;
+
 -- Skill host Mystery Box: 1 skill card gratis untuk pemain match ini, langsung masuk inventory (dipanggil server meja).
 create or replace function public.meja_grant_card(p_match uuid, p_player uuid, p_code text)
 returns void
@@ -1813,7 +1826,7 @@ grant select on public.gifts to authenticated;
 -- koin dari gift dicatat di buku besar dengan reason 'gift'
 alter table public.coin_ledger drop constraint if exists coin_ledger_reason_check;
 alter table public.coin_ledger add constraint coin_ledger_reason_check
-  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift'));
+  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift', 'table'));
 
 -- p_players null = semua player. Mengembalikan jumlah player yang dikirimi.
 create or replace function public.send_gift(p_players uuid[], p_coins int, p_card text, p_qty int, p_message text)
@@ -1936,6 +1949,7 @@ revoke all on function public.meja_refund_card(uuid, uuid, uuid) from public, an
 revoke all on function public.meja_counters(uuid) from public, anon, authenticated;
 revoke all on function public.meja_passives(uuid) from public, anon, authenticated;
 revoke all on function public.meja_grant_card(uuid, uuid, text) from public, anon, authenticated;
+revoke all on function public.meja_grant_coins(uuid, uuid, int, text) from public, anon, authenticated;
 revoke all on function public.meja_withdraw(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.online_not_dealt(uuid) from public, anon, authenticated;
 grant execute on function public.meja_withdraw(uuid, uuid) to service_role;
@@ -1944,6 +1958,7 @@ grant execute on function public.meja_refund_card(uuid, uuid, uuid) to service_r
 grant execute on function public.meja_counters(uuid) to service_role;
 grant execute on function public.meja_passives(uuid) to service_role;
 grant execute on function public.meja_grant_card(uuid, uuid, text) to service_role;
+grant execute on function public.meja_grant_coins(uuid, uuid, int, text) to service_role;
 grant execute on function public.meja_podium() to service_role;
 
 do $$

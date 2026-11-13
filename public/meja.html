@@ -300,6 +300,8 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 .seat.peek .cards{position:relative}
 .seat.peek .cards .card{outline:2px dashed #71c5eb;outline-offset:1px}
 .seat.peek .cards::after{content:'👁️';position:absolute;top:-10px;right:-8px;font-size:13px}
+/* Bonus River: 6 kartu meja diperkecil supaya tidak menabrak kursi */
+#board.six{transform:scale(.84);transform-origin:center}
 /* Final Table (skill host): bingkai meja menyala merah-emas */
 body.final #felt{animation:ftGlow 2.2s ease-in-out infinite}
 @keyframes ftGlow{0%,100%{box-shadow:0 0 0 3px #ffcf4d66,0 0 34px #ff3b5c55}50%{box-shadow:0 0 0 5px #ffcf4daa,0 0 70px #ff3b5c99}}
@@ -1130,6 +1132,10 @@ function render() {
   if (!P && phase !== 'over') { if (betting && S.turn >= 0) msg += ' · giliran ' + esc(ps[S.turn].name); }
   if (S.turn >= 0 && phase !== 'over') msg += ' · <span id="tl"></span>';
   if (P && P.sitOut && !P.place && phase !== 'over') h += `<div class="row"><button class="btn green" onclick="act('sitin')">Main lagi</button></div>`;
+  if (P && !S.ctl && S.predict && S.predict.can) h += `<div class="sub">🔮 Tebak pemenang hand ini · benar = +${S.predict.coins} koin</div><div class="lob">` +
+    ps.map((q, k) => ({ q, k })).filter(({ q }) => q.inHand && !q.folded).map(({ q, k }) => `<button class="btn ${S.predict.mine === k ? 'gold' : 'ghost'}" type="button" onclick="api('predict', { pick: ${k} })">${S.predict.mine === k ? '✓ ' : ''}${esc(q.name)}</button>`).join('') + '</div>';
+  if (P && !S.ctl && S.vote && S.vote.can) h += `<div class="sub">🗳️ Revenge Vote · pilih 1 pemain, yang terbanyak −${Math.round(S.vote.share * 100)}% chip</div><div class="lob">` +
+    ps.map((q, k) => ({ q, k })).filter(({ q }) => q.chips > 0 && !q.place).map(({ q, k }) => `<button class="btn ${S.vote.mine === k ? 'gold' : 'ghost'}" type="button" onclick="api('revenge', { pick: ${k} })">${S.vote.mine === k ? '✓ ' : ''}${esc(q.name)}</button>`).join('') + '</div>';
   stAt = Date.now() + S.startIn;
   if (chatNote && (P || isHost) && phase !== 'over') msg += `<br><span class="chatnote">${esc(chatNote)}</span>`;
   if (P) { // efek kartu yang hanya diketahui pemain ini
@@ -1164,7 +1170,8 @@ function render() {
   });
   set($('seats'), seats + bets);
 
-  set($('board'), [0, 1, 2, 3, 4].map(i => i < S.board.length ? card(S.board[i], 'b' + i) : '<div class="card empty"></div>').join(''));
+  $('board').classList.toggle('six', S.board.length > 5 || !!S.bonusRiver);
+  set($('board'), [...Array(S.board.length > 5 || S.bonusRiver ? 6 : 5).keys()].map(i => i < S.board.length ? card(S.board[i], 'b' + i) : '<div class="card empty"></div>').join(''));
   set($('pot'), S.pot ? chips(S.pot - sumBets) + `<span class="lbl">Pot</span><span class="num">${S.pot}</span>` : '');
   set($('win'), phase === 'over'
     ? `<div class="over"><b>Hasil turnamen</b><ol>${ps.slice().sort((a, b) => a.place - b.place).map(p => `<li>${esc(p.name)}</li>`).join('')}</ol></div>`
@@ -1174,7 +1181,10 @@ function render() {
   const tagBig = S.big !== undefined && betting, tagDuel = S.duelFine !== undefined && betting && S.players[S.duelFine];
   const hostTags = [S.silence && '🤐 Silence · skill card dikunci', S.speed && '⏱️ Speed Round · 10 detik per giliran', S.don && '🎲 Double or Nothing',
     S.split && '💥 Split Pot', S.insure && '🏦 Insurance all-in 25%', S.shuffleNext && '🔀 kursi diacak hand berikutnya',
-    S.death !== undefined && `💀 Death Card: ${cardTxt(S.death)} · −65% chip`, S.ransomNext && "🤴 King's Ransom hand berikutnya"].filter(Boolean).join(' · ');
+    S.death !== undefined && `💀 Death Card: ${cardTxt(S.death)} · −65% chip`, S.ransomNext && "🤴 King's Ransom hand berikutnya",
+    S.upside && '🙃 Upside Down · terlemah menang', S.bonusRiver && '➕ Bonus River', S.masked && '🎭 Masquerade', S.blackout && '🌑 Blackout',
+    S.house && `👻 Bandar: ${S.house.cards.map(cardTxt).join(' ')}${S.house.hand ? ' · ' + S.house.hand : ''}`, S.dice && `🎲 blind ×${S.dice}`,
+    S.coinDrop && `🪙 pemenang +${S.coinDrop} koin`, S.predict && `🔮 ${S.predict.n} tebakan`, S.vote && `🗳️ Revenge Vote · ${S.vote.n} suara`].filter(Boolean).join(' · ');
   document.body.classList.toggle('final', !!S.finalTable); JAZZ.hype(!!S.finalTable);
   $('bigTag').hidden = !(tagBig || tagDuel || hostTags);
   $('bigTag').classList.toggle('duel', !tagBig && !!tagDuel);
@@ -1386,7 +1396,7 @@ function drawAnn() {
       return;
     }
     if (a.by === -1 || a.code === 'bounty_claim') { // skill host: diumumkan besar dengan cap HOST
-      const base = { bounty_claim: 'bounty', don_result: 'double_or_nothing', hot_seat_hit: 'hot_seat' }[a.code] || a.code;
+      const base = { bounty_claim: 'bounty', don_result: 'double_or_nothing', hot_seat_hit: 'hot_seat', house_result: 'house_hand', prediction_result: 'prediction', revenge_result: 'revenge_vote' }[a.code] || a.code;
       const h = HOSTCARDS[base] || { icon: '🎩', name: a.code }, x = a.extra || '', nx = /next$/.test(x) ? 'hand berikutnya' : 'hand ini';
       const [x1, x2] = x.split(':'), card = USABLE[x] || { icon: '🃏', name: x };
       const line = {
@@ -1415,6 +1425,20 @@ function drawAnn() {
         seat_shuffle: ['Kursi diacak!', 'semua pemain pindah kursi mulai hand berikutnya'],
         mystery_box: [`${card.icon} ${tg}`, `dapat ${esc(card.name)} gratis ke inventory 🎁`],
         final_table: ['FINAL TABLE', 'tinggal 3 pemain · siapa juaranya?'],
+        upside_down: ['TERBALIK!', 'hand ini kombinasi terlemah yang menang 🙃'],
+        bonus_river: ['6 kartu meja', 'hand ini ada river tambahan'],
+        house_hand: [S.house ? S.house.cards.map(cardTxt).join(' ') : '👻', 'bandar ikut main · kalahkan bandar atau separuh pot hangus'],
+        house_result: x === 'win' ? ['Bandar menang 👻', 'separuh pot hangus!'] : ['Bandar kalah 🎉', 'pot utuh untuk pemenang'],
+        mandatory_ante: [`+${x} chip ke pot`, 'semua setor 5% chip'],
+        coin_drop: [`🪙 ${x} koin`, 'pemenang hand ini dapat koin aplikasi'],
+        prediction: ['Tebak pemenangnya!', `yang tersingkir/fold: tebakan benar dapat ${x} koin`],
+        prediction_result: [`${tg || '?'} menang`, `${x.split('/')[0]} dari ${x.split('/')[1]} tebakan benar`],
+        blackout: ['🌑 Lampu padam', `kartu semua pemain tertutup sampai flop di ${nx}`],
+        masquerade: ['🎭 ???', `nama semua pemain disembunyikan di ${nx}`],
+        dice_blinds: [`🎲 ${x}`, `blind hand berikutnya ×${x}`],
+        chip_rain: [`+${x} chip`, 'untuk semua pemain yang masih bertahan 🌧️'],
+        revenge_vote: ['Saatnya balas dendam', `yang tersingkir voting · terpilih −${x}% chip`],
+        revenge_result: x === '0' ? ['Tidak ada suara', 'Revenge Vote batal'] : [`${tg} −${x1}`, `terpilih dengan ${x2} suara`],
       }[a.code] || ['', ''];
       annUntil = Date.now() + 5200;
       el.className = 'host';
@@ -1559,6 +1583,17 @@ const HOSTCARDS = {
   seat_shuffle: { icon: '🔀', name: 'Seat Shuffle', desc: 'Semua pemain pindah kursi acak mulai hand berikutnya.' },
   mystery_box: { icon: '🎁', name: 'Mystery Box', desc: '1 pemain acak dapat 1 skill card gratis langsung ke inventory-nya.' },
   final_table: { icon: '🎆', name: 'Final Table', desc: 'Saat pemain tinggal 3: meja & musik jadi lebih intens sampai juara ditemukan.' },
+  upside_down: { icon: '🙃', name: 'Upside Down', desc: 'Hand ini kombinasi TERLEMAH yang menang.', now: true },
+  bonus_river: { icon: '➕', name: 'Bonus River', desc: 'Hand ini punya 6 kartu meja (sebelum river dibuka).', now: true },
+  house_hand: { icon: '👻', name: 'House Hand', desc: 'Bandar ikut dibagi 2 kartu terbuka. Kalau bandar mengalahkan semua di showdown, separuh pot hangus.', now: true },
+  mandatory_ante: { icon: '💸', name: 'Mandatory Ante', desc: 'Semua yang masih ikut hand setor 5% chip ke pot sekarang.', now: true },
+  coin_drop: { icon: '🪙', name: 'Coin Drop', desc: 'Pemenang hand ini dapat 20 koin aplikasi.', now: true },
+  prediction: { icon: '🔮', name: 'Prediction', desc: 'Pemain yang tersingkir/fold menebak pemenang hand ini. Tebakan benar = 10 koin.', now: true },
+  blackout: { icon: '🌑', name: 'Blackout', desc: 'Semua pemain tidak bisa melihat kartunya sendiri sampai flop (hand ini kalau masih pre-flop, atau berikutnya).' },
+  masquerade: { icon: '🎭', name: 'Masquerade', desc: 'Nama semua pemain disembunyikan (???) selama 1 hand.' },
+  dice_blinds: { icon: '🎲', name: 'Dice Blinds', desc: 'Lempar dadu: blind hand berikutnya jadi 1×–6×.' },
+  chip_rain: { icon: '🌧️', name: 'Chip Rain', desc: 'Semua pemain yang masih bertahan dapat bonus 10% chip awal.' },
+  revenge_vote: { icon: '🗳️', name: 'Revenge Vote', desc: 'Pemain yang sudah tersingkir voting 1 pemain; yang terpilih kehilangan 10% chip saat hand berikutnya dimulai.' },
 };
 function openHostBag() {
   const el = document.createElement('div'); el.id = 'bagSheet';
@@ -1566,7 +1601,9 @@ function openHostBag() {
   const why = code => S.hostUsed ? 'Sudah pakai skill host di hand ini.' : HOSTCARDS[code].now && !betting ? 'Hanya selama hand berjalan.'
     : code === 'board_reroll' && S.board.length < 3 ? 'Setelah flop dibuka.' : code === 'all_in_madness' && S.madness ? 'Sudah menunggu hand berikutnya.'
     : code === 'final_table' && S.finalTable ? 'Sudah aktif.' : code === 'final_table' && S.players.filter(q => q.chips > 0 && !q.place).length > 3 ? 'Saat pemain tinggal 3.'
-    : code === 'seat_shuffle' && S.shuffleNext ? 'Sudah menunggu hand berikutnya.' : code === 'double_or_nothing' && S.don ? 'Sudah aktif.' : '';
+    : code === 'seat_shuffle' && S.shuffleNext ? 'Sudah menunggu hand berikutnya.' : code === 'double_or_nothing' && S.don ? 'Sudah aktif.'
+    : code === 'house_hand' && S.phase !== 'preflop' ? 'Hanya sebelum flop.' : code === 'bonus_river' && S.board.length >= 5 ? 'River sudah dibuka.'
+    : code === 'revenge_vote' && S.vote ? 'Voting masih berjalan.' : code === 'revenge_vote' && !S.players.some(q => q.place) ? 'Belum ada yang tersingkir.' : '';
   el.innerHTML = `<div class="in"><h3>🎩 Skill host</h3><p class="note">Gratis & tanpa batas · maks 1 per hand · selalu diumumkan</p>
     ${S.hostUsed ? '<p class="note">Kamu sudah pakai skill host di hand ini. Tunggu hand berikutnya.</p>' : ''}
     <div id="bagList">${Object.entries(HOSTCARDS).map(([code, h]) => `<div class="it host"><span class="ic">${h.icon}</span>
@@ -1649,7 +1686,7 @@ function drawOdds() {
   $('hostOdds').classList.toggle('shut', !hostOddsOpen);
   if (ho) set($('hostOdds'), `<button class="t" type="button" aria-expanded="${hostOddsOpen}" title="${hostOddsOpen ? 'Sembunyikan' : 'Tampilkan'} peluang menang">Peluang menang<i>${hostOddsOpen ? '▾' : '▸'}</i></button><div class="rows">` + ho.map((o, k) =>
     `<div class="r${k === 0 ? ' top' : ''}"><span class="n">${esc(S.players[o.i].name)}</span><span class="p">${pct(o.p)}</span></div>`).join('') + '</div>');
-  const P = S && S.players[S.me], mine = betting && P && P.inHand && !P.folded && P.cards.length === 2 && P.cards[0] >= 0;
+  const P = S && S.players[S.me], mine = betting && P && P.inHand && !P.folded && P.cards.length === 2 && P.cards[0] >= 0 && S.board.length <= 5 && !S.upside && !S.bonusRiver;
   // kartu sedang disembunyikan (tombol mata): peluang ikut disembunyikan supaya tidak diintip orang di sebelah
   $('odds').hidden = !mine || masked();
   if (!mine) { oddsKey = ''; return; }

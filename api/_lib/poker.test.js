@@ -560,7 +560,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
           const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive', 'pair_me_up', 'shield', 'chip_saver', 'second_chance', 'blind_steal', 'blindfold', 'freeze_player', 'tax_collector', 'suited_up', 'third_card', 'board_peek', 'kings_ransom', 'chaos_shuffle', 'death_card', 'guardian_angel', 'share_luck'][R(27)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
-        if (r > .96 && r <= .97) { t.setPre(R(n), ['fold', 'check', 'call', ''][R(4)]); continue } // pre-action (bisa langsung jalan)
+        if (r > .96 && r <= .97) { t.setPre(R(n), ['fold', 'check', 'call', ''][R(4)]); t.setPredict(R(n), R(n)); t.setVote(R(n), R(n)); continue } // pre-action (bisa langsung jalan)
         if (r > .97) { const hk = Object.keys(HOST_SKILLS), hc = hk[R(hk.length)]; if (t.useHost(hc, R(n), R(n)) === undefined) continue } // skill host
         if (r < .05) run(t, TURN_MS)
         else if (r < .2) ok(t, i, 'fold')
@@ -795,6 +795,57 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   drain(t); nxt(t)
   assert(t.view(t.players[2]).thirdCard >= 0)
   void s0
+}
+
+{ // skill host batch 3: Upside Down, Bonus River, House Hand, Mandatory Ante, Dice Blinds
+  const t = mk([1000, 1000, 1000]); rig(t, 'As Ah 7c 2d Ks Kh 3s 8h 9c Jd 4d Qc 5h'); begin(t)
+  assert.equal(t.useHost('upside_down'), undefined)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  assert(t.players[1].won > 0, 'Upside Down: 72o (terlemah) menang'); assert.equal(t.players[0].won, 0)
+  nxt(t); t.useHost('bonus_river')
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  assert.equal(t.board.length, 6); assert(t.players.filter(p => p.won).length >= 1)
+  nxt(t); t.useHost('mandatory_ante')
+  const pot = t.view(null).pot; assert(pot > 30, 'ante masuk pot ' + pot)
+  ok(t, t.turn, 'call') // giliran tidak terganggu
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  t.hostUsed = -1; assert.equal(t.useHost('dice_blinds'), undefined); const n = +t.ann.extra; nxt(t)
+  assert.equal(t.bb, 20 * n); assert.equal(t.view(null).bb, 20 * n)
+  t.hostUsed = -1; assert.equal(t.useHost('house_hand'), undefined)
+  assert.equal(t.view(null).house.cards.length, 2)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  assert(['win', 'lose'].includes(t.house.result))
+  assert.equal(stacks(t).reduce((a, b) => a + b) + (t.forfeited || 0), 3000 + (t.minted || 0))
+}
+{ // Blackout, Masquerade, Chip Rain, Coin Drop, Prediction, Revenge Vote
+  const t = mk([1000, 1000, 1000, 40]); rig(t, 'As Ah 7c 2d Ks Kh 3s 8h 4c 5d 9c Jd 4d Qc 5h'); begin(t)
+  t.useHost('blackout'); assert.deepEqual(t.view(t.players[0]).players[0].cards, [-1, -1])
+  t.hostUsed = -1; t.useHost('masquerade')
+  const mv = t.view(t.players[0]); assert.equal(mv.players[0].name, 'P0'); assert.equal(mv.players[1].name, '???'); assert.equal(t.view(null, true).players[1].name, 'P1')
+  t.hostUsed = -1; t.useHost('coin_drop')
+  ok(t, 3, 'call'); ok(t, 0, 'raise', 1000); ok(t, 1, 'fold'); ok(t, 2, 'fold')
+  t.hostUsed = -1; assert.equal(t.useHost('prediction'), undefined)
+  assert.match(t.setPredict(0, 0) || '', /tersingkir\/fold/) // P0 masih main
+  assert.equal(t.setPredict(1, 0), undefined); assert.equal(t.setPredict(2, 3), undefined)
+  assert.equal(t.view(t.players[1]).predict.mine, 0)
+  ok(t, 3, 'call'); drain(t)
+  assert.equal(t.players[3].place, 4) // 72o... P3 (5d4c) kalah dari AA
+  assert.deepEqual(t.coins.map(c => c.uid + ':' + c.n).sort(), ['u0:20', 'u1:10'])
+  assert.equal(t.ann.code, 'prediction_result'); assert.equal(t.ann.extra, '1/2')
+  nxt(t)
+  const r0 = stacks(t).reduce((a, b) => a + b); t.useHost('chip_rain'); assert(stacks(t).reduce((a, b) => a + b) > r0)
+  nxt(t); while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check'); drain(t)
+  t.hostUsed = -1; assert.equal(t.useHost('revenge_vote'), undefined)
+  assert.equal(t.setVote(3, 1), undefined); assert(t.setVote(0, 1)) // hanya yang tersingkir
+  const c1 = t.players[1].chips; nxt(t)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check'); drain(t)
+  nxt(t)
+  assert.equal(t.ann.code, 'revenge_result'); assert(t.players[1].chips < c1 + 100000)
+  assert.equal(t.players.reduce((a, p) => a + p.chips + (t.betting ? p.total : 0), 0) + (t.forfeited || 0), 3040 + (t.minted || 0))
 }
 
 console.log('semua tes lulus')

@@ -4,6 +4,7 @@
 //   POST /api/meja {match, type:'join', access_token}       -> {token} untuk pemain match ini
 //   POST /api/meja {match, token, type, amount}             -> fold | check | call | raise | sitin | ready | unready
 //   POST /api/meja {match, token, type:'pre', pre}          -> pre-action: fold | check | call | '' (mati)
+//   POST /api/meja {match, token, type:'predict'|'revenge', pick} -> tebak pemenang / voting (pemain tersingkir/fold)
 //   POST /api/meja {match, token, type:'out'}               -> keluar dari match di lobi (sebelum hand pertama)
 //   POST /api/meja {match, token: host, type:'kick', seat}  -> host mengeluarkan pemain di lobi
 //   POST /api/meja {match, token: host, type:'host', code, target, target2} -> host memakai skill card host (HOST_SKILLS)
@@ -19,6 +20,7 @@
 //   passives(match) -> [{uid, code}] semua passive yang terpasang (opsional; fallback counters)
 //   counters(match) -> [uid] pemilik Full Counter yang terpasang (opsional)
 //   grantCard(match, uid, code) -> skill card gratis ke inventory pemain (Mystery Box, opsional)
+//   grantCoins(match, uid, amount, ref) -> koin hadiah meja (Coin Drop / Prediction, opsional)
 // }
 import { randomUUID } from 'node:crypto'
 import { COUNTERED, Table } from './poker.js'
@@ -83,9 +85,16 @@ async function settleRefunds(db, match, r) {
 
 // Mystery Box (skill host): kartu yang dicatat meja di t.gifts dimasukkan ke inventory pemainnya, lalu catatannya dihapus.
 async function settleGifts(db, match, r) {
-  if (!r?.t?.gifts?.length || !db.grantCard) return
-  for (const g of r.t.gifts) await db.grantCard(match, g.uid, g.code).catch(() => {})
-  await mutate(db, match, t => { t.gifts = [] }).catch(() => {})
+  if (r?.t?.gifts?.length && db.grantCard) {
+    for (const g of r.t.gifts) await db.grantCard(match, g.uid, g.code).catch(() => {})
+    await mutate(db, match, t => { t.gifts = [] }).catch(() => {})
+  }
+  // Coin Drop & Prediction: koin aplikasi (aman diulang: ref unik per hand per jenis)
+  if (r?.t?.coins?.length && db.grantCoins) {
+    for (const c of r.t.coins) await db.grantCoins(match, c.uid, c.n, c.ref).catch(() => {})
+    const done = r.t.coins.map(c => c.uid + c.ref)
+    await mutate(db, match, t => { t.coins = (t.coins || []).filter(c => !done.includes(c.uid + c.ref)) }).catch(() => {})
+  }
 }
 
 // Passive yang terpasang di match ini (dipasang di halaman match sebelum hand pertama), sebagai { code: [uid] }.
@@ -147,6 +156,7 @@ async function getState(db, match, token, v, watch) {
   })
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
   await settleRefunds(db, match, r)
+  await settleGifts(db, match, r)
   if (r.status === 'finished') return finalView(db, match, token)
   if (r.status) return ended(r.status)
   if (token && token === r.t.hostToken) return withPodium(db, r.t, { v: r.ver, s: hostView(match, r.t) })
@@ -161,6 +171,8 @@ async function finalView(db, match, token) {
   if (!row) return ended('finished')
   const t = Table.from(row.state)
   t.now = Date.now()
+  // hadiah koin hand terakhir (match keburu selesai): aman diulang karena ref unik
+  if (t.coins?.length && db.grantCoins) for (const c of t.coins) await db.grantCoins(match, c.uid, c.n, c.ref).catch(() => {})
   return { v: row.ver, s: t.view(t.find(token) ?? null) }
 }
 
@@ -279,12 +291,13 @@ async function act(db, match, b) {
     p.seen = t.now
     if (['fold', 'check', 'call', 'raise'].includes(b.type)) p.sitOut = false // pemain yang beraksi berarti sudah kembali
     const i = t.players.indexOf(p)
-    const err = b.type === 'pre' ? t.setPre(i, String(b.pre || '')) : b.type === 'sitin' ? t.sitIn(i) : b.type === 'ready' || b.type === 'unready' ? t.setReady(i, b.type === 'ready') : t.act(i, b.type, b.amount)
+    const err = b.type === 'predict' ? t.setPredict(i, Number(b.pick)) : b.type === 'revenge' ? t.setVote(i, Number(b.pick)) : b.type === 'pre' ? t.setPre(i, String(b.pre || '')) : b.type === 'sitin' ? t.sitIn(i) : b.type === 'ready' || b.type === 'unready' ? t.setReady(i, b.type === 'ready') : t.act(i, b.type, b.amount)
     return err ? { error: err } : { ok: true }
   })
   if (r.missing) return { error: 'Meja belum dibuka', missing: true }
   if (r.status) return ended(r.status)
   await settleRefunds(db, match, r)
+  await settleGifts(db, match, r)
   const p = r.t.find(token)
   return p ? withPodium(db, r.t, { ...r.out, v: r.ver, s: r.t.view(p) }) : r.out
 }

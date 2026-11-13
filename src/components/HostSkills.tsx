@@ -25,6 +25,17 @@ export const HOST_SKILLS = [
   { code: 'seat_shuffle', icon: '🔀', name: 'Seat Shuffle', when: 'Kapan saja', desc: 'Semua pemain pindah kursi acak mulai hand berikutnya.' },
   { code: 'mystery_box', icon: '🎁', name: 'Mystery Box', when: 'Kapan saja', desc: '1 pemain acak dapat 1 skill card gratis langsung ke inventory.' },
   { code: 'final_table', icon: '🎆', name: 'Final Table', when: 'Pemain tinggal 3', desc: 'Meja menyala & musik makin cepat sampai juara ditemukan.' },
+  { code: 'upside_down', icon: '🙃', name: 'Upside Down', when: 'Saat hand berjalan', desc: 'Hand ini kombinasi terlemah yang menang.' },
+  { code: 'bonus_river', icon: '➕', name: 'Bonus River', when: 'Sebelum river', desc: 'Hand ini punya 6 kartu meja.' },
+  { code: 'house_hand', icon: '👻', name: 'House Hand', when: 'Sebelum flop', desc: 'Bandar ikut main dengan 2 kartu terbuka; kalau bandar menang, separuh pot hangus.' },
+  { code: 'mandatory_ante', icon: '💸', name: 'Mandatory Ante', when: 'Saat hand berjalan', desc: 'Semua yang masih ikut hand setor 5% chip ke pot.' },
+  { code: 'coin_drop', icon: '🪙', name: 'Coin Drop', when: 'Saat hand berjalan', desc: 'Pemenang hand ini dapat 20 koin aplikasi.' },
+  { code: 'prediction', icon: '🔮', name: 'Prediction', when: 'Saat hand berjalan', desc: 'Pemain tersingkir/fold menebak pemenang; benar = 10 koin.' },
+  { code: 'blackout', icon: '🌑', name: 'Blackout', when: 'Kapan saja', desc: 'Semua pemain tidak bisa melihat kartunya sampai flop.' },
+  { code: 'masquerade', icon: '🎭', name: 'Masquerade', when: 'Kapan saja', desc: 'Nama semua pemain disembunyikan selama 1 hand.' },
+  { code: 'dice_blinds', icon: '🎲', name: 'Dice Blinds', when: 'Kapan saja', desc: 'Lempar dadu: blind hand berikutnya 1×–6×.' },
+  { code: 'chip_rain', icon: '🌧️', name: 'Chip Rain', when: 'Kapan saja', desc: 'Semua pemain yang bertahan dapat bonus 10% chip awal.' },
+  { code: 'revenge_vote', icon: '🗳️', name: 'Revenge Vote', when: 'Ada yang tersingkir', desc: 'Pemain tersingkir voting 1 pemain untuk kehilangan 10% chip.' },
 ]
 
 export function HostSkillList() {

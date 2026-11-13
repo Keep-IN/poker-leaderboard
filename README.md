@@ -188,6 +188,17 @@ Detailnya:
   | 🔀 Seat Shuffle | Kapan saja | Semua pemain pindah kursi acak (dealer juga acak) mulai hand berikutnya. |
   | 🎁 Mystery Box | Kapan saja | 1 pemain acak dapat 1 skill card acak gratis, langsung masuk inventory-nya. |
   | 🎆 Final Table | Pemain tinggal 3 | Meja menyala merah-emas dan musik jazz makin cepat sampai juara ditemukan. |
+  | 🙃 Upside Down | Saat hand berjalan | Di showdown hand ini kombinasi **terlemah** yang menang (sorotan showdown ikut terbalik). |
+  | ➕ Bonus River | Sebelum river | Hand ini punya 6 kartu meja; kombinasi terbaik tetap 5 kartu. |
+  | 👻 House Hand | Sebelum flop | Bandar ikut dibagi 2 kartu terbuka. Kalau kombinasi bandar mengalahkan semua pemain di showdown, separuh pot hangus. |
+  | 💸 Mandatory Ante | Saat hand berjalan | Semua yang masih ikut hand setor 5% chip ke pot (di luar taruhan ronde). |
+  | 🪙 Coin Drop | Saat hand berjalan | Pemenang hand ini dapat 20 **koin aplikasi** (tercatat "Hadiah dari meja"). |
+  | 🔮 Prediction | Saat hand berjalan | Pemain yang sudah tersingkir atau fold menebak pemenang hand ini; tebakan benar dapat 10 koin aplikasi. |
+  | 🌑 Blackout | Kapan saja | Semua pemain tidak bisa melihat kartunya sendiri sampai flop (hand ini kalau masih pre-flop, atau hand berikutnya). |
+  | 🎭 Masquerade | Kapan saja | Nama semua pemain disembunyikan (???) selama 1 hand; host tetap melihat nama. |
+  | 🎲 Dice Blinds | Kapan saja | Dadu dilempar: blind hand berikutnya dikali 1–6. |
+  | 🌧️ Chip Rain | Kapan saja | Semua pemain yang masih bertahan dapat bonus 10% chip awal. |
+  | 🗳️ Revenge Vote | Ada yang tersingkir | Pemain yang sudah tersingkir voting 1 pemain yang masih bertahan; yang suaranya terbanyak kehilangan 10% chip (hangus) saat hand berikutnya dimulai. |
 
   Chip bonus dari Double Payout, Jackpot, Bounty, Charity, Double or Nothing (kalau menang), dan Insurance dibuat oleh bandar (menambah total chip di meja).
 - Meja poker diadaptasi dari [Meja Hold'em](https://github.com/ragila/meja-holdem) karya Ragil.

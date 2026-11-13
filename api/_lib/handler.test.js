@@ -30,6 +30,7 @@ function fakeDb() {
     async withdraw(_, uid) { await yieldTurn(); this.withdrawn.push(uid); players.splice(players.findIndex(p => p.uid === uid), 1) },
     async refundCard(_, player, card) { const c = this.cards[card]; if (c && c.owner === player) c.used = false },
     granted: [], async grantCard(_, player, code) { this.granted.push(player + ':' + code) },
+    coinsGiven: [], async grantCoins(_, player, n, ref) { this.coinsGiven.push(player + ':' + n + ':' + ref) },
     async create(_, state, due) { await yieldTurn(); if (row) return null; row = { state, ver: 1, due_at: due }; return 1 },
     async save(_, ver, state, due, out, winner) {
       await yieldTurn()
