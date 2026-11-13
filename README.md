@@ -98,6 +98,30 @@ Detailnya:
     - 🔥 **Go Big or Go Home!**: beda dari wildcard lain, **langsung berlaku di hand yang sedang berjalan** dan langsung diumumkan. Sesudahnya semua lawan cuma boleh call/raise (check kalau tidak ada bet); yang fold, termasuk karena waktu habis, kehilangan **50% chip-nya ke pot**. Tombol Fold mereka diberi tanda denda dan perlu diketuk dua kali. Pemakainya bebas denda; fold karena Fold Player tidak kena denda. Memakai jatah 1 kartu per hand.
   - ✦ **Angelic** (kebalikan cursed: bingkai putih suci bersinar, stok 1, **tidak dijual sampai dealer membukanya**; tampil di Market tepat di bawah kartu cursed).
     - 😇 **Revive Card**: hidupkan lagi 1 pemain yang sudah tersingkir (boleh dirinya sendiri, jadi pemain yang tersingkir tetap bisa membuka 🎒) dengan **chip awal match**. Langsung diumumkan dengan bingkai malaikat dan suara paduan suara; pemain itu ikut lagi mulai hand berikutnya dan peringkat pemain lain yang sudah tersingkir disusun ulang. **Tidak bisa dipakai kalau pemain tersisa tinggal 2**; kalau sebelum hand berikutnya pemain jadi tinggal 2, revive batal dan kartunya kembali ke inventory. Satu revive menunggu sekaligus di satu meja.
+  - **Kartu batch 3:**
+
+    | Kartu | Jenis | Efek |
+    |---|---|---|
+    | 🪖 Shield | Defend | Kartu Attack pertama yang diarahkan ke kamu di hand ini ditahan (kartu penyerang hangus). Diam-diam sampai ada yang menyerang. |
+    | 💤 Chip Saver | Defend | Kalau kamu fold di hand ini, setengah chip yang sudah kamu taruh kembali. |
+    | 🔂 Second Chance | Defend | Kalau chip-mu habis di hand ini, kamu bertahan dengan 1 big blind. |
+    | 🕳️ Blind Steal | Attack | Sebelum flop: ambil chip sebesar blind yang dipasang 1 lawan dari stack-nya. |
+    | 🙈 Blindfold | Attack | Sebelum flop: 1 lawan tidak bisa melihat kartunya sendiri sampai flop. |
+    | 🧊 Freeze Player | Attack | 1 lawan tidak bisa raise sampai hand selesai. |
+    | 💣 Tax Collector | Attack | Ambil 10% chip lawan terkaya. |
+    | ♠️ Suited Up | Luck | Hand berikutnya 2 kartu tanganmu pasti satu jenis. |
+    | 🎴 Third Card | Luck | Hand berikutnya dibagi 3 kartu, otomatis disimpan 2 terbaik. |
+    | 🔮 Board Peek | Luck | Lihat kartu meja berikutnya sebelum dibuka (hanya kamu). |
+    | 🤴 King's Ransom | Wildcard | Di awal hand berikutnya semua lawan bayar 1 big blind ke kamu (tidak sampai membuat lawan tersingkir). |
+    | 🌪️ Chaos Shuffle | Wildcard | Semua kartu tangan pemain yang masih ikut dikocok dan dibagi ulang. |
+    | 💀 Death Card | Wildcard | Sebelum flop: 1 kartu yang sedang dipegang seseorang jadi kartu kematian (diumumkan). Pemegangnya yang bertahan sampai showdown kehilangan 65% chip awal hand-nya ke kombinasi terbaik lainnya. Bisa kena pemakainya sendiri; pemegang bisa fold untuk lolos. |
+    | 🕊️ Guardian Angel | Angelic | 1 pemain lain di hand ini kebal tersingkir (bertahan dengan 25% chip awal hand). |
+    | 💞 Share the Luck | Angelic | Kartu Luck kamu yang terpasang ikut berlaku untuk 1 pemain lain (pair/suited sejenis; kartu kombinasi meja jadi pocket pair). |
+    | 💰 Chip Stack | Passive | Mulai match dengan chip awal +20%. |
+    | 🧠 Card Sense | Passive | Sekali per match, saat flop kamu otomatis tahu 1 kartu lawan acak. |
+    | 🧲 Lucky Charm | Passive | Peluang semua kartu Luck milikmu +15%. |
+
+    Shield menahan semua kartu Attack (Fold Player, Reveal Card, Blindfold, Freeze Player, Blind Steal, Tax Collector); Full Counter tetap didahulukan. Wildcard dan Angelic batch ini belum dijual sampai dealer membukanya di Market.
 - **Pengumuman di tengah meja**: pemakaian kartu Attack dan Wildcard ditampilkan ke semua pemain (siapa memakai kartu apa ke siapa; khusus Reveal Card tanpa nama korban). Kartu Passive, Luck, dan Defend tidak diumumkan, kecuali Card Reroll. Setiap pengumuman di tengah hand **mengulang waktu giliran** pemain yang sedang jalan dari awal.
 - 🎁 **Gift dari dealer** (menu dealer **Kirim Gift** di Beranda, `/gifts`): dealer mengirim koin dan/atau skill card (1–10 per player, semua kartu termasuk wildcard) ke semua player atau player pilihan, dengan pesan opsional. Kartu gift tidak mengurangi stok market. Gift muncul di Beranda player dan masuk ke akun setelah player menekan **Klaim** (atau **Klaim semua**); koin tercatat di riwayat koin sebagai "Gift dari dealer". Dealer melihat riwayat kiriman (berapa yang sudah diklaim) dan bisa membatalkan gift yang belum diklaim.
 - Kartu Defend dan Luck baru terlihat pemain lain saat kartu dibuka di akhir hand. Kalau kartu gagal dipakai (misalnya target keburu fold), kartunya kembali ke inventory.

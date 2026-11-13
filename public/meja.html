@@ -303,6 +303,7 @@ body.watching #chat{position:relative;top:0;left:0;right:0;width:auto;min-height
 /* Final Table (skill host): bingkai meja menyala merah-emas */
 body.final #felt{animation:ftGlow 2.2s ease-in-out infinite}
 @keyframes ftGlow{0%,100%{box-shadow:0 0 0 3px #ffcf4d66,0 0 34px #ff3b5c55}50%{box-shadow:0 0 0 5px #ffcf4daa,0 0 70px #ff3b5c99}}
+#ann .dc{font-family:var(--serif);font-size:20px;color:#fff;text-shadow:0 0 10px #ff2d55}
 #ann.host .big i{font-style:normal;font-family:var(--mono);font-size:13px;color:#c9a2ff;margin:0 6px}
 /* pre-action: tombol toggle sebelum giliran */
 .prerow .btn.pre{flex:1;padding:7px 6px;font-size:13px;line-height:1.15}
@@ -845,7 +846,7 @@ const tagOf = (p, betting) => S.lobby ? (p.ready ? ['grn', '✓ ready'] : ['', '
 const SKILL_ICONS = { defend_me: ['🛡️', 'Defend Me'], reveal_card: ['👁️', 'Reveal Card'], fold_player: ['🚫', 'Fold Player'], go_big: ['🔥', 'Go Big or Go Home!'], duel_me: ['⚔️', 'Duel Me!'], card_reroll: ['🔄', 'Card Reroll'],
   give_me_straight: ['🪜', 'Give Me A Straight'], give_me_flush: ['💧', 'Give Me A Flush'], give_me_full_house: ['🏠', 'Give Me A Full House'], give_me_quads: ['🎲', 'Give Me A Four of a Kind'], give_me_straight_flush: ['🌈', 'Give Me A Straight Flush'], give_me_royal_flush: ['👑', 'Give Me A Royal Flush'], pair_me_up: ['👯', 'Pair Me Up'] };
 const skillBadges = p => (p.skills || []).length ? `<span class="skills" title="${esc(p.skills.map(c => (SKILL_ICONS[c] || ['', c])[1] + (p.target >= 0 && S.players[p.target] ? ' → ' + S.players[p.target].name : '')).join(', '))}">${p.skills.map(c => (SKILL_ICONS[c] || ['🃏'])[0]).join('')}${p.target >= 0 && S.players[p.target] ? '<small>→' + esc(S.players[p.target].name.slice(0, 8)) + '</small>' : ''}</span>` : '';
-const row3 = (p, mine, betting) => p.insured && !betting ? `<span class="tag grn">🏦 +${p.insured}</span>` : p.saved ? `<span class="tag grn">🛡️ +${p.saved}</span>` : p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
+const row3 = (p, mine, betting) => p.deathPaid && !betting ? `<span class="tag red">💀 −${p.deathPaid}</span>` : p.rescued && !betting ? `<span class="tag grn">${p.guarded ? '🕊️' : '🔂'} +${p.rescued}</span>` : p.back && !betting ? `<span class="tag grn">💤 +${p.back}</span>` : p.insured && !betting ? `<span class="tag grn">🏦 +${p.insured}</span>` : p.saved ? `<span class="tag grn">🛡️ +${p.saved}</span>` : p.won ? `<span class="tag grn">+${p.won}</span>` : !mine && p.hand ? `<i class="hand">${p.hand}</i>`
   : (t => t ? `<span class="tag ${t[0]}">${t[1]}</span>` : '')(tagOf(p, betting));
 
 const toast = (m, good) => { const t = $('toast'); t.textContent = m; t.classList.toggle('good', !!good); t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2500); };
@@ -1131,6 +1132,12 @@ function render() {
   if (P && P.sitOut && !P.place && phase !== 'over') h += `<div class="row"><button class="btn green" onclick="act('sitin')">Main lagi</button></div>`;
   stAt = Date.now() + S.startIn;
   if (chatNote && (P || isHost) && phase !== 'over') msg += `<br><span class="chatnote">${esc(chatNote)}</span>`;
+  if (P) { // efek kartu yang hanya diketahui pemain ini
+    if (S.blindfold) msg += '<br>🙈 Kamu kena Blindfold · kartumu tertutup sampai flop';
+    if (S.nextCard !== undefined) msg += `<br>🔮 Kartu meja berikutnya: <b>${cardTxt(S.nextCard)}</b>`;
+    if (S.thirdCard !== undefined && betting) msg += `<br>🎴 Third Card · kartu yang dibuang: ${cardTxt(S.thirdCard)}`;
+    if (S.sense && betting && ps[S.sense.j]) msg += `<br>🧠 Card Sense: kamu tahu 1 kartu ${esc(ps[S.sense.j].name)}`;
+  }
   curMsg = msg; drawMine();
   if (h !== lastCtl) { $('ctl').innerHTML = h; lastCtl = h; } // kontrol yang sama tidak dibongkar (slider yang sedang digeser tetap utuh)
   $('ctl').classList.remove('wait');
@@ -1151,7 +1158,7 @@ function render() {
     seats += `<div data-k="${k}" class="seat${k === me ? ' me' : ''}${k === S.turn ? ' turn' : ''}${dim ? ' dim' : ''}${p.won ? ' won' : ''}${p.podium ? ' pod' + p.podium : ''}${p.peek ? ' peek' : ''}${S.reviveNext === k || (p.revived && !p.place) ? ' revived' : ''}" style="left:${x}%;top:${y}%">
       <div class="cards">${cs}</div>
       <div class="plate"${p.podium ? ` data-pod="${p.podium}" title="#${p.podium} all time"` : ''}>${k === S.dealer && phase !== 'waiting' ? '<span class="dealer">D</span>' : ''}${skillBadges(p)}${p.podium === 1 ? '<i class="spark" style="right:-12px;top:30%">✦</i><i class="spark" style="left:30%;bottom:-13px;animation-delay:1.2s">✦</i>' : ''}
-        <div class="nm">${S.bounty && S.bounty.i === k ? `<span class="bounty" title="Bounty ${S.bounty.chips} chip">🎯</span>` : ''}${S.hot === k ? '<span class="bounty" title="Hot Seat">🔥</span>' : ''}${S.freeze === k ? '<span class="bounty" title="Freeze: tidak bisa raise">🧊</span>' : ''}${S.shot && S.shot.includes(k) ? '<span class="bounty" title="Shot Clock: 5 detik">🎤</span>' : ''}${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : p.podium === 1 ? '<span class="crown" title="#1 all time">👑</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
+        <div class="nm">${S.bounty && S.bounty.i === k ? `<span class="bounty" title="Bounty ${S.bounty.chips} chip">🎯</span>` : ''}${S.hot === k ? '<span class="bounty" title="Hot Seat">🔥</span>' : ''}${S.freeze === k || p.iced ? '<span class="bounty" title="Freeze: tidak bisa raise">🧊</span>' : ''}${S.shot && S.shot.includes(k) ? '<span class="bounty" title="Shot Clock: 5 detik">🎤</span>' : ''}${p.place === 1 ? '<span class="crown" title="Juara">&#9819;&#xFE0E;</span>' : p.podium === 1 ? '<span class="crown" title="#1 all time">👑</span>' : ''}${esc(p.name)}</div><div class="ch">${p.chips}</div><div class="r3">${row3(p, k === me, betting)}</div>
         ${k === S.turn ? '<div class="tm"><b></b></div>' : ''}</div>${narrow && p.bet ? `<div class="sbet">${chip1(p.bet)}${p.bet}</div>` : ''}</div>`;
     if (p.bet) { sumBets += p.bet; if (!narrow) bets += `<div class="bet" style="left:${x + (50 - x) * .45}%;top:${y + (50 - y) * .45}%">${chips(p.bet)}<span>${p.bet}</span></div>`; }
   });
@@ -1166,7 +1173,8 @@ function render() {
   drawBubbles(); syncChatBtn(); drawReveal(); drawAnn(); drawWinner();
   const tagBig = S.big !== undefined && betting, tagDuel = S.duelFine !== undefined && betting && S.players[S.duelFine];
   const hostTags = [S.silence && '🤐 Silence · skill card dikunci', S.speed && '⏱️ Speed Round · 10 detik per giliran', S.don && '🎲 Double or Nothing',
-    S.split && '💥 Split Pot', S.insure && '🏦 Insurance all-in 25%', S.shuffleNext && '🔀 kursi diacak hand berikutnya'].filter(Boolean).join(' · ');
+    S.split && '💥 Split Pot', S.insure && '🏦 Insurance all-in 25%', S.shuffleNext && '🔀 kursi diacak hand berikutnya',
+    S.death !== undefined && `💀 Death Card: ${cardTxt(S.death)} · −65% chip`, S.ransomNext && "🤴 King's Ransom hand berikutnya"].filter(Boolean).join(' · ');
   document.body.classList.toggle('final', !!S.finalTable); JAZZ.hype(!!S.finalTable);
   $('bigTag').hidden = !(tagBig || tagDuel || hostTags);
   $('bigTag').classList.toggle('duel', !tagBig && !!tagDuel);
@@ -1318,6 +1326,24 @@ const USABLE = {
   card_reroll: { icon: '🔄', name: 'Card Reroll', desc: 'Tukar 2 kartu tanganmu dengan 2 kartu baru dari bandar. Diumumkan ke semua pemain.' },
   defend_me: { icon: '🛡️', name: 'Defend Me', desc: 'Kalah di hand ini? Setengah chip yang kamu taruhkan kembali.' },
   reveal_card: { icon: '👁️', name: 'Reveal Card', desc: 'Intip 2 kartu satu lawan sampai hand ini selesai. Diam-diam: lawan baru tahu saat kartu dibuka.', target: true },
+  shield: { icon: '🪖', name: 'Shield', desc: 'Kartu Attack pertama yang diarahkan ke kamu di hand ini ditahan. Diam-diam sampai ada yang menyerang.' },
+  chip_saver: { icon: '💤', name: 'Chip Saver', desc: 'Kalau kamu fold di hand ini, setengah chip yang sudah kamu taruh kembali.' },
+  second_chance: { icon: '🔂', name: 'Second Chance', desc: 'Kalau chip-mu habis di hand ini, kamu tetap bertahan dengan 1 big blind.' },
+  blind_steal: { icon: '🕳️', name: 'Blind Steal', desc: 'Sebelum flop: ambil chip sebesar blind yang dipasang 1 lawan (SB/BB) dari stack-nya.', target: true, preflop: true },
+  blindfold: { icon: '🙈', name: 'Blindfold', desc: 'Sebelum flop: 1 lawan tidak bisa melihat kartunya sendiri sampai flop dibuka.', target: true, preflop: true },
+  freeze_player: { icon: '🧊', name: 'Freeze Player', desc: '1 lawan tidak bisa raise sampai hand ini selesai.', target: true },
+  tax_collector: { icon: '💣', name: 'Tax Collector', desc: 'Ambil 10% chip lawan dengan chip terbanyak.' },
+  board_peek: { icon: '🔮', name: 'Board Peek', desc: 'Lihat kartu meja berikutnya sebelum dibuka (hanya kamu).' },
+  suited_up: { icon: '♠️', name: 'Suited Up', desc: 'Berlaku di hand berikutnya: 2 kartu tanganmu pasti satu jenis (suited).', luck: true },
+  third_card: { icon: '🎴', name: 'Third Card', desc: 'Berlaku di hand berikutnya: dibagi 3 kartu, otomatis disimpan 2 terbaik.', luck: true },
+  kings_ransom: { icon: '🤴', name: "King's Ransom", desc: '☠ Wildcard: di awal hand berikutnya semua lawan bayar 1 big blind ke kamu.', cursed: true, ransom: true },
+  chaos_shuffle: { icon: '🌪️', name: 'Chaos Shuffle', desc: '☠ Wildcard: semua kartu tangan pemain yang masih ikut dikocok & dibagi ulang acak.', cursed: true },
+  death_card: { icon: '💀', name: 'Death Card', desc: '☠ Wildcard (sebelum flop): 1 kartu yang sedang dipegang seseorang jadi kartu kematian. Pemegangnya sampai showdown −65% chip. Bisa kena dirimu sendiri!', cursed: true, preflop: true },
+  guardian_angel: { icon: '🕊️', name: 'Guardian Angel', desc: '✦ Angelic: 1 pemain lain di hand ini kebal tersingkir (bertahan dengan 25% chip awal hand).', target: true, holy: true },
+  share_luck: { icon: '💞', name: 'Share the Luck', desc: '✦ Angelic: kartu Luck kamu yang terpasang ikut berlaku untuk 1 pemain lain.', target: true, holy: true, share: true },
+  chip_stack: { icon: '💰', name: 'Chip Stack', desc: 'Mulai match dengan chip awal +20%. Pasang sebelum hand pertama. Memakai 1 dari 3 jatah kartu.', passive: true, on: 'Chip awal +20%.' },
+  card_sense: { icon: '🧠', name: 'Card Sense', desc: 'Sekali per match, saat flop kamu otomatis tahu 1 kartu lawan acak. Pasang sebelum hand pertama. Memakai 1 dari 3 jatah kartu.', passive: true, on: 'Sekali per match tahu 1 kartu lawan saat flop.' },
+  lucky_charm: { icon: '🧲', name: 'Lucky Charm', desc: 'Peluang semua kartu Luck milikmu naik 15%. Pasang sebelum hand pertama. Memakai 1 dari 3 jatah kartu.', passive: true, on: 'Peluang kartu Luck +15%.' },
   fold_player: { icon: '🚫', name: 'Fold Player', desc: 'Paksa satu lawan fold. Hanya sebelum flop, tidak ke pemain all-in. Chip-nya tetap di pot.', target: true, preflop: true },
   give_me_straight: { icon: '🪜', name: 'Give Me A Straight', desc: 'Berlaku di hand berikutnya: peluang 70% kamu dapat Straight.', luck: true },
   give_me_flush: { icon: '💧', name: 'Give Me A Flush', desc: 'Berlaku di hand berikutnya: peluang 70% kamu dapat Flush.', luck: true },
@@ -1327,7 +1353,8 @@ const USABLE = {
   give_me_royal_flush: { icon: '👑', name: 'Give Me A Royal Flush', desc: 'Berlaku di hand berikutnya: peluang 15% kamu dapat Royal Flush.', luck: true },
 };
 // lawan yang bisa ditarget kartu ini
-const targetsFor = code => S.players.map((q, k) => ({ q, k })).filter(({ q, k }) => USABLE[code].angel ? q.place > 1 && !q.chips : k !== S.me && (USABLE[code].wild ? q.chips > 0 && !q.place : q.inHand && !q.folded && !(code === 'fold_player' && q.allIn)));
+const targetsFor = code => S.players.map((q, k) => ({ q, k })).filter(({ q, k }) => USABLE[code].angel ? q.place > 1 && !q.chips : k !== S.me && (USABLE[code].wild || USABLE[code].share ? q.chips > 0 && !q.place : q.inHand && !q.folded && !(code === 'fold_player' && q.allIn)));
+const cardTxt = c => c >= 0 ? RK[c % 13] + SU[c / 13 | 0] : '?';
 // ---- pengumuman kartu Attack/Wildcard di tengah meja (dari server, S.ann) ----
 let annSeen = 0, annUntil = 0;
 function drawAnn() {
@@ -1340,7 +1367,24 @@ function drawAnn() {
       go_big: 'semua lawan cuma boleh call atau raise',
       revive: `${tg} bangkit kembali dengan ${a.extra} chip ✨ ikut lagi di hand berikutnya`,
       you_owe_me: `80% chip ${tg} (${a.extra}) pindah ke ${by}`, duel_me: 'hand ini jadi duel · pemain lain dipaksa fold',
-      get_out: `${tg} langsung tereliminasi` }[a.code] || '';
+      get_out: `${tg} langsung tereliminasi`,
+      blind_steal: `${a.extra} chip blind ${tg} dicuri`, blindfold: `${tg} tidak bisa melihat kartunya sampai flop 🙈`, freeze_player: `${tg} tidak bisa raise di hand ini 🧊`,
+      tax_collector: `10% chip ${tg} (${a.extra}) ditarik pajak`, chaos_shuffle: 'semua kartu tangan dikocok & dibagi ulang!',
+      death_card: `kartu kematian: <b class="dc">${cardTxt(+a.extra)}</b> · pemegangnya sampai showdown −65% chip`,
+      kings_ransom: 'di awal hand berikutnya semua lawan bayar 1 big blind', guardian_angel: `${tg} kebal tersingkir di hand ini`,
+      share_luck: `kartu Luck-nya ikut berlaku untuk ${tg}` }[a.code] || '';
+    const RES = { death_hit: ['💀', 'Death Card!', `${by} memegang kartu kematian`, `${a.extra} chip pindah ke ${tg || 'pemenang'}`, 'wild big'],
+      ransom_paid: ['🤴', "King's Ransom", `${by} menerima tebusan`, `+${a.extra} chip dari semua lawan`, 'wild'],
+      guardian_hit: ['🕊️', 'Guardian Angel', `${by} diselamatkan`, `bertahan dengan ${a.extra} chip ✨`, 'angel'],
+      second_chance_hit: ['🔂', 'Second Chance', `${by} belum habis!`, `bertahan dengan ${a.extra} chip`, 'angel'] }[a.code];
+    if (RES || a.extra === 'shield') { // hasil kartu (Death Card, tebusan, selamat) & serangan yang ditahan Shield
+      const [ic, cn, who, sb2, cls] = RES || ['🪖', 'Shield!', a.target >= 0 ? `<b>${tg}</b> menahan serangan` : 'Serangan ditahan', `${esc(u.name)} dari ${by} hangus`, ''];
+      annUntil = Date.now() + 5200; el.className = cls;
+      el.innerHTML = `<span class="ic">${ic}</span><span class="cn">${cn}</span><span class="who">${who}</span><span class="sub">${sb2}</span>`;
+      if (prevS) play(cls === 'angel' ? 'angel' : cls ? 'allin' : 'knock', 6);
+      el.hidden = false;
+      return;
+    }
     if (a.by === -1 || a.code === 'bounty_claim') { // skill host: diumumkan besar dengan cap HOST
       const base = { bounty_claim: 'bounty', don_result: 'double_or_nothing', hot_seat_hit: 'hot_seat' }[a.code] || a.code;
       const h = HOSTCARDS[base] || { icon: '🎩', name: a.code }, x = a.extra || '', nx = /next$/.test(x) ? 'hand berikutnya' : 'hand ini';
@@ -1390,7 +1434,7 @@ function drawAnn() {
       el.hidden = false;
       return;
     }
-    el.className = a.code === 'go_big' ? 'wild big' : a.code === 'duel_me' ? 'wild big duel' : u.angel ? 'angel' : u.wild || u.cursed ? 'wild' : '';
+    el.className = a.code === 'go_big' || a.code === 'death_card' ? 'wild big' : a.code === 'duel_me' ? 'wild big duel' : u.angel || u.holy ? 'angel' : u.wild || u.cursed ? 'wild' : '';
     el.innerHTML = `<span class="ic">${u.icon}</span><span class="who"><b>${by}</b> memakai</span><span class="cn">${esc(u.name)}</span>` +
       (tg && a.code !== 'reveal_card' ? `<span class="who">→ <b>${tg}</b></span>` : '') + (sub ? `<span class="sub">${sub}</span>` : '') +
       (a.code === 'go_big' ? '<span class="warn">⚠ fold = 50% chip masuk pot ⚠</span>' : a.code === 'duel_me' ? `<span class="warn">⚠ ${tg} cuma boleh call/raise · fold = 50% chip masuk pot ⚠</span>` : '');
@@ -1448,12 +1492,13 @@ async function openBag() {
     : S.reviveNext !== undefined ? 'Sudah ada pemain yang menunggu dihidupkan.' : !deadN ? 'Belum ada pemain yang tersingkir.' : '';
   const inHandN = S.players.filter(q => q.inHand && !q.folded).length;
   const duelWhy = S.board.length >= 4 ? 'Hanya sebelum kartu ke-4 (turn) dibuka.' : aliveN <= 2 ? 'Tidak bisa dipakai kalau pemain tinggal 2.' : inHandN <= 2 ? 'Hand ini sudah tinggal berdua.' : '';
-  const can = code => code === 'duel_me' ? ok && !duelWhy : USABLE[code].angel ? !!P && S.phase !== 'over' && !angelWhy : code === 'go_big' ? ok && !bigWhy : USABLE[code].wild ? wildOk : USABLE[code].passive ? ddOk(code) : USABLE[code].luck ? luckOk : ok && !(USABLE[code].preflop && S.phase !== 'preflop');
+  const ransomOk = !!P && !S.lobby && S.phase !== 'over' && !P.place && P.chips > 0 && !S.ransomNext;
+  const can = code => code === 'kings_ransom' ? ransomOk : code === 'share_luck' ? !!S.luckNext : code === 'board_peek' ? ok && S.board.length < 5 : code === 'duel_me' ? ok && !duelWhy : USABLE[code].angel ? !!P && S.phase !== 'over' && !angelWhy : code === 'go_big' ? ok && !bigWhy : USABLE[code].wild ? wildOk : USABLE[code].passive ? ddOk(code) : USABLE[code].luck ? luckOk : ok && !(USABLE[code].preflop && S.phase !== 'preflop');
   const why = !P ? '' : (P.skills || []).length ? 'Kamu sudah pakai kartu di hand ini.' : !ok ? 'Bisa dipakai saat kamu ikut hand yang sedang berjalan.' : '';
   const ddLine = armed.map(code => `<div class="it"><span class="ic">${USABLE[code].icon}</span><span style="flex:1"><b>${USABLE[code].name} terpasang</b><small>${USABLE[code].on}</small></span>${S.lobby && !S.countdown ? `<button class="btn ghost" type="button" data-off="${code}">Lepas</button>` : ''}</div>`).join('')
     + (dd ? `<p class="note">Passive terpasang memakai jatah · sisa ${slots} kartu untuk dipakai di meja</p>` : '');
   $('bagList').innerHTML = ddLine + (Object.keys(groups).length
-    ? (why && Object.keys(groups).some(c => !USABLE[c].luck && !USABLE[c].passive && !USABLE[c].wild) ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it${USABLE[code].wild || USABLE[code].cursed ? ' cursed' : USABLE[code].angel ? ' angel' : ''}"><span class="ic">${USABLE[code].icon}</span>
+    ? (why && Object.keys(groups).some(c => !USABLE[c].luck && !USABLE[c].passive && !USABLE[c].wild && !USABLE[c].ransom && !USABLE[c].share) ? `<p class="note">${why}</p>` : '') + Object.entries(groups).map(([code, list]) => `<div class="it${USABLE[code].wild || USABLE[code].cursed ? ' cursed' : USABLE[code].angel || USABLE[code].holy ? ' angel' : ''}"><span class="ic">${USABLE[code].icon}</span>
         <span style="flex:1"><b>${USABLE[code].name} ×${list.length}</b><small>${USABLE[code].desc}</small></span>
         <button class="btn gold" type="button" data-id="${list[0].id}" data-code="${code}" ${can(code) ? '' : 'disabled'}>${USABLE[code].passive ? 'Pasang' : 'Pakai'}</button></div>
         ${USABLE[code].passive && !armed.includes(code) && !(S.lobby && !S.countdown) ? '<p class="note" style="padding-left:36px">Hanya bisa dipasang sebelum hand pertama</p>' : USABLE[code].passive && !armed.includes(code) && slots <= 0 ? '<p class="note" style="padding-left:36px">Jatah 3 kartu sudah habis</p>' : ''}
@@ -1462,6 +1507,8 @@ async function openBag() {
         ${code === 'go_big' && ok && bigWhy ? `<p class="note" style="padding-left:36px">${bigWhy}</p>` : ''}
         ${USABLE[code].wild && wildWhy ? `<p class="note" style="padding-left:36px">${wildWhy}</p>` : ''}
         ${USABLE[code].luck && luckWhy ? `<p class="note" style="padding-left:36px">${luckWhy}</p>` : ''}
+        ${code === 'share_luck' && !S.luckNext ? '<p class="note" style="padding-left:36px">Pasang kartu Luck dulu, lalu bagi ke pemain lain</p>' : ''}
+        ${code === 'kings_ransom' && S.ransomNext ? `<p class="note" style="padding-left:36px">Sudah ada King's Ransom yang menunggu</p>` : ''}
         ${USABLE[code].preflop && ok && S.phase !== 'preflop' ? '<p class="note" style="padding-left:36px">Hanya sebelum flop</p>' : ''}<div class="tg" data-for="${code}" hidden></div>`).join('')
     : dd ? '' : '<p class="note">Belum ada skill card yang bisa dipakai di meja. Beli di Market.</p>');
   // Double Down dipasang/dilepas langsung ke database (bukan lewat meja): berlaku untuk poin match ini
@@ -1473,7 +1520,7 @@ async function openBag() {
     if (r && r.ok) {
       const u = USABLE[code], who = target >= 0 && S.players[target] ? S.players[target].name : '';
       if (u.angel) { toast(`😇 ${target === S.me ? 'Kamu' : who} akan bangkit di hand berikutnya`, true); el.remove(); return; }
-      toast(u.icon + ' ' + u.name + (who ? ' → ' + who + (u.wild ? ' · diumumkan setelah hand ini' : '') : u.luck ? ' terpasang untuk hand berikutnya' : ' aktif untuk hand ini'), true); el.remove();
+      toast(u.icon + ' ' + u.name + (who ? ' → ' + who + (u.wild ? ' · diumumkan setelah hand ini' : '') : u.luck ? ' terpasang untuk hand berikutnya' : u.ransom ? ' · berlaku di awal hand berikutnya' : ' aktif untuk hand ini'), true); el.remove();
     } else b.disabled = false;
   };
   $('bagList').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => {
@@ -1483,7 +1530,7 @@ async function openBag() {
     // kartu Attack: pilih lawan dulu
     const box = $('bagList').querySelector(`.tg[data-for="${code}"]`), ts = targetsFor(code);
     box.hidden = !box.hidden;
-    box.innerHTML = ts.length ? `<p class="note" style="width:100%;margin:0">${USABLE[code].angel ? 'Hidupkan siapa?' : code === 'duel_me' ? 'Duel dengan siapa?' : USABLE[code].wild ? 'Pilih korban:' : 'Pilih lawan:'}</p>` + ts.map(({ q, k }) => `<button class="btn" type="button" data-k="${k}">${k === S.me ? 'Diriku sendiri' : esc(q.name)}</button>`).join('')
+    box.innerHTML = ts.length ? `<p class="note" style="width:100%;margin:0">${USABLE[code].angel ? 'Hidupkan siapa?' : code === 'duel_me' ? 'Duel dengan siapa?' : code === 'guardian_angel' ? 'Lindungi siapa?' : code === 'share_luck' ? 'Bagi keberuntungan ke siapa?' : USABLE[code].wild ? 'Pilih korban:' : 'Pilih lawan:'}</p>` + ts.map(({ q, k }) => `<button class="btn" type="button" data-k="${k}">${k === S.me ? 'Diriku sendiri' : esc(q.name)}</button>`).join('')
       : '<p class="note" style="margin:0">Tidak ada lawan yang bisa ditarget.</p>';
     box.querySelectorAll('button[data-k]').forEach(t => t.onclick = () => { t.disabled = true; play(b, code, +t.dataset.k); });
   });

@@ -16,6 +16,7 @@
 //   create(match, state, dueAt) -> ver | null
 //   save(match, ver, state, dueAt, out, winner) -> ver baru | null (kalah balapan) ; throw 'match_not_ongoing'
 //   withdraw(match, uid)  -> pemain keluar dari match (hapus dari match_players) ; throw kalau hand pertama sudah dibagi
+//   passives(match) -> [{uid, code}] semua passive yang terpasang (opsional; fallback counters)
 //   counters(match) -> [uid] pemilik Full Counter yang terpasang (opsional)
 //   grantCard(match, uid, code) -> skill card gratis ke inventory pemain (Mystery Box, opsional)
 // }
@@ -87,12 +88,26 @@ async function settleGifts(db, match, r) {
   await mutate(db, match, t => { t.gifts = [] }).catch(() => {})
 }
 
-// Pemilik Full Counter yang terpasang di match ini (dipasang di halaman match sebelum hand pertama). null = tidak tahu.
+// Passive yang terpasang di match ini (dipasang di halaman match sebelum hand pertama), sebagai { code: [uid] }.
+// Full Counter juga disimpan di t.counter (dipakai engine). null = tidak tahu.
 async function counters(db, match) {
+  if (db.passives) {
+    try {
+      const map = {}
+      for (const r of await db.passives(match)) (map[r.code] = map[r.code] || []).push(r.uid)
+      for (const k of Object.keys(map)) map[k].sort()
+      return map
+    } catch { /* fungsi meja_passives belum ada di database: pakai meja_counters */ }
+  }
   if (!db.counters) return null
-  try { return (await db.counters(match)).slice().sort() } catch { return null }
+  try { return { full_counter: (await db.counters(match)).slice().sort() } } catch { return null }
 }
-const setCounter = (t, list) => { if (list && key(list) !== key(t.counter || [])) t.counter = list }
+const setCounter = (t, map) => {
+  if (!map) return
+  const list = map.full_counter || []
+  if (key(list) !== key(t.counter || [])) t.counter = list
+  if (key(map) !== key(t.passives || {})) t.passives = map
+}
 
 // Meja dibuat saat ada yang pertama kali membukanya setelah match dimulai.
 async function ensureTable(db, match) {

@@ -236,7 +236,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
 }
 
 { // kartu Luck: susunan selalu membentuk kombinasinya, dan kombinasinya tidak cuma dari kartu meja
-  for (const [code, sk] of Object.entries(SKILLS).filter(([, x]) => x.luck && !x.luck.pair)) for (let k = 0; k < 150; k++) {
+  for (const [code, sk] of Object.entries(SKILLS).filter(([, x]) => x.luck && x.luck.cat)) for (let k = 0; k < 150; k++) {
     const r = rigLuck(sk.luck), all = r.hole.concat(r.board)
     assert.equal(new Set(all).size, 7, code)
     assert(all.every(c => c >= 0 && c < 52))
@@ -548,7 +548,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   for (let round = 0; round < 300; round++) {
     const n = 3 + (round % 6), R = k => Math.random() * k | 0
     let t = mk(Array.from({ length: n }, () => 200 + R(800)), { level_minutes: 1 + R(3) })
-    if (round % 2) t.counter = [t.players[R(n)].uid]
+    if (round % 2) { t.counter = [t.players[R(n)].uid]; t.passives = { chip_stack: [t.players[R(n)].uid], card_sense: [t.players[R(n)].uid], lucky_charm: [t.players[R(n)].uid] } }
     const total = t.players.reduce((s, p) => s + p.chips, 0)
     begin(t)
     let g = 0
@@ -557,7 +557,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
       if (t.turn >= 0) {
         const i = t.turn, c = t.ctl(i), r = Math.random()
         if (r < .03) { // boleh gagal (fold/sudah pakai/target salah): tidak mengubah apa-apa
-          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive', 'pair_me_up'][R(12)]
+          const code = ['defend_me', 'reveal_card', 'fold_player', 'give_me_flush', 'give_me_royal_flush', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive', 'pair_me_up', 'shield', 'chip_saver', 'second_chance', 'blind_steal', 'blindfold', 'freeze_player', 'tax_collector', 'suited_up', 'third_card', 'board_peek', 'kings_ransom', 'chaos_shuffle', 'death_card', 'guardian_angel', 'share_luck'][R(27)]
           if (t.useCard(R(n), code, R(n)) === undefined && code === 'fold_player') continue // giliran bisa berubah
         }
         if (r > .96 && r <= .97) { t.setPre(R(n), ['fold', 'check', 'call', ''][R(4)]); continue } // pre-action (bisa langsung jalan)
@@ -714,6 +714,87 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert(!t.shuffleNext)
   t.useHost('final_table'); assert(t.view(null).finalTable)
   void uids
+}
+
+{ // batch 3 kartu pemain: Shield, Blindfold, Blind Steal, Freeze Player, Tax Collector, Board Peek, Chaos Shuffle
+  const t = mk([1000, 1000, 1000, 1000]); begin(t) // dealer P0, SB P1, BB P2, giliran P3
+  assert.equal(t.useCard(2, 'shield'), undefined)
+  assert.equal(t.useCard(3, 'fold_player', 2), undefined) // ditahan Shield
+  assert(!t.players[2].folded); assert.equal(t.ann.extra, 'shield')
+  assert.equal(t.useCard(1, 'blindfold', 0), undefined)
+  assert.deepEqual(t.view(t.players[0]).players[0].cards, [-1, -1]); assert(t.view(t.players[0]).blindfold)
+  assert.equal(t.useCard(0, 'blind_steal', 1), undefined) // P0 (buta) mencuri blind P1 (10)
+  assert.equal(t.players[1].chips, 980); assert.equal(t.players[0].chips, 1010)
+  ok(t, 3, 'call'); ok(t, 0, 'call'); ok(t, 1, 'call'); ok(t, 2, 'check')
+  assert.equal(t.phase, 'flop'); assert(t.view(t.players[0]).players[0].cards[0] >= 0) // flop: kartu terlihat lagi
+  nxt(t); drain(t); nxt(t)
+  const i = t.turn, j = (i + 1) % 4
+  assert.equal(t.useCard(i, 'freeze_player', j), undefined); assert.equal(t.ctl(j).raise, false)
+  assert.equal(t.useCard(j, 'tax_collector'), undefined)
+  const k = t.players.findIndex((q, x) => x !== j && t.players[x].inHand && !(q.skills || []).length)
+  const top = t.board.length; assert.equal(t.useCard(k, 'board_peek'), undefined)
+  const nc = t.view(t.players[k]).nextCard; assert(nc >= 0)
+  while (t.phase === 'preflop') ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  assert.equal(t.board[top], nc) // kartu yang diintip memang keluar
+  const before = t.players.filter(q => q.inHand && !q.folded).flatMap(q => q.cards).sort().join()
+  const m = t.players.findIndex(q => q.inHand && !q.folded && !(q.skills || []).length)
+  assert.equal(t.useCard(m, 'chaos_shuffle'), undefined)
+  assert.equal(t.players.filter(q => q.inHand && !q.folded).flatMap(q => q.cards).sort().join(), before)
+}
+{ // Death Card: pemegang sampai showdown kehilangan 65% chip ke kombinasi terbaik lainnya
+  const t = mk([1000, 1000, 1000]); rig(t, 'As Ah 7c 2d Ks Kh 3s 8h 9c Jd 4d'); begin(t)
+  assert.equal(t.useCard(0, 'death_card'), undefined)
+  t.death.card = C('7c')[0] // paksa: kartu kematian dipegang P1 (72o)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  assert.equal(t.players[1].deathPaid, 650); assert.equal(t.players[1].chips, 1000 - 20 - 650)
+  assert.equal(t.players[0].chips, 1000 + 40 + 650); assert.equal(t.ann.code, 'death_hit')
+  assert.equal(stacks(t).reduce((a, b) => a + b), 3000)
+}
+{ // Second Chance & Guardian Angel & Chip Saver
+  const t = mk([1000, 200, 200]); rig(t, 'As Ah 7c 2d 8s 3h Ks 8h 9c Jd 4d'); begin(t) // P1 72o, P2 83o
+  assert.equal(t.useCard(1, 'second_chance'), undefined)
+  assert.equal(t.useCard(0, 'guardian_angel', 2), undefined)
+  ok(t, 0, 'raise', 200); ok(t, 1, 'call'); ok(t, 2, 'call')
+  drain(t)
+  assert.equal(t.players[1].chips, 20); assert.equal(t.players[1].place, 0) // bertahan 1 big blind
+  assert.equal(t.players[2].chips, 50); assert.equal(t.players[2].place, 0) // Guardian: 25% stack awal hand
+  assert.equal(stacks(t).reduce((a, b) => a + b) + (t.forfeited || 0), 1400 + (t.minted || 0))
+}
+{ // Chip Saver: fold = setengah chip yang sudah ditaruh kembali
+  const t = mk([1000, 1000, 1000]); begin(t) // dealer P0, SB P1, BB P2
+  ok(t, 0, 'raise', 100); assert.equal(t.useCard(1, 'chip_saver'), undefined); ok(t, 1, 'call')
+  ok(t, 2, 'call') // flop
+  ok(t, 1, 'check'); ok(t, 2, 'raise', 200); ok(t, 0, 'call'); ok(t, 1, 'fold')
+  drain(t)
+  assert.equal(t.players[1].back, 50); assert.equal(t.players[1].chips, 950)
+  assert.equal(stacks(t).reduce((a, b) => a + b), 3000)
+}
+{ // Suited Up, Third Card, Share the Luck, King's Ransom, passive Chip Stack / Lucky Charm / Card Sense
+  const t = mk([1000, 1000, 1000])
+  t.passives = { chip_stack: ['u0'], card_sense: ['u1'], lucky_charm: ['u2'] }
+  begin(t)
+  assert.equal(t.players[0].chips + t.players[0].total, 1200) // +20% chip awal
+  assert.equal(t.useCard(1, 'suited_up'), undefined)
+  assert.equal(t.useCard(1, 'share_luck', 2), undefined)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  assert.equal(t.view(t.players[1]).sense, undefined) // sesudah hand: Card Sense tidak terlihat
+  nxt(t)
+  const [a, b] = t.players[1].cards; assert.equal((a / 13) | 0, (b / 13) | 0) // suited
+  const [c, d] = t.players[2].cards; assert.equal(((c / 13) | 0) === ((d / 13) | 0), true, 'pasangan ikut suited')
+  assert.equal(t.useCard(0, 'kings_ransom'), undefined)
+  while (t.phase === 'preflop') ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  assert(t.sensed.includes('u1') || t.players[1].folded)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  const s0 = stacks(t); nxt(t)
+  assert.equal(t.ann.code === 'ransom_paid' || t.annN > 0, true)
+  assert.equal(t.useCard(2, 'third_card'), undefined)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t); nxt(t)
+  assert(t.view(t.players[2]).thirdCard >= 0)
+  void s0
 }
 
 console.log('semua tes lulus')

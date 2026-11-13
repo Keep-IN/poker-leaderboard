@@ -215,7 +215,26 @@ insert into public.skill_cards (code, name, kind, description, price, stock, on_
   -- Angelic: kebalikan cursed, belum dijual sampai dealer membukanya di Market
   ('pair_me_up', 'Pair Me Up', 'luck', 'Pasang untuk hand berikutnya: dijamin dapat pocket pair (2 kartu tangan kembar). Satu kartu Luck per hand di seluruh meja.', 45, 5, true, 5),
   ('full_counter', 'Full Counter', 'passive', 'Pasang di halaman match sebelum match dimulai: selama match, Fold Player dan Reveal Card yang diarahkan ke kamu berbalik ke penyerangnya. Memakai 1 jatah dari 3 kartu per match.', 250, 3, true, 1),
-  ('revive', 'Revive Card', 'angelic', 'Hidupkan lagi 1 pemain yang sudah tersingkir (boleh dirimu sendiri) dengan chip awal match. Diumumkan, ikut lagi mulai hand berikutnya. Tidak bisa dipakai kalau pemain tersisa tinggal 2.', 1200, 1, false, 0)
+  ('revive', 'Revive Card', 'angelic', 'Hidupkan lagi 1 pemain yang sudah tersingkir (boleh dirimu sendiri) dengan chip awal match. Diumumkan, ikut lagi mulai hand berikutnya. Tidak bisa dipakai kalau pemain tersisa tinggal 2.', 1200, 1, false, 0),
+  -- batch 3
+  ('shield', 'Shield', 'defend', 'Pakai saat hand berjalan: kartu Attack pertama yang diarahkan ke kamu di hand ini ditahan (kartu penyerang hangus). Diam-diam sampai ada yang menyerang.', 60, 10, true, 3),
+  ('chip_saver', 'Chip Saver', 'defend', 'Pakai saat hand berjalan: kalau kamu fold di hand ini, setengah chip yang sudah kamu taruh kembali.', 80, 10, true, 3),
+  ('second_chance', 'Second Chance', 'defend', 'Pakai saat hand berjalan: kalau chip-mu habis di hand ini, kamu tetap bertahan dengan 1 big blind.', 150, 5, true, 3),
+  ('blind_steal', 'Blind Steal', 'attack', 'Sebelum flop: ambil chip sebesar blind yang dipasang 1 lawan (SB/BB) di hand ini dari stack-nya. Diumumkan.', 70, 10, true, 4),
+  ('blindfold', 'Blindfold', 'attack', 'Sebelum flop: 1 lawan tidak bisa melihat kartunya sendiri sampai flop dibuka. Diumumkan.', 90, 10, true, 4),
+  ('freeze_player', 'Freeze Player', 'attack', 'Saat hand berjalan: 1 lawan tidak bisa raise sampai hand ini selesai. Diumumkan.', 80, 10, true, 4),
+  ('tax_collector', 'Tax Collector', 'attack', 'Saat hand berjalan: ambil 10% chip lawan dengan chip terbanyak. Diumumkan.', 100, 5, true, 4),
+  ('suited_up', 'Suited Up', 'luck', 'Pasang untuk hand berikutnya: 2 kartu tanganmu pasti satu jenis (suited). Satu kartu Luck per hand di seluruh meja.', 50, 5, true, 5),
+  ('third_card', 'Third Card', 'luck', 'Pasang untuk hand berikutnya: kamu dibagi 3 kartu, otomatis disimpan 2 yang terbaik. Satu kartu Luck per hand di seluruh meja.', 120, 5, true, 5),
+  ('board_peek', 'Board Peek', 'luck', 'Saat hand berjalan: lihat kartu meja berikutnya sebelum dibuka (hanya kamu).', 70, 10, true, 5),
+  ('kings_ransom', 'King''s Ransom', 'wildcard', 'Di awal hand berikutnya, semua lawan yang masih bertahan bayar 1 big blind ke kamu. Diumumkan.', 250, 1, false, 15),
+  ('chaos_shuffle', 'Chaos Shuffle', 'wildcard', 'Saat hand berjalan: semua kartu tangan pemain yang masih ikut dikumpulkan lalu dibagi ulang acak. Diumumkan.', 200, 1, false, 16),
+  ('death_card', 'Death Card', 'wildcard', 'Sebelum flop: 1 kartu tangan yang sedang dipegang seseorang jadi kartu kematian (diumumkan). Pemegangnya yang bertahan sampai showdown kehilangan 65% chip ke kombinasi terbaik lainnya. Bisa kena dirimu sendiri.', 200, 1, false, 17),
+  ('guardian_angel', 'Guardian Angel', 'angelic', 'Saat hand berjalan: 1 pemain lain yang masih ikut hand kebal tersingkir di hand ini (bertahan dengan 25% chip awal hand-nya). Diumumkan.', 200, 1, false, 0),
+  ('share_luck', 'Share the Luck', 'angelic', 'Setelah memasang kartu Luck: 1 pemain lain ikut mendapat keberuntungan di hand itu (pair/suited sejenis, atau pocket pair untuk kartu kombinasi meja).', 120, 3, false, 0),
+  ('chip_stack', 'Chip Stack', 'passive', 'Pasang di halaman match sebelum match dimulai: mulai match dengan chip awal +20%. Memakai 1 jatah dari 3 kartu per match.', 200, 3, true, 1),
+  ('card_sense', 'Card Sense', 'passive', 'Pasang sebelum match dimulai: sekali per match, saat flop kamu otomatis tahu 1 kartu lawan acak. Memakai 1 jatah dari 3 kartu per match.', 250, 3, true, 1),
+  ('lucky_charm', 'Lucky Charm', 'passive', 'Pasang sebelum match dimulai: peluang semua kartu Luck milikmu naik 15%. Memakai 1 jatah dari 3 kartu per match.', 300, 3, true, 1)
 on conflict (code) do update set name = excluded.name, kind = excluded.kind, description = excluded.description, sort = excluded.sort;
 
 -- Kartu milik player. owned = di inventory, armed = Double Down dipasang ke match, used = sudah terpakai.
@@ -1588,7 +1607,7 @@ begin
     raise exception 'Jatah 3 skill card per match sudah habis (termasuk passive yang dipasang)';
   end if;
   update public.player_cards set status = 'used', used_at = now(), match_id = p_match
-   where id = p_card and player_id = p_player and status = 'owned' and (card_code in ('defend_me', 'reveal_card', 'fold_player', 'you_owe_me', 'duel_me', 'get_out', 'go_big', 'card_reroll', 'revive', 'pair_me_up') or card_code like 'give\_me\_%')
+   where id = p_card and player_id = p_player and status = 'owned' and card_code in (select sc.code from public.skill_cards sc where sc.kind <> 'passive')
   returning card_code into code;
   if code is null then
     raise exception 'Kartu tidak ada di inventory atau tidak bisa dipakai di meja';
@@ -1626,6 +1645,18 @@ set search_path = public
 as $$
   select coalesce(array_agg(player_id), '{}') from public.player_cards
    where match_id = p_match and card_code = 'full_counter' and status = 'armed';
+$$;
+
+-- Dipakai server meja: semua passive yang terpasang di match ini, sebagai [{uid, code}].
+create or replace function public.meja_passives(p_match uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object('uid', player_id, 'code', card_code)), '[]'::jsonb) from public.player_cards
+   where match_id = p_match and status = 'armed';
 $$;
 
 -- Kartu yang sudah ditandai terpakai tapi gagal dipakai di meja (misalnya target keburu fold) dikembalikan.
@@ -1903,6 +1934,7 @@ revoke all on function public.meja_use_card(uuid, uuid, uuid) from public, anon,
 revoke all on function public.meja_podium() from public, anon, authenticated;
 revoke all on function public.meja_refund_card(uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.meja_counters(uuid) from public, anon, authenticated;
+revoke all on function public.meja_passives(uuid) from public, anon, authenticated;
 revoke all on function public.meja_grant_card(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.meja_withdraw(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.online_not_dealt(uuid) from public, anon, authenticated;
@@ -1910,6 +1942,7 @@ grant execute on function public.meja_withdraw(uuid, uuid) to service_role;
 grant execute on function public.meja_use_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_refund_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_counters(uuid) to service_role;
+grant execute on function public.meja_passives(uuid) to service_role;
 grant execute on function public.meja_grant_card(uuid, uuid, text) to service_role;
 grant execute on function public.meja_podium() to service_role;
 
