@@ -61,13 +61,17 @@ Detailnya:
 ### 🪙 Koin
 - **Koin** adalah mata uang terpisah dari poin. Koin hanya untuk membeli skill card dan **tidak mengurangi poin leaderboard**.
 - Cara dapat koin:
-  - **Ikut match** (offline/online): +10, juara +15, runner-up +8, peringkat 3 +4. Otomatis masuk saat match selesai.
+  - **Ikut match** (offline/online): +15, juara +25 (total 40), runner-up +15 (total 30), peringkat 3 +8 (total 23). Otomatis masuk saat match selesai.
+  - **Menang hand di meja online**: +2 koin tiap menang hand yang sampai flop (menang karena semua lawan fold sebelum flop tidak dihitung), maksimal 30 koin per match. Langsung masuk sebagai "Hadiah dari meja".
+  - **Hadiah meja** dari skill host Coin Drop dan Prediction.
   - **Gaji bulanan** dari leaderboard bulan lalu: #1 100, #2 70, #3 50, #4–10 30, sisanya yang main minimal 1 match 20.
   - **Bonus peluncuran** sekali berdasarkan peringkat all time: 150 / 120 / 100 / 75 (#4–10) / 50.
   - **Pencapaian total poin**: 50 → 30 koin, 100 → 50, 250 → 80, 500 → 120.
 - Gaji, bonus, dan pencapaian **diklaim** lewat tombol Klaim di Beranda atau Profil.
 
 ### 🛒 Market & 🎒 Inventory
+- **🎰 Gacha** (tab di Market): 1× tarik **50 koin**, 10× **450 koin** (dijamin minimal 1 Rare). Peluang: Legendary 0.5%, Epic 3.5%, Rare 13%, Common 58%, Zonk 25% (10 koin kembali). **Pity**: Epic pasti keluar di tarikan ke-25 tanpa Epic, Legendary di tarikan ke-150 tanpa Legendary. Semua kartu bisa keluar, termasuk wildcard & angelic yang belum dijual, dan gacha tidak memakai stok Market. Ada animasi orb (warnanya bocoran rarity tertinggi), kartu dibalik satu per satu (10× dengan sorotan khusus untuk Epic/Legendary, bisa dilewati), riwayat tarikan, dan penghitung pity. Dealer bisa membuka/menutup gacha, mengubah harga, serta mengatur rarity dan isi pool tiap kartu di tab Gacha.
+- **Rarity & harga** (disusun ulang supaya seimbang dengan ekonomi koin): Common 30–70 (Card Reroll, Reveal, Defend Me, Suited Up, Pair Me Up, Give Me Straight/Flush, Blind Steal, Blindfold, Freeze Player, Chip Saver, Board Peek, Third Card, Shield), Rare 80–150 (Give Me Full House/Quads/Straight Flush/Royal Flush, Fold Player, Tax Collector, Second Chance, Double Down, Card Sense, Lucky Charm, Share the Luck), Epic 150–300 (King's Ransom, Chaos Shuffle, Guardian Angel, Full Counter, Chip Stack, Death Card), Legendary 500–1200 (Duel Me, You Owe Me, Get Out, Revive, Go Big). Harga yang sudah diubah dealer tidak ditimpa.
 - Player membeli **skill card** di Market pakai koin. Dealer mengatur kartu mana yang dijual, harga, dan stoknya.
 - Kartu yang dibeli masuk ke **Inventory** (tombol di Beranda player).
 - Kartu yang tersedia sekarang:

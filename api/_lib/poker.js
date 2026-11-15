@@ -174,6 +174,8 @@ export const HOST_SKILLS = {
   prediction: { name: 'Prediction', icon: '🔮', now: true },
   revenge_vote: { name: 'Revenge Vote', icon: '🗳️' },
 }
+/** Koin aplikasi tiap menang hand yang sampai flop (bukan menang karena semua fold pre-flop), maks per match. */
+export const HAND_COINS = 2, HAND_COINS_MAX = 30
 export const COIN_DROP = 20, PREDICT_COINS = 10, RAIN_SHARE = 0.1, ANTE_SHARE = 0.05, REVENGE_SHARE = 0.1
 // target: true = pemain yang masih bertahan; 'hand' = masih ikut hand ini (atau hand berikutnya kalau di antara hand);
 // 'two' = dua pemain berbeda yang masih bertahan.
@@ -312,7 +314,7 @@ export class Table {
     }
     this.lobby = false
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false, boost: 0, pre: null, spot: -1, insured: 0, blind: false, iced: false, guarded: false, rescued: 0, back: 0, sense: null, peekCard: -1, third: -1, deathPaid: 0 })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false, boost: 0, pre: null, coin: 0, spot: -1, insured: 0, blind: false, iced: false, guarded: false, rescued: 0, back: 0, sense: null, peekCard: -1, third: -1, deathPaid: 0 })
     this.death = null
     this.handNo++
     if (this.dice?.no === this.handNo) { this.sb *= this.dice.n; this.bb *= this.dice.n } // Dice Blinds (host)
@@ -870,6 +872,13 @@ export class Table {
     const winners = won > 0 ? this.players.filter(p => p.won === won) : []
     const add = (p, n, kind) => { this.coins = [...(this.coins || []), { uid: p.uid, n, ref: `${this.handNo}:${kind}` }] }
     if (this.coinDrop === this.handNo) winners.forEach(p => add(p, COIN_DROP, 'drop'))
+    if (this.board.length >= 3) for (const p of this.players) { // menang hand = +2 koin (maks 30 per match)
+      const got = this.handCoins?.[p.uid] || 0
+      if (!(p.won > 0) || got >= HAND_COINS_MAX) continue
+      const n = Math.min(HAND_COINS, HAND_COINS_MAX - got)
+      this.handCoins = { ...(this.handCoins || {}), [p.uid]: got + n }
+      p.coin = n; add(p, n, 'hand')
+    }
     if (this.predict?.no === this.handNo) {
       const v = this.predict.votes, ids = new Set(winners.map(p => p.uid))
       const right = Object.keys(v).filter(u => ids.has(v[u]))
@@ -1167,12 +1176,13 @@ export class Table {
         skills: seen(q) ? q.skills || [] : [], target: q.target >= 0 && (q === me || (seen(q) && !(q.skills || []).some(c => SKILLS[c]?.secret))) ? q.target : -1, saved: q.saved || 0,
         forced: !!q.forced, peek: peek(q), countered: !!q.countered,
         cards: q === me && blindMe && !q.show ? [-1, -1] : q === me || q.show || peek(q) ? q.cards : q.inHand && !q.folded ? [0, 1].map(k => q.spot === k || sensed(q, k) ? q.cards[k] : -1) : [],
-        iced: !!q.iced && this.betting, rescued: q.rescued || 0, back: q.back || 0, deathPaid: q.deathPaid || 0,
+        iced: !!q.iced && this.betting, coin: !this.betting ? q.coin || 0 : 0, rescued: q.rescued || 0, back: q.back || 0, deathPaid: q.deathPaid || 0,
         spot: q.spot >= 0 && q.inHand && !q.folded ? q.spot : -1, insured: q.insured || 0,
       })),
     }
     if (i >= 0 && this.turn === i) v.ctl = this.ctl(i)
     if (me?.pre) v.pre = me.pre // pre-action saya (hanya terlihat sendiri)
+    if (me) v.handCoins = [this.handCoins?.[me.uid] || 0, HAND_COINS_MAX] // koin dari menang hand di match ini
     if (me && me.peekCard >= 0 && this.betting && this.board.length === me.peekLen) v.nextCard = me.peekCard // Board Peek
     if (me && me.third >= 0) v.thirdCard = me.third // Third Card: kartu ke-3 yang dibuang
     if (me?.sense && this.betting) v.sense = me.sense // Card Sense

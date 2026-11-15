@@ -834,7 +834,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.equal(t.view(t.players[1]).predict.mine, 0)
   ok(t, 3, 'call'); drain(t)
   assert.equal(t.players[3].place, 4) // 72o... P3 (5d4c) kalah dari AA
-  assert.deepEqual(t.coins.map(c => c.uid + ':' + c.n).sort(), ['u0:20', 'u1:10'])
+  assert.deepEqual(t.coins.filter(c => !c.ref.endsWith(':hand')).map(c => c.uid + ':' + c.n).sort(), ['u0:20', 'u1:10'])
   assert.equal(t.ann.code, 'prediction_result'); assert.equal(t.ann.extra, '1/2')
   nxt(t)
   const r0 = stacks(t).reduce((a, b) => a + b); t.useHost('chip_rain'); assert(stacks(t).reduce((a, b) => a + b) > r0)
@@ -846,6 +846,21 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   nxt(t)
   assert.equal(t.ann.code, 'revenge_result'); assert(t.players[1].chips < c1 + 100000)
   assert.equal(t.players.reduce((a, p) => a + p.chips + (t.betting ? p.total : 0), 0) + (t.forfeited || 0), 3040 + (t.minted || 0))
+}
+
+{ // +2 koin tiap menang hand yang sampai flop, maks 30 per match; menang karena semua fold pre-flop tidak dihitung
+  const t = mk([1000, 1000, 1000]); begin(t)
+  ok(t, 0, 'fold'); ok(t, 1, 'fold') // BB menang tanpa flop
+  assert.equal((t.coins || []).length, 0)
+  nxt(t)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  const w = t.players.filter(p => p.won > 0)
+  assert.equal(t.coins.filter(c => c.ref.endsWith(':hand')).length, w.length); assert(w.every(p => p.coin === 2))
+  t.handCoins[w[0].uid] = 29; t.coins = []
+  nxt(t); while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check'); drain(t)
+  for (const c of t.coins.filter(c => c.uid === w[0].uid && c.ref.endsWith(':hand'))) assert.equal(c.n, 1) // sisa jatah 1
+  assert(Object.values(t.handCoins).every(n => n <= 30))
 }
 
 console.log('semua tes lulus')

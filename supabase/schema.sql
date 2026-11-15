@@ -1296,13 +1296,13 @@ as $$
   select coalesce(sum(amount), 0)::int from public.coin_ledger where player_id = p_player;
 $$;
 
--- Koin dari hasil match: ikut sampai selesai +10, juara +15, runner-up 1 +8, runner-up 2 +4 (tambahan).
+-- Koin dari hasil match: ikut sampai selesai +15, juara +25, runner-up 1 +15, runner-up 2 +8 (tambahan).
 create or replace function public.match_coins(p_placement int)
 returns int
 language sql
 immutable
 as $$
-  select 10 + case p_placement when 1 then 15 when 2 then 8 when 3 then 4 else 0 end;
+  select 15 + case p_placement when 1 then 25 when 2 then 15 when 3 then 8 else 0 end;
 $$;
 
 -- Dipanggil saat match selesai (setelah peringkat dihitung): Double Down menggandakan poin, lalu koin dibagikan.
@@ -1826,7 +1826,7 @@ grant select on public.gifts to authenticated;
 -- koin dari gift dicatat di buku besar dengan reason 'gift'
 alter table public.coin_ledger drop constraint if exists coin_ledger_reason_check;
 alter table public.coin_ledger add constraint coin_ledger_reason_check
-  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift', 'table'));
+  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift', 'table', 'gacha'));
 
 -- p_players null = semua player. Mengembalikan jumlah player yang dikirimi.
 create or replace function public.send_gift(p_players uuid[], p_coins int, p_card text, p_qty int, p_message text)
@@ -1961,6 +1961,180 @@ grant execute on function public.meja_grant_card(uuid, uuid, text) to service_ro
 grant execute on function public.meja_grant_coins(uuid, uuid, int, text) to service_role;
 grant execute on function public.meja_podium() to service_role;
 
+-- ---------- Gacha skill card & rebalance harga ---------------------------
+-- Rarity menentukan pool gacha: common 58%, rare 13%, epic 3.5%, legendary 0.5%, zonk 25% (10 koin kembali).
+-- Pity: epic pasti di tarikan ke-25 tanpa epic, legendary pasti di tarikan ke-150 tanpa legendary.
+-- 10x pull: dijamin minimal 1 rare ke atas. Gacha tidak memakai stok market.
+alter table public.skill_cards add column if not exists rarity text;
+alter table public.skill_cards add column if not exists in_gacha boolean not null default true;
+alter table public.skill_cards drop constraint if exists skill_cards_rarity_check;
+alter table public.skill_cards add constraint skill_cards_rarity_check check (rarity is null or rarity in ('common', 'rare', 'epic', 'legendary'));
+
+-- Harga seimbang dengan ekonomi koin baru: hanya kartu yang harganya masih harga awal yang diubah
+-- (harga yang sudah diatur dealer tidak ditimpa).
+update public.skill_cards s set price = v.np from (values
+  ('card_reroll', 20, 30), ('reveal_card', 35, 40), ('suited_up', 50, 30), ('give_me_flush', 50, 55),
+  ('blind_steal', 70, 40), ('blindfold', 90, 60), ('freeze_player', 80, 60), ('chip_saver', 80, 60), ('board_peek', 70, 60),
+  ('third_card', 120, 60), ('shield', 60, 70), ('give_me_full_house', 80, 90), ('give_me_royal_flush', 150, 100),
+  ('give_me_quads', 100, 120), ('fold_player', 130, 120), ('tax_collector', 100, 120), ('give_me_straight_flush', 130, 140),
+  ('double_down', 70, 120), ('card_sense', 250, 120), ('lucky_charm', 300, 150), ('share_luck', 120, 80),
+  ('kings_ransom', 250, 150), ('chaos_shuffle', 200, 150), ('full_counter', 250, 200), ('chip_stack', 200, 250),
+  ('death_card', 200, 300), ('revive', 1200, 1000), ('go_big', 1500, 1200)
+) v(code, op, np) where s.code = v.code and s.price = v.op;
+
+update public.skill_cards s set rarity = v.r from (values
+  ('card_reroll', 'common'), ('reveal_card', 'common'), ('defend_me', 'common'), ('suited_up', 'common'), ('pair_me_up', 'common'),
+  ('give_me_straight', 'common'), ('give_me_flush', 'common'), ('blind_steal', 'common'), ('blindfold', 'common'),
+  ('freeze_player', 'common'), ('chip_saver', 'common'), ('board_peek', 'common'), ('third_card', 'common'), ('shield', 'common'),
+  ('give_me_full_house', 'rare'), ('give_me_royal_flush', 'rare'), ('give_me_quads', 'rare'), ('fold_player', 'rare'),
+  ('tax_collector', 'rare'), ('give_me_straight_flush', 'rare'), ('second_chance', 'rare'), ('double_down', 'rare'),
+  ('card_sense', 'rare'), ('lucky_charm', 'rare'), ('share_luck', 'rare'),
+  ('kings_ransom', 'epic'), ('chaos_shuffle', 'epic'), ('guardian_angel', 'epic'), ('full_counter', 'epic'),
+  ('chip_stack', 'epic'), ('death_card', 'epic'),
+  ('duel_me', 'legendary'), ('you_owe_me', 'legendary'), ('get_out', 'legendary'), ('revive', 'legendary'), ('go_big', 'legendary')
+) v(code, r) where s.code = v.code and s.rarity is null;
+
+create table if not exists public.gacha_config (
+  id        int primary key default 1 check (id = 1),
+  enabled   boolean not null default true,
+  price     int not null default 50,
+  price10   int not null default 450
+);
+insert into public.gacha_config (id) values (1) on conflict (id) do nothing;
+
+create table if not exists public.gacha_pity (
+  player_id uuid primary key references public.profiles (id) on delete cascade,
+  epic      int not null default 0,
+  legend    int not null default 0,
+  pulls     int not null default 0
+);
+
+create table if not exists public.gacha_pulls (
+  id         uuid primary key default gen_random_uuid(),
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  batch      uuid not null,
+  slot       int not null,
+  rarity     text not null check (rarity in ('zonk', 'common', 'rare', 'epic', 'legendary')),
+  card_code  text references public.skill_cards (code),
+  refund     int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists gacha_pulls_player_idx on public.gacha_pulls (player_id, created_at desc);
+
+alter table public.gacha_config enable row level security;
+alter table public.gacha_pity enable row level security;
+alter table public.gacha_pulls enable row level security;
+drop policy if exists "gacha config read" on public.gacha_config;
+create policy "gacha config read" on public.gacha_config for select to authenticated using (true);
+drop policy if exists "gacha pity own" on public.gacha_pity;
+create policy "gacha pity own" on public.gacha_pity for select to authenticated using (player_id = auth.uid());
+drop policy if exists "gacha pulls own" on public.gacha_pulls;
+create policy "gacha pulls own" on public.gacha_pulls for select to authenticated using (player_id = auth.uid());
+grant select on public.gacha_config, public.gacha_pity, public.gacha_pulls to authenticated;
+
+create or replace function public.gacha_pull(p_count int)
+returns setof public.gacha_pulls
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cfg public.gacha_config;
+  pity public.gacha_pity;
+  cost int;
+  b uuid := gen_random_uuid();
+  r double precision;
+  rar text;
+  pick text;
+  good boolean := false;
+  row public.gacha_pulls;
+begin
+  if public.current_role_name() is distinct from 'player' then
+    raise exception 'Hanya player yang bisa gacha';
+  end if;
+  if p_count is null or p_count not in (1, 10) then
+    raise exception 'Pilih 1x atau 10x';
+  end if;
+  select * into cfg from public.gacha_config where id = 1;
+  if not found or not cfg.enabled then
+    raise exception 'Gacha sedang ditutup';
+  end if;
+  cost := case when p_count = 1 then cfg.price else cfg.price10 end;
+  perform 1 from public.profiles where id = auth.uid() for update;
+  if public.coin_balance(auth.uid()) < cost then
+    raise exception 'Koin kamu belum cukup (butuh % koin)', cost;
+  end if;
+  insert into public.coin_ledger (player_id, amount, reason, ref) values (auth.uid(), -cost, 'gacha', b::text);
+  insert into public.gacha_pity (player_id) values (auth.uid()) on conflict (player_id) do nothing;
+  select * into pity from public.gacha_pity where player_id = auth.uid() for update;
+  for i in 1..p_count loop
+    pity.epic := pity.epic + 1; pity.legend := pity.legend + 1; pity.pulls := pity.pulls + 1;
+    r := random();
+    rar := case when pity.legend >= 150 then 'legendary' when pity.epic >= 25 then 'epic'
+                when r < 0.005 then 'legendary' when r < 0.04 then 'epic' when r < 0.17 then 'rare' when r < 0.75 then 'common' else 'zonk' end;
+    if p_count = 10 and i = 10 and not good and rar in ('common', 'zonk') then rar := 'rare'; end if;
+    pick := null;
+    if rar <> 'zonk' then
+      select c.code into pick from public.skill_cards c where c.in_gacha and c.rarity = rar order by random() limit 1;
+      if pick is null then -- pool rarity ini kosong (diatur dealer): turun ke common
+        select c.code into pick from public.skill_cards c where c.in_gacha and c.rarity = 'common' order by random() limit 1;
+        rar := case when pick is null then 'zonk' else 'common' end;
+      end if;
+    end if;
+    if rar in ('rare', 'epic', 'legendary') then good := true; end if;
+    if rar = 'legendary' then pity.legend := 0; pity.epic := 0; elsif rar = 'epic' then pity.epic := 0; end if;
+    if rar = 'zonk' then
+      insert into public.coin_ledger (player_id, amount, reason, ref) values (auth.uid(), 10, 'gacha', b::text || ':' || i);
+    else
+      insert into public.player_cards (player_id, card_code, price) values (auth.uid(), pick, 0);
+    end if;
+    insert into public.gacha_pulls (player_id, batch, slot, rarity, card_code, refund)
+      values (auth.uid(), b, i, rar, pick, case when rar = 'zonk' then 10 else 0 end) returning * into row;
+    return next row;
+  end loop;
+  update public.gacha_pity set epic = pity.epic, legend = pity.legend, pulls = pity.pulls where player_id = auth.uid();
+end;
+$$;
+
+-- Dealer: buka/tutup gacha dan atur harganya.
+create or replace function public.set_gacha(p_enabled boolean, p_price int, p_price10 int)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa mengatur gacha';
+  end if;
+  if p_price is null or p_price < 1 or p_price > 10000 or p_price10 is null or p_price10 < 1 or p_price10 > 100000 then
+    raise exception 'Harga gacha tidak valid';
+  end if;
+  update public.gacha_config set enabled = coalesce(p_enabled, false), price = p_price, price10 = p_price10 where id = 1;
+end;
+$$;
+
+-- Dealer: rarity kartu dan apakah kartu ikut pool gacha.
+create or replace function public.set_card_gacha(p_code text, p_rarity text, p_in_gacha boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa mengatur gacha';
+  end if;
+  if p_rarity is null or p_rarity not in ('common', 'rare', 'epic', 'legendary') then
+    raise exception 'Rarity tidak valid';
+  end if;
+  update public.skill_cards set rarity = p_rarity, in_gacha = coalesce(p_in_gacha, false) where code = p_code;
+  if not found then
+    raise exception 'Kartu tidak ditemukan';
+  end if;
+end;
+$$;
+
 do $$
 declare
   fn text;
@@ -2008,7 +2182,10 @@ begin
     'public.start_due_matches()',
     'public.send_gift(uuid[], int, text, int, text)',
     'public.cancel_gift(uuid, boolean)',
-    'public.claim_gift(uuid)'
+    'public.claim_gift(uuid)',
+    'public.gacha_pull(int)',
+    'public.set_gacha(boolean, int, int)',
+    'public.set_card_gacha(text, text, boolean)'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
     execute format('grant execute on function %s to authenticated', fn);

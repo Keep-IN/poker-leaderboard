@@ -12,6 +12,8 @@ export interface SkillCard {
   stock: number
   on_sale: boolean
   sort: number
+  rarity: 'common' | 'rare' | 'epic' | 'legendary' | null
+  in_gacha: boolean
 }
 
 export interface OwnedCard {

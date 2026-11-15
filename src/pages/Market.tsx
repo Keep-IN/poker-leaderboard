@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ConfirmSheet from '../components/ConfirmSheet'
+import { GachaDealer, GachaPanel } from '../components/Gacha'
 import { Button, Card, EmptyState, ErrorText, PageLoader, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { CARD_ICONS, KIND_LABELS, kindRank, type SkillCard } from '../lib/cards'
@@ -36,6 +37,7 @@ export default function Market() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
+  const [tab, setTab] = useState<'shop' | 'gacha'>('shop')
 
   if (!profile || !cards) return <PageLoader />
 
@@ -69,10 +71,21 @@ export default function Market() {
         )}
       </div>
 
+      <div className="flex gap-1 rounded-2xl bg-ink/5 p-1">
+        {([['shop', isDealer ? '🛒 Listing' : '🛒 Beli'], ['gacha', '🎰 Gacha']] as const).map(([k, label]) => (
+          <button key={k} type="button" onClick={() => setTab(k)}
+            className={cx('min-h-10 flex-1 rounded-xl text-sm font-bold transition', tab === k ? 'bg-brand-400 text-on-accent' : 'text-slate-300 hover:bg-ink/5')}>
+            {label}
+          </button>
+        ))}
+      </div>
+
       <ErrorText>{error}</ErrorText>
       {done && <p className="rounded-xl bg-emerald-500/15 px-3 py-2 text-sm text-emerald-300">✓ {done}</p>}
 
-      {isDealer ? (
+      {tab === 'gacha' ? (
+        isDealer ? <GachaDealer cards={cards} onSaved={reload} /> : <GachaPanel cards={cards} balance={balance} onCoins={reloadCoins} />
+      ) : isDealer ? (
         <div className="grid gap-3 md:grid-cols-2">
           {cards.map((c) => (
             <DealerListing key={c.code} card={c} onSaved={reload} />
@@ -103,8 +116,8 @@ export default function Market() {
       )}
 
       <p className="text-center text-xs text-slate-500">
-        Koin didapat dari ikut match (+10, juara +15, runner-up +8/+4), gaji bulanan dari leaderboard, dan pencapaian. Koin tidak
-        mengurangi poin leaderboard.
+        Koin didapat dari ikut match (+15; juara 40, runner-up 30, peringkat 3 23), +2 tiap menang hand di meja online (maks 30 per
+        match), gaji bulanan dari leaderboard, dan pencapaian. Koin tidak mengurangi poin leaderboard.
       </p>
 
       {buying && (

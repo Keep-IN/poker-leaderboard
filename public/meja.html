@@ -1143,6 +1143,7 @@ function render() {
     if (S.nextCard !== undefined) msg += `<br>🔮 Kartu meja berikutnya: <b>${cardTxt(S.nextCard)}</b>`;
     if (S.thirdCard !== undefined && betting) msg += `<br>🎴 Third Card · kartu yang dibuang: ${cardTxt(S.thirdCard)}`;
     if (S.sense && betting && ps[S.sense.j]) msg += `<br>🧠 Card Sense: kamu tahu 1 kartu ${esc(ps[S.sense.j].name)}`;
+    if (S.handCoins && S.handCoins[0] && phase !== 'over') msg += `<br><span class="chatnote">🪙 koin dari menang hand: ${S.handCoins[0]}/${S.handCoins[1]}</span>`;
   }
   curMsg = msg; drawMine();
   if (h !== lastCtl) { $('ctl').innerHTML = h; lastCtl = h; } // kontrol yang sama tidak dibongkar (slider yang sedang digeser tetap utuh)
@@ -1175,7 +1176,7 @@ function render() {
   set($('pot'), S.pot ? chips(S.pot - sumBets) + `<span class="lbl">Pot</span><span class="num">${S.pot}</span>` : '');
   set($('win'), phase === 'over'
     ? `<div class="over"><b>Hasil turnamen</b><ol>${ps.slice().sort((a, b) => a.place - b.place).map(p => `<li>${esc(p.name)}</li>`).join('')}</ol></div>`
-    : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}</em></span>`).join(''));
+    : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}${p.coin ? ` · 🪙+${p.coin}` : ''}</em></span>`).join(''));
 
   drawBubbles(); syncChatBtn(); drawReveal(); drawAnn(); drawWinner();
   const tagBig = S.big !== undefined && betting, tagDuel = S.duelFine !== undefined && betting && S.players[S.duelFine];
