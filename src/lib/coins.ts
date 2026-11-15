@@ -11,7 +11,7 @@ export interface Claimable {
 export interface LedgerRow {
   id: string
   amount: number
-  reason: 'launch' | 'match' | 'salary' | 'milestone' | 'purchase' | 'gift' | 'table'
+  reason: 'launch' | 'match' | 'salary' | 'milestone' | 'purchase' | 'gift' | 'table' | 'gacha'
   ref: string
   created_at: string
 }
@@ -23,7 +23,8 @@ export const LEDGER_LABELS: Record<LedgerRow['reason'], string> = {
   milestone: 'Pencapaian',
   purchase: 'Beli skill card',
   gift: 'Gift dari dealer',
-  table: 'Hadiah dari meja (Coin Drop / Prediction)',
+  table: 'Hadiah dari meja (menang hand / Coin Drop / Prediction)',
+  gacha: 'Gacha skill card',
 }
 
 /** Coin balance and coins ready to claim for the signed-in player. */
