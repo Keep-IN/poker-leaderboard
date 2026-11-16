@@ -20,6 +20,11 @@ export function supabaseDb(url, secret) {
       if (!r.ok) return null
       return (await r.json()).id ?? null
     },
+    // alasan suspend akun ini (null kalau tidak di-suspend)
+    async suspended(uid) {
+      const r = await one(`/rest/v1/suspensions?player_id=eq.${uid}&select=reason`)
+      return r?.reason ?? null
+    },
     async seats(match) {
       const m = await one(`/rest/v1/matches?id=eq.${match}&select=status,mode,online_config,dealer_id,players:match_players(player_id,profile:profiles(name))`)
       if (!m) return null

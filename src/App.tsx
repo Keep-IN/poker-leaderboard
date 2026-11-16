@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
-import { PageLoader } from './components/ui'
+import { Button, PageLoader } from './components/ui'
+import { formatDateTime } from './lib/format'
 import { AuthProvider, useAuth } from './lib/auth'
 import { isConfigured } from './lib/supabase'
 import AuthPage from './pages/AuthPage'
@@ -52,10 +53,36 @@ export default function App() {
 }
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { session, loading } = useAuth()
+  const { session, loading, suspended } = useAuth()
   if (loading) return <PageLoader />
   if (!session) return <Navigate to="/login" replace />
+  if (suspended) return <SuspendedScreen />
   return children
+}
+
+/** Akun di-suspend dealer: tidak bisa memakai aplikasi, hanya melihat alasannya lalu keluar. */
+function SuspendedScreen() {
+  const { suspended, signOut } = useAuth()
+  if (!suspended) return null
+  return (
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-5 p-6">
+      <div className="rounded-3xl border border-red-400/40 bg-red-500/10 p-6 text-center">
+        <p className="text-5xl">🚫</p>
+        <h1 className="mt-3 text-2xl font-extrabold">Akun kamu di-suspend</h1>
+        <p className="mt-2 text-sm text-slate-300">Kamu tidak bisa memakai BTP Poker League sampai suspend dicabut oleh dealer.</p>
+        <div className="mt-5 rounded-2xl bg-surface-950/60 p-4 text-left">
+          <p className="text-xs uppercase tracking-wider text-slate-400">Alasan</p>
+          <p className="mt-1 whitespace-pre-wrap text-base font-semibold text-red-200">{suspended.reason}</p>
+          <p className="mt-3 text-xs text-slate-400">
+            Di-suspend{suspended.by ? ` oleh ${suspended.by}` : ''} · {formatDateTime(suspended.at)}
+          </p>
+        </div>
+      </div>
+      <Button variant="ghost" onClick={signOut} className="min-h-12 w-full">
+        Keluar
+      </Button>
+    </div>
+  )
 }
 
 function GuestOnly({ children }: { children: ReactNode }) {

@@ -16,6 +16,11 @@ Tampilannya dirancang untuk HP. Halaman match update secara real-time, jadi semu
 - Daftar cukup dengan **nama, email, dan password**, lalu langsung bisa login.
 - Ada dua jenis akun: **Player** dan **Dealer**.
 - Ketuk avatar di Beranda atau 👤 di header untuk membuka **Profil**: gelar podium, saldo koin, riwayat koin, pencapaian, statistik, dan pengaturan (ganti nama, ganti password, tema).
+- **Suspend player (dealer)**: di halaman profil player, dealer menekan **🚫 Suspend**, mengisi alasan (3–200 karakter), lalu konfirmasi. Player itu:
+  - tidak bisa memakai aplikasi: setelah login hanya muncul layar **"Akun kamu di-suspend"** berisi alasan, siapa yang men-suspend, dan kapan, plus tombol Keluar. Kalau sedang membuka aplikasi, suspend berlaku saat aplikasi dibuka/aktif lagi;
+  - ditolak di **semua request API** oleh database (pre-request PostgREST `check_request`), jadi tidak bisa diakali lewat API langsung;
+  - langsung dikeluarkan dari meja online yang sedang berjalan (kursinya lanjut auto check/fold) dan tidak bisa membuka meja lagi.
+  - Data, poin, koin, dan kartunya tetap aman. Dealer bisa **Cabut suspend** kapan saja dari halaman profil yang sama. Alasan suspend hanya terlihat oleh dealer dan player itu sendiri.
 
 ### 🎟️ Player bisa jadi host
 - Player bisa **membuat match sendiri dengan biaya 1 poin**. Sebelum match dibuat, ada **halaman konfirmasi** yang menampilkan biaya dan sisa poin.

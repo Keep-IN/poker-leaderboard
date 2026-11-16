@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Avatar, Button, Card, Chevron, EmptyState, PageLoader, SectionTitle, cx } from '../components/ui'
+import { Avatar, Button, Card, Chevron, EmptyState, ErrorText, PageLoader, SectionTitle, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { LEDGER_LABELS, MILESTONES, PODIUM_TITLES, useCoins, usePodiumRank, type LedgerRow } from '../lib/coins'
 import { formatDate, winRate } from '../lib/format'
@@ -221,6 +221,7 @@ export function PlayerProfile({ self }: { self?: boolean }) {
               ⚔️ Ajak {player.name.split(' ')[0]} duel
             </Link>
           )}
+          {me?.role === 'dealer' && player.role === 'player' && <SuspendPanel playerId={player.id} name={player.name} />}
           {isMe && player.role === 'player' && <MyCoins />}
           {player.role === 'player' && total !== null && <Achievements total={total} />}
           {player.role === 'player' && <PlayerStats playerId={player.id} isMe={isMe} />}
@@ -228,6 +229,90 @@ export function PlayerProfile({ self }: { self?: boolean }) {
         </>
       )}
     </div>
+  )
+}
+
+/** Dealer: suspend player dengan alasan (player tidak bisa memakai aplikasi) atau cabut suspend-nya. */
+function SuspendPanel({ playerId, name }: { playerId: string; name: string }) {
+  const [sus, setSus] = useState<{ reason: string; created_at: string } | null | undefined>(undefined)
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.from('suspensions').select('reason, created_at').eq('player_id', playerId).maybeSingle()
+    setSus((data as { reason: string; created_at: string } | null) ?? null)
+  }, [playerId])
+  useEffect(() => {
+    load()
+  }, [load])
+
+  async function run(fn: string, args: Record<string, unknown>) {
+    setBusy(true)
+    setError('')
+    const { error } = await supabase.rpc(fn, args)
+    setBusy(false)
+    if (error) return setError(errorMessage(error))
+    setOpen(false)
+    setReason('')
+    load()
+  }
+
+  if (sus === undefined) return null
+  const first = name.split(' ')[0]
+  if (sus)
+    return (
+      <Card className="space-y-3 border-red-400/40 bg-red-500/10">
+        <div>
+          <p className="font-bold text-red-200">🚫 {first} sedang di-suspend</p>
+          <p className="mt-1 text-sm text-slate-300">Alasan: {sus.reason}</p>
+          <p className="mt-1 text-xs text-slate-400">Sejak {formatDate(sus.created_at)} · tidak bisa login dan dikeluarkan dari meja online</p>
+        </div>
+        <Button variant="ghost" loading={busy} onClick={() => run('unsuspend_player', { p_player: playerId })} className="w-full md:w-fit">
+          Cabut suspend
+        </Button>
+        <ErrorText>{error}</ErrorText>
+      </Card>
+    )
+  if (!open)
+    return (
+      <Button variant="danger" onClick={() => setOpen(true)} className="w-full md:w-fit">
+        🚫 Suspend {first}
+      </Button>
+    )
+  return (
+    <Card className="space-y-3 border-red-400/40">
+      <div>
+        <p className="font-bold">🚫 Suspend {name}</p>
+        <p className="mt-1 text-xs text-slate-400">
+          {first} tidak bisa login dan langsung dikeluarkan dari meja online yang sedang berjalan. Alasan di bawah akan ditampilkan ke {first}. Data, poin, dan koinnya tetap aman, dan suspend bisa dicabut kapan saja.
+        </p>
+      </div>
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        maxLength={200}
+        rows={3}
+        placeholder="Contoh: Curang di match online, kerja sama dengan pemain lain"
+        className="w-full rounded-xl border border-ink/10 bg-surface-950/60 px-3 py-2 text-base outline-none focus:border-red-400/70"
+      />
+      <div className="flex gap-2">
+        <Button variant="ghost" onClick={() => setOpen(false)} className="flex-1 md:flex-none">
+          Batal
+        </Button>
+        <Button
+          variant="danger"
+          loading={busy}
+          disabled={reason.trim().length < 3}
+          onClick={() => run('suspend_player', { p_player: playerId, p_reason: reason.trim() })}
+          className="flex-1 md:flex-none"
+        >
+          Suspend {first}
+        </Button>
+      </div>
+      <ErrorText>{error}</ErrorText>
+    </Card>
   )
 }
 

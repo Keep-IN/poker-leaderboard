@@ -186,6 +186,8 @@ async function finalView(db, match, token) {
 async function join(db, match, accessToken) {
   const uid = await db.user(String(accessToken || ''))
   if (!uid) return { error: 'Sesi login habis, buka ulang dari halaman match', auth: true }
+  const sus = db.suspended ? await db.suspended(uid) : null
+  if (sus) return { error: `Akun kamu di-suspend: ${sus}`, suspended: true }
   await ensureTable(db, match)
   // Host match (tidak ikut main) mendapat token sendiri supaya tetap dikenali sebagai host (boleh chat) setelah refresh.
   const host = (await db.seats(match))?.match.dealer_id === uid

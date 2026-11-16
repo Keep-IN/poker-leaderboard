@@ -58,6 +58,11 @@ assert(a.token && b.token && c.token && new Set([a.token, b.token, c.token]).siz
 assert.equal(a.s.players.length, 5)
 assert.equal((await post({ type: 'join', access_token: 'tokA' })).token, a.token) // perangkat lain: token sama
 const x = await post({ type: 'join', access_token: 'tokX' })
+// akun di-suspend dealer: tidak bisa membuka meja
+db.suspended = async uid => uid === 'uX' ? 'Curang' : null
+const sx = await post({ type: 'join', access_token: 'tokX' })
+assert(sx.suspended && /Curang/.test(sx.error))
+delete db.suspended
 assert(x.watch && !x.token && !x.host) // bukan pemain match: penonton
 const hst = await post({ type: 'join', access_token: 'tokH' })
 assert(hst.host && hst.token && hst.s.hostView) // host match: token sendiri, boleh chat

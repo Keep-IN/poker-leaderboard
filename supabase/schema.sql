@@ -2290,6 +2290,114 @@ as $$
   on conflict (player_id, ref) do nothing;
 $$;
 
+-- ---------- Suspend player (oleh dealer) -------------------------------
+-- Dealer bisa men-suspend player dengan alasan. Player yang di-suspend ditolak di SEMUA request API (lewat
+-- pre-request PostgREST di bawah), jadi tidak bisa memakai aplikasi walau sesi loginnya masih ada; aplikasi
+-- menampilkan layar peringatan berisi alasannya. Disimpan di tabel terpisah supaya alasan tidak terbaca player lain.
+create table if not exists public.suspensions (
+  player_id     uuid primary key references public.profiles (id) on delete cascade,
+  reason        text not null check (char_length(reason) between 3 and 200),
+  suspended_by  uuid references public.profiles (id) on delete set null,
+  created_at    timestamptz not null default now()
+);
+alter table public.suspensions enable row level security;
+revoke all on public.suspensions from anon, authenticated;
+grant select on public.suspensions to authenticated;
+drop policy if exists "suspensions dealer read" on public.suspensions;
+create policy "suspensions dealer read" on public.suspensions for select to authenticated
+  using (public.current_role_name() = 'dealer');
+
+-- Dipanggil aplikasi setelah login: alasan suspend akun ini, atau null kalau tidak di-suspend.
+create or replace function public.my_suspension()
+returns json
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select json_build_object('reason', s.reason, 'at', s.created_at, 'by', p.name)
+    from public.suspensions s left join public.profiles p on p.id = s.suspended_by
+   where s.player_id = auth.uid();
+$$;
+
+create or replace function public.suspend_player(p_player uuid, p_reason text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa men-suspend player';
+  end if;
+  if p_player = auth.uid() then
+    raise exception 'Tidak bisa men-suspend akun sendiri';
+  end if;
+  if (select role from public.profiles where id = p_player) is distinct from 'player' then
+    raise exception 'Hanya akun player yang bisa di-suspend';
+  end if;
+  if p_reason is null or char_length(trim(p_reason)) < 3 or char_length(trim(p_reason)) > 200 then
+    raise exception 'Alasan suspend 3 sampai 200 karakter';
+  end if;
+  insert into public.suspensions (player_id, reason, suspended_by)
+  values (p_player, trim(p_reason), auth.uid())
+  on conflict (player_id) do update set reason = excluded.reason, suspended_by = excluded.suspended_by, created_at = now();
+  -- keluarkan sesinya dari meja online yang sedang berjalan (token kursi dihapus; kursinya lanjut auto check/fold)
+  update public.online_tables t
+     set state = jsonb_set(t.state, '{players}', (
+           select jsonb_agg(case when x.p ->> 'uid' = p_player::text then x.p || '{"token": null}'::jsonb else x.p end order by x.ord)
+             from jsonb_array_elements(t.state -> 'players') with ordinality x(p, ord))),
+         ver = t.ver + 1, updated_at = now()
+   where t.state -> 'players' @> jsonb_build_array(jsonb_build_object('uid', p_player::text))
+     and exists (select 1 from public.matches m where m.id = t.match_id and m.status = 'ongoing');
+end;
+$$;
+
+create or replace function public.unsuspend_player(p_player uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.current_role_name() is distinct from 'dealer' then
+    raise exception 'Hanya dealer yang bisa mencabut suspend';
+  end if;
+  delete from public.suspensions where player_id = p_player;
+end;
+$$;
+
+-- Pre-request PostgREST: jalan sebelum setiap request API. Akun yang di-suspend ditolak, kecuali my_suspension
+-- (supaya aplikasi bisa menampilkan alasannya). Request tanpa login / server meja (service role) tidak terpengaruh.
+create or replace function public.check_request()
+returns void
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  r text;
+begin
+  if auth.uid() is null or coalesce(current_setting('request.path', true), '') like '%/rpc/my_suspension' then
+    return;
+  end if;
+  select reason into r from public.suspensions where player_id = auth.uid();
+  if found then
+    raise exception 'Akun kamu di-suspend: %', r using errcode = '42501', hint = 'suspended';
+  end if;
+end;
+$$;
+grant execute on function public.check_request() to anon, authenticated;
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'authenticator') then
+    alter role authenticator set pgrst.db_pre_request = 'public.check_request';
+  end if;
+end;
+$$;
+notify pgrst, 'reload config';
+
 do $$
 declare
   fn text;
@@ -2342,7 +2450,10 @@ begin
     'public.set_gacha(boolean, int, int)',
     'public.set_card_gacha(text, text, boolean)',
     'public.get_my_quests()',
-    'public.claim_quest(text)'
+    'public.claim_quest(text)',
+    'public.my_suspension()',
+    'public.suspend_player(uuid, text)',
+    'public.unsuspend_player(uuid)'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
     execute format('grant execute on function %s to authenticated', fn);
