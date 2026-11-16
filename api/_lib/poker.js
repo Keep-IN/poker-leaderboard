@@ -175,7 +175,9 @@ export const HOST_SKILLS = {
   revenge_vote: { name: 'Revenge Vote', icon: '🗳️' },
 }
 /** Koin aplikasi tiap menang hand yang sampai flop (bukan menang karena semua fold pre-flop), maks per match. */
-export const HAND_COINS = 2, HAND_COINS_MAX = 30
+export const HAND_COINS = 2, HAND_COINS_MAX = 50
+/** Knockout: koin tiap menyingkirkan 1 pemain. Big Hand: koin menang showdown dengan kombinasi besar (kartu tangan ikut). */
+export const KO_COINS = 5, BIG_HAND_COINS = { 5: 3, 6: 5, 7: 10, 8: 25 }, ROYAL_COINS = 50
 export const COIN_DROP = 20, PREDICT_COINS = 10, RAIN_SHARE = 0.1, ANTE_SHARE = 0.05, REVENGE_SHARE = 0.1
 // target: true = pemain yang masih bertahan; 'hand' = masih ikut hand ini (atau hand berikutnya kalau di antara hand);
 // 'two' = dua pemain berbeda yang masih bertahan.
@@ -314,7 +316,7 @@ export class Table {
     }
     this.lobby = false
     ;[this.sb, this.bb] = this.blinds() // blind baru berlaku mulai hand berikutnya, tidak di tengah hand
-    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false, boost: 0, pre: null, coin: 0, spot: -1, insured: 0, blind: false, iced: false, guarded: false, rescued: 0, back: 0, sense: null, peekCard: -1, third: -1, deathPaid: 0 })
+    for (const p of this.players) Object.assign(p, { inHand: el.includes(p), folded: !el.includes(p), allIn: false, acted: false, noRaise: false, show: false, cards: [], bet: 0, total: 0, score: 0, won: 0, last: '', stack0: p.chips, skills: [], saved: 0, fined: 0, target: -1, forced: false, lucky: null, peekAt: -1, countered: false, boost: 0, pre: null, coin: 0, ko: 0, bigHand: 0, spot: -1, insured: 0, blind: false, iced: false, guarded: false, rescued: 0, back: 0, sense: null, peekCard: -1, third: -1, deathPaid: 0 })
     this.death = null
     this.handNo++
     if (this.dice?.no === this.handNo) { this.sb *= this.dice.n; this.bb *= this.dice.n } // Dice Blinds (host)
@@ -496,7 +498,9 @@ export class Table {
     this.phase = 'showdown'; this.turn = -1; this.hands++
     // hitung hand AFK: masih istirahat di akhir hand = AFK; beraksi atau menekan "Main lagi" = mulai dari 0
     for (const p of this.players) if (p.inHand && !p.place) p.afk = p.sitOut ? (p.afk || 0) + 1 : 0
+    const placed = new Set(this.players.filter(p => p.place).map(p => p.uid))
     this.eliminate()
+    this.knockouts(placed)
     if (this.donResult?.no === this.handNo) this.announce(-1, 'don_result', -1, (this.donResult.win ? 'win:' : 'lose:') + this.donResult.pot)
     if (this.hotPaid?.no === this.handNo && this.hotPaid.chips) this.announce(this.hotPaid.i, 'hot_seat_hit', this.hotPaid.i, String(this.hotPaid.chips))
     if (this.house?.no === this.handNo && this.house.result) this.announce(-1, 'house_result', -1, this.house.result)
@@ -879,6 +883,13 @@ export class Table {
       this.handCoins = { ...(this.handCoins || {}), [p.uid]: got + n }
       p.coin = n; add(p, n, 'hand')
     }
+    for (const p of this.players) { // Big Hand Bonus: Flush ke atas, kombinasi harus memakai kartu tangan pemenang
+      if (!(p.won > 0) || !p.score || this.board.length < 5) continue
+      const all = p.cards.concat(this.board), sc = best(all)
+      const n = sc === ROYAL ? ROYAL_COINS : BIG_HAND_COINS[cat(sc)] || 0
+      if (!n || !bestFive(all).some(c => p.cards.includes(c))) continue
+      p.coin = (p.coin || 0) + n; p.bigHand = n; add(p, n, 'big')
+    }
     if (this.predict?.no === this.handNo) {
       const v = this.predict.votes, ids = new Set(winners.map(p => p.uid))
       const right = Object.keys(v).filter(u => ids.has(v[u]))
@@ -886,6 +897,16 @@ export class Table {
       this.predicted = { no: this.handNo, winner: winners.length ? this.players.indexOf(winners[0]) : -1, right: right.length, total: Object.keys(v).length }
       this.predict = null
     }
+  }
+  // Knockout Bonus: pemain yang tersingkir karena kalah di hand ini memberi koin ke pemenang chip terbanyak hand ini.
+  knockouts(before) {
+    const out = this.players.filter(p => p.place && !before.has(p.uid) && !p.afkOut && !p.killed)
+    if (!out.length) return
+    const k = this.players.filter(p => !out.includes(p) && p.won > 0).sort((x, y) => y.won - x.won)[0]
+    if (!k) return
+    const n = KO_COINS * out.length
+    k.coin = (k.coin || 0) + n; k.ko = out.length
+    this.coins = [...(this.coins || []), { uid: k.uid, n, ref: `${this.handNo}:ko` }]
   }
   // King's Ransom: sebelum hand berikutnya dibagi, tiap lawan yang masih bertahan bayar 1 big blind ke pemakainya
   // (tidak sampai membuat lawan tersingkir).
@@ -1176,7 +1197,7 @@ export class Table {
         skills: seen(q) ? q.skills || [] : [], target: q.target >= 0 && (q === me || (seen(q) && !(q.skills || []).some(c => SKILLS[c]?.secret))) ? q.target : -1, saved: q.saved || 0,
         forced: !!q.forced, peek: peek(q), countered: !!q.countered,
         cards: q === me && blindMe && !q.show ? [-1, -1] : q === me || q.show || peek(q) ? q.cards : q.inHand && !q.folded ? [0, 1].map(k => q.spot === k || sensed(q, k) ? q.cards[k] : -1) : [],
-        iced: !!q.iced && this.betting, coin: !this.betting ? q.coin || 0 : 0, rescued: q.rescued || 0, back: q.back || 0, deathPaid: q.deathPaid || 0,
+        iced: !!q.iced && this.betting, coin: !this.betting ? q.coin || 0 : 0, ko: !this.betting ? q.ko || 0 : 0, bigHand: !this.betting ? q.bigHand || 0 : 0, rescued: q.rescued || 0, back: q.back || 0, deathPaid: q.deathPaid || 0,
         spot: q.spot >= 0 && q.inHand && !q.folded ? q.spot : -1, insured: q.insured || 0,
       })),
     }

@@ -1319,9 +1319,28 @@ begin
                   where c.match_id = p_match and c.player_id = mp.player_id and c.card_code = 'double_down' and c.status = 'armed');
   update public.player_cards set status = 'used', used_at = now()
    where match_id = p_match and status = 'armed'; -- semua passive (Double Down, Full Counter) habis dipakai
+  -- koin hasil match; juara dapat tambahan 3 koin per pemain di match itu
   insert into public.coin_ledger (player_id, amount, reason, ref)
-  select player_id, public.match_coins(placement), 'match', p_match::text
+  select player_id, public.match_coins(placement)
+         + case when placement = 1 then 3 * (select count(*) from public.match_players x where x.match_id = p_match) else 0 end,
+         'match', p_match::text
     from public.match_players where match_id = p_match and placement is not null
+  on conflict (player_id, reason, ref) do nothing;
+  -- Daily First Match: match pertama yang selesai tiap hari (WIB) +20 koin
+  insert into public.coin_ledger (player_id, amount, reason, ref)
+  select player_id, 20, 'daily', to_char(now() at time zone 'Asia/Jakarta', 'YYYY-MM-DD')
+    from public.match_players where match_id = p_match and placement is not null
+  on conflict (player_id, reason, ref) do nothing;
+  -- Streak mingguan (Senin-Minggu WIB): 3 match selesai +30, 5 match +60
+  insert into public.coin_ledger (player_id, amount, reason, ref)
+  select w.player_id, t.coins, 'streak', w.wk || ':' || t.need
+    from (select mp.player_id, to_char(now() at time zone 'Asia/Jakarta', 'IYYY-"W"IW') as wk,
+                 (select count(*) from public.match_players y join public.matches m on m.id = y.match_id
+                   where y.player_id = mp.player_id and y.placement is not null
+                     and (m.id = p_match -- match ini (statusnya baru diubah jadi finished sesudah fungsi ini)
+                          or (m.status = 'finished' and date_trunc('week', m.finished_at at time zone 'Asia/Jakarta') = date_trunc('week', now() at time zone 'Asia/Jakarta')))) as n
+            from public.match_players mp where mp.match_id = p_match and mp.placement is not null) w
+    join (values (3, 30), (5, 60)) t(need, coins) on w.n >= t.need
   on conflict (player_id, reason, ref) do nothing;
 end;
 $$;
@@ -1826,7 +1845,7 @@ grant select on public.gifts to authenticated;
 -- koin dari gift dicatat di buku besar dengan reason 'gift'
 alter table public.coin_ledger drop constraint if exists coin_ledger_reason_check;
 alter table public.coin_ledger add constraint coin_ledger_reason_check
-  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift', 'table', 'gacha'));
+  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift', 'table', 'gacha', 'daily', 'streak'));
 
 -- p_players null = semua player. Mengembalikan jumlah player yang dikirimi.
 create or replace function public.send_gift(p_players uuid[], p_coins int, p_card text, p_qty int, p_message text)

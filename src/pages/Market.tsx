@@ -116,8 +116,9 @@ export default function Market() {
       )}
 
       <p className="text-center text-xs text-slate-500">
-        Koin didapat dari ikut match (+15; juara 40, runner-up 30, peringkat 3 23), +2 tiap menang hand di meja online (maks 30 per
-        match), gaji bulanan dari leaderboard, dan pencapaian. Koin tidak mengurangi poin leaderboard.
+        Koin didapat dari ikut match (+15; juara 40 + 3 per pemain, runner-up 30, peringkat 3 23), match pertama tiap hari +20, streak
+        mingguan (3 match +30, 5 match +60), dan di meja online: menang hand +2 (maks 50/match), KO +5, Big Hand +3 s.d. +50. Juga gaji
+        bulanan dan pencapaian. Koin tidak mengurangi poin leaderboard.
       </p>
 
       {buying && (

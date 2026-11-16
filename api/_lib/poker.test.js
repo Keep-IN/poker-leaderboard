@@ -834,7 +834,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   assert.equal(t.view(t.players[1]).predict.mine, 0)
   ok(t, 3, 'call'); drain(t)
   assert.equal(t.players[3].place, 4) // 72o... P3 (5d4c) kalah dari AA
-  assert.deepEqual(t.coins.filter(c => !c.ref.endsWith(':hand')).map(c => c.uid + ':' + c.n).sort(), ['u0:20', 'u1:10'])
+  assert.deepEqual(t.coins.filter(c => /:(drop|predict)$/.test(c.ref)).map(c => c.uid + ':' + c.n).sort(), ['u0:20', 'u1:10'])
   assert.equal(t.ann.code, 'prediction_result'); assert.equal(t.ann.extra, '1/2')
   nxt(t)
   const r0 = stacks(t).reduce((a, b) => a + b); t.useHost('chip_rain'); assert(stacks(t).reduce((a, b) => a + b) > r0)
@@ -857,10 +857,26 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   drain(t)
   const w = t.players.filter(p => p.won > 0)
   assert.equal(t.coins.filter(c => c.ref.endsWith(':hand')).length, w.length); assert(w.every(p => p.coin === 2))
-  t.handCoins[w[0].uid] = 29; t.coins = []
+  t.handCoins[w[0].uid] = 49; t.coins = []
   nxt(t); while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check'); drain(t)
   for (const c of t.coins.filter(c => c.uid === w[0].uid && c.ref.endsWith(':hand'))) assert.equal(c.n, 1) // sisa jatah 1
-  assert(Object.values(t.handCoins).every(n => n <= 30))
+  assert(Object.values(t.handCoins).every(n => n <= 50))
+}
+
+{ // Knockout Bonus (+5 per pemain disingkirkan) & Big Hand Bonus (Full House +5, kartu tangan ikut)
+  const t = mk([1000, 300, 1000]); rig(t, 'As Ah 7c 2d Ks Kh Ad 7h 7s Jd 4d'); begin(t) // P0 AA + board A 7 7 -> Full House
+  ok(t, 0, 'raise', 300); ok(t, 1, 'call'); ok(t, 2, 'fold')
+  drain(t)
+  assert.equal(t.players[1].place, 3)
+  const mine = t.coins.filter(c => c.uid === 'u0').map(c => c.ref.split(':')[1] + c.n).sort()
+  assert.deepEqual(mine, ['big5', 'hand2', 'ko5'])
+  assert.equal(t.view(null).players[0].coin, 12); assert.equal(t.view(null).players[0].ko, 1)
+}
+{ // Big Hand tidak dihitung kalau kombinasinya murni dari kartu meja
+  const t = mk([1000, 1000]); rig(t, '2c 3d 4h 9s Ah Kh Qh Jh Th'); begin(t)
+  while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
+  drain(t)
+  assert(!(t.coins || []).some(c => c.ref.endsWith(':big')))
 }
 
 console.log('semua tes lulus')

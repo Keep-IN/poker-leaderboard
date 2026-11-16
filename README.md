@@ -61,8 +61,13 @@ Detailnya:
 ### 🪙 Koin
 - **Koin** adalah mata uang terpisah dari poin. Koin hanya untuk membeli skill card dan **tidak mengurangi poin leaderboard**.
 - Cara dapat koin:
-  - **Ikut match** (offline/online): +15, juara +25 (total 40), runner-up +15 (total 30), peringkat 3 +8 (total 23). Otomatis masuk saat match selesai.
-  - **Menang hand di meja online**: +2 koin tiap menang hand yang sampai flop (menang karena semua lawan fold sebelum flop tidak dihitung), maksimal 30 koin per match. Langsung masuk sebagai "Hadiah dari meja".
+  - **Ikut match** (offline/online): +15, juara +25 (total 40) **ditambah 3 koin per pemain di match itu**, runner-up +15 (total 30), peringkat 3 +8 (total 23). Otomatis masuk saat match selesai.
+  - **Daily First Match**: match pertama yang selesai tiap hari (WIB) +20 koin.
+  - **Streak mingguan** (Senin–Minggu WIB): 3 match selesai +30, 5 match +60.
+  - **Di meja online** (langsung masuk sebagai "Hadiah dari meja", terlihat 🪙 di cap "Menang"):
+    - **Menang hand**: +2 tiap menang hand yang sampai flop (menang karena semua lawan fold sebelum flop tidak dihitung), maksimal 50 koin per match.
+    - **Knockout**: +5 tiap pemain yang kamu singkirkan (pemenang chip terbanyak di hand saat dia habis).
+    - **Big Hand**: menang showdown dengan Flush +3, Full House +5, Four of a Kind +10, Straight Flush +25, Royal Flush +50 (kartu tanganmu harus ikut membentuk kombinasi).
   - **Hadiah meja** dari skill host Coin Drop dan Prediction.
   - **Gaji bulanan** dari leaderboard bulan lalu: #1 100, #2 70, #3 50, #4–10 30, sisanya yang main minimal 1 match 20.
   - **Bonus peluncuran** sekali berdasarkan peringkat all time: 150 / 120 / 100 / 75 (#4–10) / 50.

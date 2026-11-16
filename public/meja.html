@@ -1176,7 +1176,7 @@ function render() {
   set($('pot'), S.pot ? chips(S.pot - sumBets) + `<span class="lbl">Pot</span><span class="num">${S.pot}</span>` : '');
   set($('win'), phase === 'over'
     ? `<div class="over"><b>Hasil turnamen</b><ol>${ps.slice().sort((a, b) => a.place - b.place).map(p => `<li>${esc(p.name)}</li>`).join('')}</ol></div>`
-    : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}${p.coin ? ` · 🪙+${p.coin}` : ''}</em></span>`).join(''));
+    : ps.filter(p => p.won).map(p => `<span class="stamp">Menang · ${esc(p.name)}<br><em>+${p.won}${p.hand ? ' · ' + p.hand : ''}${p.coin ? ` · 🪙+${p.coin}` : ''}${p.ko ? ` · 💥 KO${p.ko > 1 ? '×' + p.ko : ''}` : ''}${p.bigHand ? ' · 🃏 Big Hand' : ''}</em></span>`).join(''));
 
   drawBubbles(); syncChatBtn(); drawReveal(); drawAnn(); drawWinner();
   const tagBig = S.big !== undefined && betting, tagDuel = S.duelFine !== undefined && betting && S.players[S.duelFine];
