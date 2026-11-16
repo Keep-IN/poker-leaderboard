@@ -1845,7 +1845,7 @@ grant select on public.gifts to authenticated;
 -- koin dari gift dicatat di buku besar dengan reason 'gift'
 alter table public.coin_ledger drop constraint if exists coin_ledger_reason_check;
 alter table public.coin_ledger add constraint coin_ledger_reason_check
-  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift', 'table', 'gacha', 'daily', 'streak'));
+  check (reason in ('launch', 'match', 'salary', 'milestone', 'purchase', 'gift', 'table', 'gacha', 'daily', 'streak', 'quest'));
 
 -- p_players null = semua player. Mengembalikan jumlah player yang dikirimi.
 create or replace function public.send_gift(p_players uuid[], p_coins int, p_card text, p_qty int, p_message text)
@@ -2154,6 +2154,116 @@ begin
 end;
 $$;
 
+-- ---------- Quest mingguan otomatis ------------------------------------
+-- 3 quest per minggu (Senin-Minggu WIB), sama untuk semua player, dipilih dari quest_defs() berdasarkan minggunya.
+-- Progres dari meja online dicatat di quest_events (ref unik per hand), progres match dihitung dari match_players.
+create table if not exists public.quest_events (
+  id         uuid primary key default gen_random_uuid(),
+  player_id  uuid not null references public.profiles (id) on delete cascade,
+  metric     text not null,
+  n          int  not null default 1,
+  ref        text not null,
+  created_at timestamptz not null default now(),
+  unique (player_id, ref)
+);
+create index if not exists quest_events_player_idx on public.quest_events (player_id, created_at);
+alter table public.quest_events enable row level security;
+
+create or replace function public.quest_week_start()
+returns timestamptz
+language sql
+stable
+as $$
+  select date_trunc('week', now() at time zone 'Asia/Jakarta') at time zone 'Asia/Jakarta';
+$$;
+
+create or replace function public.quest_defs()
+returns table (code text, title text, metric text, target int, reward int)
+language sql
+immutable
+as $$
+  values
+    ('win_hands', 'Menang 15 hand di meja online', 'hand', 15, 25),
+    ('showdowns', 'Menang 8 showdown', 'showdown', 8, 25),
+    ('knockouts', 'Singkirkan 3 pemain (KO)', 'ko', 3, 30),
+    ('big_hands', 'Menang dengan Flush atau lebih 2 kali', 'big', 2, 30),
+    ('allin_wins', 'Menang all-in 3 kali', 'allin', 3, 30),
+    ('use_cards', 'Pakai 3 skill card di meja', 'card', 3, 20),
+    ('play_matches', 'Selesaikan 4 match', 'match', 4, 25),
+    ('play_online', 'Main 2 match online sampai selesai', 'online', 2, 20),
+    ('top_three', 'Masuk 3 besar 2 kali', 'top3', 2, 40),
+    ('champion', 'Juara 1 match', 'champ', 1, 40);
+$$;
+
+-- Daftar quest minggu ini + progres & status klaim player yang login.
+create or replace function public.get_my_quests()
+returns table (code text, title text, target int, reward int, progress int, claimed boolean, week text, ends_at timestamptz)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with w as (select public.quest_week_start() as st, to_char(now() at time zone 'Asia/Jakarta', 'IYYY-"W"IW') as wk),
+  q as (select d.* from public.quest_defs() d, w order by md5(w.wk || d.code) limit 3),
+  ev as (select e.metric, sum(e.n)::int as n from public.quest_events e, w
+          where e.player_id = auth.uid() and e.created_at >= w.st group by e.metric),
+  mt as (select count(*)::int as played,
+                count(*) filter (where m.mode = 'online')::int as online,
+                count(*) filter (where mp.placement <= 3)::int as top3,
+                count(*) filter (where mp.placement = 1)::int as champ
+           from public.match_players mp join public.matches m on m.id = mp.match_id, w
+          where mp.player_id = auth.uid() and mp.placement is not null and m.status = 'finished' and m.finished_at >= w.st)
+  select q.code, q.title, q.target, q.reward,
+         least(q.target, coalesce(case q.metric when 'match' then mt.played when 'online' then mt.online when 'top3' then mt.top3
+                                                when 'champ' then mt.champ else (select ev.n from ev where ev.metric = q.metric) end, 0))::int,
+         exists (select 1 from public.coin_ledger c, w where c.player_id = auth.uid() and c.reason = 'quest' and c.ref = w.wk || ':' || q.code),
+         w.wk, w.st + interval '7 days'
+    from q, mt, w;
+$$;
+
+-- Klaim hadiah quest yang sudah selesai (sekali per quest per minggu).
+create or replace function public.claim_quest(p_code text)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r record;
+begin
+  if public.current_role_name() is distinct from 'player' then
+    raise exception 'Hanya player yang bisa klaim quest';
+  end if;
+  select * into r from public.get_my_quests() g where g.code = p_code;
+  if not found then
+    raise exception 'Quest ini bukan quest minggu ini';
+  end if;
+  if r.claimed then
+    raise exception 'Hadiah quest ini sudah diklaim';
+  end if;
+  if r.progress < r.target then
+    raise exception 'Quest belum selesai (% / %)', r.progress, r.target;
+  end if;
+  insert into public.coin_ledger (player_id, amount, reason, ref) values (auth.uid(), r.reward, 'quest', r.week || ':' || r.code)
+  on conflict (player_id, reason, ref) do nothing;
+  return r.reward;
+end;
+$$;
+
+-- Dipakai server meja: catat event quest pemain match ini (aman diulang, ref unik).
+create or replace function public.meja_quest_add(p_match uuid, p_player uuid, p_metric text, p_n int, p_ref text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into public.quest_events (player_id, metric, n, ref)
+  select p_player, p_metric, least(greatest(p_n, 1), 10), p_match::text || ':' || p_ref
+   where p_metric in ('hand', 'showdown', 'ko', 'big', 'allin', 'card')
+     and exists (select 1 from public.match_players mp where mp.match_id = p_match and mp.player_id = p_player)
+  on conflict (player_id, ref) do nothing;
+$$;
+
 do $$
 declare
   fn text;
@@ -2204,13 +2314,19 @@ begin
     'public.claim_gift(uuid)',
     'public.gacha_pull(int)',
     'public.set_gacha(boolean, int, int)',
-    'public.set_card_gacha(text, text, boolean)'
+    'public.set_card_gacha(text, text, boolean)',
+    'public.get_my_quests()',
+    'public.claim_quest(text)'
   ] loop
     execute format('revoke all on function %s from public, anon', fn);
     execute format('grant execute on function %s to authenticated', fn);
   end loop;
 end;
 $$;
+
+-- server meja: event quest
+revoke all on function public.meja_quest_add(uuid, uuid, text, int, text) from public, anon, authenticated;
+grant execute on function public.meja_quest_add(uuid, uuid, text, int, text) to service_role;
 
 -- ---------- Realtime ---------------------------------------------------
 

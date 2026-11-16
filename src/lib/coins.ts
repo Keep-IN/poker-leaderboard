@@ -11,7 +11,7 @@ export interface Claimable {
 export interface LedgerRow {
   id: string
   amount: number
-  reason: 'launch' | 'match' | 'salary' | 'milestone' | 'purchase' | 'gift' | 'table' | 'gacha' | 'daily' | 'streak'
+  reason: 'launch' | 'match' | 'salary' | 'milestone' | 'purchase' | 'gift' | 'table' | 'gacha' | 'daily' | 'streak' | 'quest'
   ref: string
   created_at: string
 }
@@ -27,6 +27,7 @@ export const LEDGER_LABELS: Record<LedgerRow['reason'], string> = {
   gacha: 'Gacha skill card',
   daily: 'Bonus match pertama hari ini',
   streak: 'Streak mingguan',
+  quest: 'Quest mingguan',
 }
 
 /** Coin balance and coins ready to claim for the signed-in player. */
@@ -43,6 +44,8 @@ export function useCoins(enabled = true) {
 
   useEffect(() => {
     load()
+    window.addEventListener('coins:changed', load) // saldo berubah di tempat lain (mis. klaim quest)
+    return () => window.removeEventListener('coins:changed', load)
   }, [load])
 
   async function claim() {

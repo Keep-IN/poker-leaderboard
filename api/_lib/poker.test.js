@@ -871,6 +871,8 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   const mine = t.coins.filter(c => c.uid === 'u0').map(c => c.ref.split(':')[1] + c.n).sort()
   assert.deepEqual(mine, ['big5', 'hand2', 'ko5'])
   assert.equal(t.view(null).players[0].coin, 12); assert.equal(t.view(null).players[0].ko, 1)
+  // event quest: menang hand, showdown, Big Hand, KO
+  assert.deepEqual(t.quests.filter(q => q.uid === 'u0').map(q => q.m + q.n).sort(), ['big1', 'hand1', 'ko1', 'showdown1'])
 }
 { // Big Hand tidak dihitung kalau kombinasinya murni dari kartu meja
   const t = mk([1000, 1000]); rig(t, '2c 3d 4h 9s Ah Kh Qh Jh Th'); begin(t)

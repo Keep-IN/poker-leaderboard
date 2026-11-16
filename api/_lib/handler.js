@@ -21,6 +21,7 @@
 //   counters(match) -> [uid] pemilik Full Counter yang terpasang (opsional)
 //   grantCard(match, uid, code) -> skill card gratis ke inventory pemain (Mystery Box, opsional)
 //   grantCoins(match, uid, amount, ref) -> koin hadiah meja (Coin Drop / Prediction, opsional)
+//   questAdd(match, uid, metric, n, ref) -> event quest mingguan (opsional)
 // }
 import { randomUUID } from 'node:crypto'
 import { COUNTERED, Table } from './poker.js'
@@ -94,6 +95,12 @@ async function settleGifts(db, match, r) {
     for (const c of r.t.coins) await db.grantCoins(match, c.uid, c.n, c.ref).catch(() => {})
     const done = r.t.coins.map(c => c.uid + c.ref)
     await mutate(db, match, t => { t.coins = (t.coins || []).filter(c => !done.includes(c.uid + c.ref)) }).catch(() => {})
+  }
+  // Quest mingguan: event dari meja (aman diulang: ref unik per pemain)
+  if (r?.t?.quests?.length && db.questAdd) {
+    for (const q of r.t.quests) await db.questAdd(match, q.uid, q.m, q.n, q.ref).catch(() => {})
+    const done = r.t.quests.map(q => q.uid + q.ref)
+    await mutate(db, match, t => { t.quests = (t.quests || []).filter(q => !done.includes(q.uid + q.ref)) }).catch(() => {})
   }
 }
 
@@ -226,6 +233,7 @@ async function playCard(db, match, b) {
   if (r.error || r.status || r.out?.error) await db.refundCard(match, p0.uid, cardId).catch(() => {})
   if (r.error) throw r.error
   if (r.status) return ended(r.status)
+  if (r.out?.ok && db.questAdd) await db.questAdd(match, p0.uid, 'card', 1, 'card:' + cardId).catch(() => {}) // quest: pakai skill card
   const p = r.t?.find(token)
   return p ? withPodium(db, r.t, { ...r.out, v: r.ver, s: r.t.view(p) }) : r.out
 }

@@ -5,6 +5,7 @@ import { DealerBounties, PlayerBounties } from '../components/BountySections'
 import GiftInbox from '../components/GiftInbox'
 import { HostSkillList } from '../components/HostSkills'
 import { DealerMissions, PlayerMissions } from '../components/MissionSections'
+import { WeeklyQuests } from '../components/WeeklyQuests'
 import { ACTIVE_DUEL_STATUSES, DUEL_SELECT, type Duel, type DuelStatus } from '../lib/duels'
 import { Avatar, Card, Chevron, EmptyState, PageLoader, SectionTitle, StatusBadge, cx } from '../components/ui'
 import { useAuth } from '../lib/auth'
@@ -50,6 +51,7 @@ function PlayerHome({ profile }: { profile: Profile }) {
     <div className="space-y-5">
       <Greeting profile={profile} subtitle="Statistik kamu" />
       <CoinStrip me={profile.id} />
+      <WeeklyQuests me={profile.id} />
       <PlayerStats playerId={profile.id} isMe>
         <PlayerDuelSections me={profile.id} />
         <PlayerMissions me={profile.id} />

@@ -31,6 +31,7 @@ function fakeDb() {
     async refundCard(_, player, card) { const c = this.cards[card]; if (c && c.owner === player) c.used = false },
     granted: [], async grantCard(_, player, code) { this.granted.push(player + ':' + code) },
     coinsGiven: [], async grantCoins(_, player, n, ref) { this.coinsGiven.push(player + ':' + n + ':' + ref) },
+    questLog: [], async questAdd(_, player, m, n, ref) { this.questLog.push(player + ':' + m) },
     async create(_, state, due) { await yieldTurn(); if (row) return null; row = { state, ver: 1, due_at: due }; return 1 },
     async save(_, ver, state, due, out, winner) {
       await yieldTurn()
@@ -113,6 +114,7 @@ assert((await post({ token: b.token, type: 'card', card: CARD, code: 'defend_me'
 assert((await post({ token: a.token, type: 'card', card: CARD, code: 'reveal' })).error)
 const used = await post({ token: a.token, type: 'card', card: CARD, code: 'defend_me' })
 assert(used.ok && used.s.players[used.s.me].skills.includes('defend_me'), JSON.stringify(used.error))
+assert(db.questLog.some(x => x.endsWith(':card')), 'pakai kartu tercatat untuk quest')
 assert((await post({ token: a.token, type: 'card', card: CARD, code: 'defend_me' })).error)
 // kartu yang terpakai di database tapi gagal di meja dikembalikan (di sini: kode yang dikirim tidak cocok, target kosong)
 const RV = '99999999-2222-3333-4444-666666666666'

@@ -64,6 +64,7 @@ Detailnya:
   - **Ikut match** (offline/online): +15, juara +25 (total 40) **ditambah 3 koin per pemain di match itu**, runner-up +15 (total 30), peringkat 3 +8 (total 23). Otomatis masuk saat match selesai.
   - **Daily First Match**: match pertama yang selesai tiap hari (WIB) +20 koin.
   - **Streak mingguan** (Senin–Minggu WIB): 3 match selesai +30, 5 match +60.
+  - **📋 Quest mingguan** (Beranda player): 3 quest per minggu, sama untuk semua player, ganti otomatis tiap Senin (WIB). Dipilih dari: Menang 15 hand (+25), Menang 8 showdown (+25), Singkirkan 3 pemain (+30), Menang dengan Flush atau lebih 2× (+30), Menang all-in 3× (+30), Pakai 3 skill card (+20), Selesaikan 4 match (+25), Main 2 match online (+20), Masuk 3 besar 2× (+40), Juara 1 match (+40). Progres terhitung otomatis dari meja online dan hasil match; hadiah diklaim dengan tombol **Klaim** (sekali per quest per minggu).
   - **Di meja online** (langsung masuk sebagai "Hadiah dari meja", terlihat 🪙 di cap "Menang"):
     - **Menang hand**: +2 tiap menang hand yang sampai flop (menang karena semua lawan fold sebelum flop tidak dihitung), maksimal 50 koin per match.
     - **Knockout**: +5 tiap pemain yang kamu singkirkan (pemenang chip terbanyak di hand saat dia habis).

@@ -35,6 +35,7 @@ export function supabaseDb(url, secret) {
     },
     counters: match => rpc('meja_counters', { p_match: match }),
     passives: match => rpc('meja_passives', { p_match: match }),
+    questAdd: (match, player, metric, n, ref) => rpc('meja_quest_add', { p_match: match, p_player: player, p_metric: metric, p_n: n, p_ref: ref }),
     grantCoins: (match, player, amount, ref) => rpc('meja_grant_coins', { p_match: match, p_player: player, p_amount: amount, p_ref: ref }),
     grantCard: (match, player, code) => rpc('meja_grant_card', { p_match: match, p_player: player, p_code: code }),
     create: (match, state, dueAt) => rpc('meja_create', { p_match: match, p_state: state, p_due: dueAt }),

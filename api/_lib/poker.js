@@ -890,6 +890,15 @@ export class Table {
       if (!n || !bestFive(all).some(c => p.cards.includes(c))) continue
       p.coin = (p.coin || 0) + n; p.bigHand = n; add(p, n, 'big')
     }
+    // Quest mingguan: event per pemain (dicatat server ke quest_events; ref unik per hand supaya tidak dobel)
+    const showdown = this.board.length >= 5 && this.players.filter(p => p.inHand && !p.folded).length > 1
+    for (const p of this.players) {
+      if (!(p.won > 0) || this.board.length < 3) continue
+      this.quest(p, 'hand')
+      if (showdown && p.score) this.quest(p, 'showdown')
+      if (p.allIn && p.score) this.quest(p, 'allin')
+      if (p.bigHand) this.quest(p, 'big')
+    }
     if (this.predict?.no === this.handNo) {
       const v = this.predict.votes, ids = new Set(winners.map(p => p.uid))
       const right = Object.keys(v).filter(u => ids.has(v[u]))
@@ -907,7 +916,9 @@ export class Table {
     const n = KO_COINS * out.length
     k.coin = (k.coin || 0) + n; k.ko = out.length
     this.coins = [...(this.coins || []), { uid: k.uid, n, ref: `${this.handNo}:ko` }]
+    this.quest(k, 'ko', out.length)
   }
+  quest(p, m, n = 1) { this.quests = [...(this.quests || []), { uid: p.uid, m, n, ref: `${this.handNo}:${m}` }] }
   // King's Ransom: sebelum hand berikutnya dibagi, tiap lawan yang masih bertahan bayar 1 big blind ke pemakainya
   // (tidak sampai membuat lawan tersingkir).
   applyRansom() {
