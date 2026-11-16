@@ -142,6 +142,8 @@ export const DEATH_SHARE = 0.65, TAX_COLLECT = 0.1, STACK_BONUS = 0.2, CHARM_BON
 /** Mode match online: normal (skill card maks 3/match, skill bandar manual), casual (tanpa skill card & skill bandar),
  *  chaos (skill card tanpa batas jatah, skill bandar keluar otomatis acak tiap hand). */
 export const STYLES = ['normal', 'casual', 'chaos']
+/** Mode Chaos: jatah fold tiap pemain sepanjang match (fold paksa dari kartu/duel tidak dihitung). */
+export const CHAOS_FOLDS = 3
 export const HOST_SKILLS = {
   double_payout: { name: 'Double Payout', icon: '💰', now: true },
   jackpot: { name: 'Jackpot Hand', icon: '🎰', now: true },
@@ -363,8 +365,11 @@ export class Table {
 
   ctl(i) {
     const p = this.players[i], call = this.bet - p.bet, max = p.bet + p.chips
-    return { call: Math.min(call, p.chips), bet: this.bet, minTo: Math.min(this.bet + this.minRaise, max), maxTo: max, raise: !p.noRaise && !this.frozen(i) && p.chips > call }
+    return { call: Math.min(call, p.chips), bet: this.bet, minTo: Math.min(this.bet + this.minRaise, max), maxTo: max, raise: !p.noRaise && !this.frozen(i) && p.chips > call,
+      ...(this.style === 'chaos' ? { folds: this.foldsLeft(i) } : {}) }
   }
+  // sisa jatah fold (Mode Chaos); mode lain tanpa batas
+  foldsLeft(i) { return this.style === 'chaos' ? Math.max(0, CHAOS_FOLDS - (this.players[i].folds || 0)) : Infinity }
   // Pemain yang tidak aktif cuma diberi waktu singkat supaya turnamen tidak tertahan.
   // Speed Round (host): waktu giliran lebih singkat; Shot Clock Duel: dua pemain itu cuma SHOT_MS
   turnMs(i = this.turn) {
@@ -384,6 +389,7 @@ export class Table {
     if (!['', 'fold', 'check', 'call'].includes(v)) return 'Pilihan tidak dikenal'
     if (v && (!this.betting || !p.inHand || p.folded || p.allIn)) return 'Hanya selama kamu masih ikut hand'
     if (v === 'check' && this.bet > p.bet) return 'Sudah ada taruhan, Auto Check tidak bisa dipakai'
+    if (v === 'fold' && !this.foldsLeft(i)) return 'Mode Chaos: jatah fold kamu sudah habis'
     p.pre = v || null
     if (v && this.turn === i) this.autoAct(i) // dipilih tepat saat gilirannya: langsung jalan
   }
@@ -391,14 +397,15 @@ export class Table {
     const p = this.players[i], toCall = this.bet - p.bet, pre = p.pre
     if (pre === 'call') return this.act(i, toCall ? 'call' : 'check')
     if (!toCall) return this.act(i, 'check')
-    if (pre === 'fold' && !this.bigFine(i)) return this.act(i, 'fold')
+    if (pre === 'fold' && !this.bigFine(i) && this.foldsLeft(i)) return this.act(i, 'fold')
     p.pre = null // auto check bertemu taruhan / fold kena denda: pemain memutuskan sendiri
   }
   timeout() {
     const p = this.players[this.turn]
     if (!p) return
     p.sitOut = true // pemain idle: auto check/fold sampai dia beraksi lagi atau menekan "Main lagi"
-    this.act(this.turn, p.bet === this.bet ? 'check' : 'fold')
+    // Mode Chaos dengan jatah fold habis: waktu habis = call (tidak bisa fold lagi)
+    this.act(this.turn, p.bet === this.bet ? 'check' : this.foldsLeft(this.turn) ? 'fold' : 'call')
   }
 
   // Mengembalikan string error, atau undefined kalau sukses.
@@ -406,6 +413,8 @@ export class Table {
     if (i !== this.turn) return 'Bukan giliranmu'
     const p = this.players[i], toCall = this.bet - p.bet
     if (type === 'fold') {
+      if (!this.foldsLeft(i)) return `Mode Chaos: jatah fold kamu (${CHAOS_FOLDS}×) sudah habis, harus call atau all-in`
+      if (this.style === 'chaos') p.folds = (p.folds || 0) + 1
       p.folded = true; p.last = 'fold'
       const pen = this.bigFine(i)
       if (pen) { p.chips -= pen; p.total += pen; p.fined = pen } // Go Big or Go Home!: denda fold masuk pot
@@ -1244,6 +1253,7 @@ export class Table {
     if (me && me.peekCard >= 0 && this.betting && this.board.length === me.peekLen) v.nextCard = me.peekCard // Board Peek
     if (me && me.third >= 0) v.thirdCard = me.third // Third Card: kartu ke-3 yang dibuang
     if (me?.sense && this.betting) v.sense = me.sense // Card Sense
+    if (me && this.style === 'chaos') v.foldsLeft = this.foldsLeft(i) // Mode Chaos: sisa jatah fold
     if (me && blindMe) v.blindfold = true
     if (this.death?.no === this.handNo && (this.betting || this.phase === 'showdown')) v.death = this.death.card
     if (this.ransom) v.ransomNext = true

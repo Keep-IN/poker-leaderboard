@@ -400,6 +400,7 @@ body.final #felt{animation:ftGlow 2.2s ease-in-out infinite}
 .bigwarn{margin:0 0 6px;padding:5px 8px;border:1.5px solid #ff7a1a;background:#2a0500;color:#ffd2b8;font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-align:center}
 .btn.fine{border-color:#ff2d55;color:#ff8da0;box-shadow:0 0 12px #ff2d5566}
 .btn.fine small{display:block;font-size:10px;letter-spacing:.04em;color:#ff6b84}
+.btn.folds small{display:block;font-size:10px;letter-spacing:.04em;color:#ff9ce6}
 .rrfly{position:fixed;z-index:30;pointer-events:none;margin:0}
 @keyframes curseGlow{50%{box-shadow:0 0 0 3px #12020a,0 0 44px #ff2d55dd,0 10px 30px #000c}}
 /* Revive Card: angelic, putih suci bersinar */
@@ -995,13 +996,16 @@ function doneR(el, go) {
 function preButtons(P) {
   const owe = Math.max(...S.players.map(q => q.bet)) - P.bet, pre = S.pre || '';
   const b = (v, label, sub, dis) => `<button class="btn ghost pre${pre === v ? ' on' : ''}" type="button" aria-pressed="${pre === v}" ${dis ? 'disabled' : ''} onclick="api('pre', { pre: '${pre === v ? '' : v}' })">${label}<small>${sub}</small></button>`;
-  return `<div class="row prerow">${b('fold', 'Auto Fold', owe ? 'fold saat giliran' : 'check kalau gratis')}${b('check', 'Auto Check', owe ? 'ada taruhan' : 'mati kalau ada raise', owe && pre !== 'check')}${b('call', 'Any Call', owe ? 'call ' + Math.min(owe, P.chips) + '+' : 'call berapa pun')}</div>`;
+  return `<div class="row prerow">${S.foldsLeft === 0 ? '' : b('fold', 'Auto Fold', owe ? 'fold saat giliran' : 'check kalau gratis')}${b('check', 'Auto Check', owe ? 'ada taruhan' : 'mati kalau ada raise', owe && pre !== 'check')}${b('call', 'Any Call', owe ? 'call ' + Math.min(owe, P.chips) + '+' : 'call berapa pun')}</div>`;
 }
 function controls(c, P) {
   const key = S.phase + c.bet + c.minTo + S.board.length;
   if (key !== rkey) { rkey = key; raiseTo = c.minTo; }
   const f = x => Math.min(c.maxTo, Math.max(c.minTo, c.bet + Math.round((S.pot + c.call) * x))); // raise-to untuk x * pot
-  const fold = S.fine ? `<button class="btn ghost fine" onclick="sure(this, () => act('fold'))">Fold<small>−${S.fine} chip ke pot</small></button>` : `<button class="btn ghost" onclick="act('fold')">Fold</button>`;
+  const fl = c.folds; // Mode Chaos: sisa jatah fold (undefined = tanpa batas)
+  const fold = fl === 0 ? `<button class="btn ghost folds" disabled>Fold<small>🌀 jatah fold habis</small></button>`
+    : S.fine ? `<button class="btn ghost fine" onclick="sure(this, () => act('fold'))">Fold<small>−${S.fine} chip ke pot${fl !== undefined ? ` · sisa ${fl}×` : ''}</small></button>`
+    : fl !== undefined ? `<button class="btn ghost folds" onclick="act('fold')">Fold<small>🌀 sisa ${fl}× fold</small></button>` : `<button class="btn ghost" onclick="act('fold')">Fold</button>`;
   const duelHit = S.duelFine === S.me && S.duel;
   let h = (S.fine ? duelHit ? `<div class="bigwarn duel">⚔️ Kamu diajak duel ${esc(S.players[S.duel[0]].name)} · fold = <b>${S.fine}</b> chip kamu masuk pot</div>`
     : `<div class="bigwarn">🔥 Go Big or Go Home! aktif · fold = <b>${S.fine}</b> chip kamu masuk pot</div>` : '') + `<div class="row">${fold}
@@ -1496,7 +1500,7 @@ function canPlayCard() {
   return P && ['preflop', 'flop', 'turn', 'river'].includes(S.phase) && P.inHand && !P.folded && !(P.skills || []).length;
 }
 // Mode permainan (selain Normal) ditampilkan di lobi
-const STYLES = { casual: '☕ Mode Casual: poker murni, tanpa skill card dan tanpa skill bandar', chaos: '🌀 Mode Chaos: skill card tanpa batas jatah · 1 skill bandar acak keluar otomatis tiap hand' };
+const STYLES = { casual: '☕ Mode Casual: poker murni, tanpa skill card dan tanpa skill bandar', chaos: '🌀 Mode Chaos: skill card tanpa batas jatah · 1 skill bandar acak keluar otomatis tiap hand · fold cuma 3× sepanjang match' };
 async function openBag() {
   const el = document.createElement('div'); el.id = 'bagSheet';
   el.innerHTML = '<div class="in"><h3>🎒 Skill card</h3><p class="note">Maks 1 kartu per hand · ' + (S && S.style === 'chaos' ? '🌀 Mode Chaos: tanpa batas per match' : '3 per match') + '</p><div id="bagList">Memuat…</div><button class="btn ghost close" type="button">Tutup</button></div>';

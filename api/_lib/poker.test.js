@@ -563,7 +563,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
         if (r > .96 && r <= .97) { t.setPre(R(n), ['fold', 'check', 'call', ''][R(4)]); t.setPredict(R(n), R(n)); t.setVote(R(n), R(n)); continue } // pre-action (bisa langsung jalan)
         if (r > .97) { const hk = Object.keys(HOST_SKILLS), hc = hk[R(hk.length)]; if (t.useHost(hc, R(n), R(n)) === undefined) continue } // skill host
         if (r < .05) run(t, TURN_MS)
-        else if (r < .2) ok(t, i, 'fold')
+        else if (r < .2 && c.folds !== 0) ok(t, i, 'fold')
         else if (r < .6 || !c.raise) ok(t, i, c.call ? 'call' : 'check')
         else ok(t, i, 'raise', c.minTo + R(c.maxTo - c.minTo + 1))
       } else if (t.due) run(t, Math.max(0, t.due.at - t.now))
@@ -900,6 +900,26 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
     drain(x); mad = !!x.madness; nxt(x)
   }
   assert(fired >= 1)
+  // jatah fold 3× per match: fold ke-4 ditolak, waktu habis = call, Auto Fold tidak bisa dipasang
+  const f = mk([5000, 5000, 5000], { style: 'chaos' }); f.chaosRoll = () => {} // skill acak dimatikan: uji jatah fold saja
+  begin(f)
+  const P0 = f.players[0], me = () => f.players.indexOf(P0) // Seat Shuffle bisa menukar kursi: ikuti pemainnya
+  let folds = 0
+  for (let g = 0; g < 400 && P0.folds !== 3; g++) {
+    if (f.turn === me() && f.ctl(me()).call) { assert.equal(f.ctl(me()).folds, 3 - folds); ok(f, me(), 'fold'); folds++ }
+    else if (f.turn >= 0) ok(f, f.turn, f.ctl(f.turn).call ? 'call' : 'check')
+    else { drain(f); nxt(f) }
+  }
+  assert.equal(P0.folds, 3)
+  for (let g = 0; g < 400 && !(f.turn === me() && f.ctl(me()).call); g++) { if (f.turn >= 0) ok(f, f.turn, f.ctl(f.turn).call ? 'call' : 'check'); else { drain(f); nxt(f) } }
+  if (f.turn === me()) {
+    assert.equal(f.ctl(me()).folds, 0)
+    bad(f, me(), 'fold')
+    assert.match(f.setPre(me(), 'fold'), /fold/)
+    const bet0 = P0.bet; run(f, TURN_MS); assert(P0.bet > bet0 || P0.allIn, 'waktu habis = call')
+    assert(!P0.folded)
+  }
+  const nf = mk([1000, 1000, 1000]); begin(nf); assert.equal(nf.ctl(nf.turn).folds, undefined) // mode Normal tanpa batas
 }
 
 console.log('semua tes lulus')

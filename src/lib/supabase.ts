@@ -34,7 +34,7 @@ export type PlayStyle = 'normal' | 'casual' | 'chaos'
 export const PLAY_STYLES: Record<PlayStyle, { icon: string; name: string; desc: string }> = {
   normal: { icon: '🃏', name: 'Normal', desc: 'Skill card maks 3 per match, bandar pakai skill sendiri (maks 1 per hand).' },
   casual: { icon: '☕', name: 'Casual', desc: 'Poker murni: skill card tidak bisa dipakai dan bandar tidak bisa pakai skill.' },
-  chaos: { icon: '🌀', name: 'Chaos', desc: 'Skill card tanpa batas jatah, dan 1 skill bandar acak keluar otomatis tiap hand.' },
+  chaos: { icon: '🌀', name: 'Chaos', desc: 'Skill card tanpa batas jatah, 1 skill bandar acak keluar otomatis tiap hand, dan tiap pemain cuma bisa fold 3× sepanjang match.' },
 }
 export const styleOf = (c: OnlineConfig | null | undefined): PlayStyle => (c?.style && c.style in PLAY_STYLES ? c.style : 'normal')
 
