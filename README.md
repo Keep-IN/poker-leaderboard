@@ -128,7 +128,7 @@ Detailnya:
     | 🕊️ Guardian Angel | Angelic | 1 pemain lain di hand ini kebal tersingkir (bertahan dengan 25% chip awal hand). |
     | 💞 Share the Luck | Angelic | Kartu Luck kamu yang terpasang ikut berlaku untuk 1 pemain lain (pair/suited sejenis; kartu kombinasi meja jadi pocket pair). |
     | 💰 Chip Stack | Passive | Mulai match dengan chip awal +20%. |
-    | 🧠 Card Sense | Passive | Sekali per match, saat flop kamu otomatis tahu 1 kartu lawan acak. |
+    | 🧠 Card Sense | Passive | Setiap flop ada peluang 20% kamu otomatis tahu 1 kartu lawan acak (bisa berkali-kali per match). |
     | 🧲 Lucky Charm | Passive | Peluang semua kartu Luck milikmu +15%. |
 
     Shield menahan semua kartu Attack (Fold Player, Reveal Card, Blindfold, Freeze Player, Blind Steal, Tax Collector); Full Counter tetap didahulukan. Wildcard dan Angelic batch ini belum dijual sampai dealer membukanya di Market.

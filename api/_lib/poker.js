@@ -134,6 +134,7 @@ export const SKILLS = {
 /** Kartu Attack (bisa ditahan Shield). */
 export const ATTACKS = ['fold_player', 'reveal_card', 'blindfold', 'freeze_player', 'blind_steal', 'tax_collector']
 /** Passive yang dipasang sebelum match (selain Double Down yang dihitung di poin): kode -> efek di meja. */
+export const SENSE_CHANCE = 20 // % per flop
 export const PASSIVES = ['full_counter', 'chip_stack', 'card_sense', 'lucky_charm']
 export const DEATH_SHARE = 0.65, TAX_COLLECT = 0.1, STACK_BONUS = 0.2, CHARM_BONUS = 15, GUARD_SHARE = 0.25
 // ---- skill card khusus host (bandar): tanpa batas & gratis, tapi maks 1 per hand; setiap pemakaian diumumkan ----
@@ -420,13 +421,12 @@ export class Table {
     for (let k = this.phase === 'preflop' ? 3 : this.phase === 'turn' && this.extraBoard === this.handNo ? 2 : 1; k--;) this.board.push(this.deck.pop()) // tanpa burn card; Bonus River = 6 kartu meja
     this.phase = { preflop: 'flop', flop: 'turn', turn: 'river' }[this.phase]
     const con = this.players.filter(p => p.inHand && !p.folded)
-    if (this.phase === 'flop') for (const p of con) { // passive Card Sense: sekali per match, tahu 1 kartu lawan saat flop
-      if (!has(this, 'card_sense', p.uid) || (this.sensed || []).includes(p.uid)) continue
+    if (this.phase === 'flop') for (const p of con) { // passive Card Sense: tiap flop 20% peluang tahu 1 kartu lawan acak
+      if (!has(this, 'card_sense', p.uid) || R(100) >= (this.senseChance ?? SENSE_CHANCE)) continue
       const opp = con.filter(q => q !== p)
       if (!opp.length) continue
       const q = opp[R(opp.length)]
       p.sense = { j: this.players.indexOf(q), k: R(2) }
-      this.sensed = [...(this.sensed || []), p.uid]
     }
     if (con.filter(p => !p.allIn).length > 1) return this.setTurn(this.after(this.dealer, p => p.inHand && !p.folded && !p.allIn))
     con.forEach(p => p.show = true) // semua all-in: buka kartu, board dibuka bertahap

@@ -773,6 +773,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
 { // Suited Up, Third Card, Share the Luck, King's Ransom, passive Chip Stack / Lucky Charm / Card Sense
   const t = mk([1000, 1000, 1000])
   t.passives = { chip_stack: ['u0'], card_sense: ['u1'], lucky_charm: ['u2'] }
+  t.senseChance = 100 // paksa Card Sense aktif supaya bisa dites
   begin(t)
   assert.equal(t.players[0].chips + t.players[0].total, 1200) // +20% chip awal
   assert.equal(t.useCard(1, 'suited_up'), undefined)
@@ -785,7 +786,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   const [c, d] = t.players[2].cards; assert.equal(((c / 13) | 0) === ((d / 13) | 0), true, 'pasangan ikut suited')
   assert.equal(t.useCard(0, 'kings_ransom'), undefined)
   while (t.phase === 'preflop') ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
-  assert(t.sensed.includes('u1') || t.players[1].folded)
+  assert(t.players[1].sense || t.players[1].folded) // Card Sense aktif lagi di flop hand berikutnya (tidak lagi sekali per match)
   while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
   drain(t)
   const s0 = stacks(t); nxt(t)

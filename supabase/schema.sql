@@ -233,7 +233,7 @@ insert into public.skill_cards (code, name, kind, description, price, stock, on_
   ('guardian_angel', 'Guardian Angel', 'angelic', 'Saat hand berjalan: 1 pemain lain yang masih ikut hand kebal tersingkir di hand ini (bertahan dengan 25% chip awal hand-nya). Diumumkan.', 200, 1, false, 0),
   ('share_luck', 'Share the Luck', 'angelic', 'Setelah memasang kartu Luck: 1 pemain lain ikut mendapat keberuntungan di hand itu (pair/suited sejenis, atau pocket pair untuk kartu kombinasi meja).', 120, 3, false, 0),
   ('chip_stack', 'Chip Stack', 'passive', 'Pasang di halaman match sebelum match dimulai: mulai match dengan chip awal +20%. Memakai 1 jatah dari 3 kartu per match.', 200, 3, true, 1),
-  ('card_sense', 'Card Sense', 'passive', 'Pasang sebelum match dimulai: sekali per match, saat flop kamu otomatis tahu 1 kartu lawan acak. Memakai 1 jatah dari 3 kartu per match.', 250, 3, true, 1),
+  ('card_sense', 'Card Sense', 'passive', 'Pasang sebelum match dimulai: setiap flop ada peluang 20% kamu otomatis tahu 1 kartu lawan acak. Memakai 1 jatah dari 3 kartu per match.', 250, 3, true, 1),
   ('lucky_charm', 'Lucky Charm', 'passive', 'Pasang sebelum match dimulai: peluang semua kartu Luck milikmu naik 15%. Memakai 1 jatah dari 3 kartu per match.', 300, 3, true, 1)
 on conflict (code) do update set name = excluded.name, kind = excluded.kind, description = excluded.description, sort = excluded.sort;
 

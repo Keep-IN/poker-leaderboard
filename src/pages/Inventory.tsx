@@ -33,7 +33,7 @@ const howToUse: Record<string, string> = {
   guardian_angel: 'Pakai di meja lewat 🎒 saat hand berjalan, pilih pemain lain: dia kebal tersingkir di hand itu.',
   share_luck: 'Pasang kartu Luck dulu, lalu pakai lewat 🎒 dan pilih pemain yang ikut kebagian.',
   chip_stack: 'Pasang di halaman match online sebelum match dimulai: chip awal +20%. Memakai 1 dari 3 jatah kartu.',
-  card_sense: 'Pasang di halaman match online sebelum match dimulai: sekali per match tahu 1 kartu lawan saat flop. Memakai 1 jatah.',
+  card_sense: 'Pasang di halaman match online sebelum match dimulai: setiap flop ada peluang 20% tahu 1 kartu lawan acak. Memakai 1 jatah.',
   lucky_charm: 'Pasang di halaman match online sebelum match dimulai: peluang kartu Luck +15%. Memakai 1 jatah.',
 }
 

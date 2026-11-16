@@ -466,7 +466,7 @@ const PASSIVES = [
   { code: 'double_down', icon: '⚡', name: 'Double Down', on: 'Poin kamu dari match ini jadi 2× lipat.', off: 'Poin dari match ini jadi 2×.' },
   { code: 'full_counter', icon: '🪞', name: 'Full Counter', on: 'Fold Player & Reveal Card ke kamu berbalik ke penyerangnya.', off: 'Fold Player & Reveal Card ke kamu berbalik ke penyerang.' },
   { code: 'chip_stack', icon: '💰', name: 'Chip Stack', on: 'Chip awal kamu di match ini +20%.', off: 'Chip awal +20%.' },
-  { code: 'card_sense', icon: '🧠', name: 'Card Sense', on: 'Sekali di match ini, saat flop kamu tahu 1 kartu lawan.', off: 'Sekali per match tahu 1 kartu lawan saat flop.' },
+  { code: 'card_sense', icon: '🧠', name: 'Card Sense', on: 'Di match ini, tiap flop 20% peluang kamu tahu 1 kartu lawan.', off: 'Tiap flop 20% peluang tahu 1 kartu lawan acak.' },
   { code: 'lucky_charm', icon: '🧲', name: 'Lucky Charm', on: 'Peluang kartu Luck kamu +15% di match ini.', off: 'Peluang kartu Luck +15%.' },
 ]
 
