@@ -13,6 +13,8 @@ import {
   MIN_MATCH_PLAYERS,
   errorMessage,
   onlineConfigText,
+  PLAY_STYLES,
+  styleOf,
   pointsFor,
   supabase,
   type Match,
@@ -82,6 +84,7 @@ export default function MatchRoom() {
 
   const isDealer = match.dealer_id === profile.id
   const online = match.mode === 'online'
+  const style = styleOf(match.online_config)
   // Online results come from the poker table, so the host only starts or cancels.
   const manual = isDealer && !online
   const pts = (place: number) => pointsFor(place, players.length, match.mode)
@@ -112,12 +115,18 @@ export default function MatchRoom() {
           <span className="rounded-full bg-ink/10 px-2.5 py-1 text-xs font-semibold text-slate-200">
             {online ? '🌐 Online' : '🃏 Offline'}
           </span>
+          {online && style !== 'normal' && (
+            <span className={cx('rounded-full px-2.5 py-1 text-xs font-semibold', style === 'chaos' ? 'bg-fuchsia-500/20 text-fuchsia-200' : 'bg-sky-500/15 text-sky-200')}>
+              {PLAY_STYLES[style].icon} {PLAY_STYLES[style].name}
+            </span>
+          )}
         </div>
         <h1 className="mt-2 text-2xl font-extrabold">{match.title}</h1>
         <p className="mt-1 text-sm text-slate-300">
           {hostedByPlayer ? 'Host' : 'Dealer'}: <span className="font-semibold">{match.dealer?.name ?? '-'}</span>
         </p>
         {online && match.online_config && <p className="mt-1 text-xs text-slate-300">{onlineConfigText(match.online_config)}</p>}
+        {online && style !== 'normal' && <p className="mt-1 text-xs text-slate-400">{PLAY_STYLES[style].desc}</p>}
         <div className="mt-4 flex gap-4 text-sm">
           <Meta label="Player" value={`${players.length}/${match.max_players}`} />
           {match.status === 'ongoing' && <Meta label="Masih main" value={String(stillPlaying.length)} />}
@@ -189,7 +198,7 @@ export default function MatchRoom() {
         </p>
       )}
 
-      {online && match.status === 'open' && me && profile.role === 'player' && <PassivePicker matchId={id} />}
+      {online && style !== 'casual' && match.status === 'open' && me && profile.role === 'player' && <PassivePicker matchId={id} chaos={style === 'chaos'} />}
 
       {/* Online table */}
       {online && match.status === 'ongoing' && (
@@ -474,7 +483,7 @@ const PASSIVES = [
  * Pasang/lepas kartu passive untuk match online ini (sebelum dimulai). Boleh beberapa passive sekaligus; tiap passive
  * memakai 1 dari 3 jatah skill card per match. Tidak tampil kalau tidak punya kartu passive.
  */
-function PassivePicker({ matchId }: { matchId: string }) {
+function PassivePicker({ matchId, chaos }: { matchId: string; chaos: boolean }) {
   const { cards, reload } = useMyCards()
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -516,7 +525,9 @@ function PassivePicker({ matchId }: { matchId: string }) {
         </div>
       ))}
       <p className="px-1 text-xs text-slate-400">
-        Tiap passive yang dipasang memakai 1 dari 3 jatah skill card match ini{used ? ` · sisa jatah di meja: ${3 - used}` : ''}.
+        {chaos
+          ? 'Mode Chaos: tanpa batas jatah, pasang passive sebanyak yang kamu punya.'
+          : `Tiap passive yang dipasang memakai 1 dari 3 jatah skill card match ini${used ? ` · sisa jatah di meja: ${3 - used}` : ''}.`}
       </p>
       <ErrorText>{error}</ErrorText>
     </div>

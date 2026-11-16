@@ -24,7 +24,19 @@ export interface OnlineConfig {
   sb: number
   start_chips: number
   level_minutes: number
+  /** Mode permainan; match lama tanpa style = normal. */
+  style?: PlayStyle
 }
+
+export type PlayStyle = 'normal' | 'casual' | 'chaos'
+
+/** Mode permainan match online. Mirrors online_config.style di create_match() dan Table.style di engine meja. */
+export const PLAY_STYLES: Record<PlayStyle, { icon: string; name: string; desc: string }> = {
+  normal: { icon: '🃏', name: 'Normal', desc: 'Skill card maks 3 per match, bandar pakai skill sendiri (maks 1 per hand).' },
+  casual: { icon: '☕', name: 'Casual', desc: 'Poker murni: skill card tidak bisa dipakai dan bandar tidak bisa pakai skill.' },
+  chaos: { icon: '🌀', name: 'Chaos', desc: 'Skill card tanpa batas jatah, dan 1 skill bandar acak keluar otomatis tiap hand.' },
+}
+export const styleOf = (c: OnlineConfig | null | undefined): PlayStyle => (c?.style && c.style in PLAY_STYLES ? c.style : 'normal')
 
 export interface Match {
   id: string
@@ -100,7 +112,8 @@ export function formatChips(n: number) {
 }
 
 export function onlineConfigText(c: OnlineConfig) {
-  return `Blind ${formatChips(c.sb)}/${formatChips(c.sb * 2)} · ${formatChips(c.start_chips)} chip · naik tiap ${c.level_minutes} menit`
+  const st = styleOf(c)
+  return `${st === 'normal' ? '' : `${PLAY_STYLES[st].icon} Mode ${PLAY_STYLES[st].name} · `}Blind ${formatChips(c.sb)}/${formatChips(c.sb * 2)} · ${formatChips(c.start_chips)} chip · naik tiap ${c.level_minutes} menit`
 }
 
 /** Points a player pays to host a match (refunded if it is cancelled). Mirrors `match_creation_cost()` in the database. */

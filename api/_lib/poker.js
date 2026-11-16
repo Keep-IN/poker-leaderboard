@@ -139,6 +139,9 @@ export const PASSIVES = ['full_counter', 'chip_stack', 'card_sense', 'lucky_char
 export const DEATH_SHARE = 0.65, TAX_COLLECT = 0.1, STACK_BONUS = 0.2, CHARM_BONUS = 15, GUARD_SHARE = 0.25
 // ---- skill card khusus host (bandar): tanpa batas & gratis, tapi maks 1 per hand; setiap pemakaian diumumkan ----
 // now: hanya selama hand berjalan. target: pilih 1 pemain yang masih bertahan.
+/** Mode match online: normal (skill card maks 3/match, skill bandar manual), casual (tanpa skill card & skill bandar),
+ *  chaos (skill card tanpa batas jatah, skill bandar keluar otomatis acak tiap hand). */
+export const STYLES = ['normal', 'casual', 'chaos']
 export const HOST_SKILLS = {
   double_payout: { name: 'Double Payout', icon: '💰', now: true },
   jackpot: { name: 'Jackpot Hand', icon: '🎰', now: true },
@@ -270,6 +273,7 @@ export class Table {
     t.started = true
     t.lobby = true
     t.startChips = cfg.start_chips
+    t.style = STYLES.includes(cfg.style) ? cfg.style : 'normal'
     return t
   }
   static from(o) { return Object.assign(new Table(), o) }
@@ -335,7 +339,25 @@ export class Table {
       this.bet = Math.max(...el.map(p => p.bet))
       return this.advance()
     }
+    if (this.style === 'chaos') this.chaosAt = { no: this.handNo, phase: R(2) ? 'flop' : 'preflop' }
     this.step(bb)
+    this.chaosRoll()
+  }
+  // Mode Chaos: 1 skill bandar acak per hand, keluar di fase yang diundi (target juga acak). Dicoba sampai ada yang sah.
+  chaosRoll() {
+    const c = this.chaosAt
+    if (this.style !== 'chaos' || !c || c.no !== this.handNo || c.phase !== this.phase || !this.betting) return
+    this.chaosAt = null
+    const al = this.alive(), con = this.players.filter(p => p.inHand && !p.folded), idx = q => this.players.indexOf(q)
+    const pick = a => a.length ? idx(a[R(a.length)]) : -1
+    for (const code of shuffle(Object.keys(HOST_SKILLS))) {
+      const h = HOST_SKILLS[code]
+      let j = -1, k2 = -1
+      if (h.target === 'hand') j = pick(con)
+      else if (h.target) j = pick(al)
+      if (h.target === 'two') { const rest = al.filter(q => idx(q) !== j); k2 = pick(rest) }
+      if (!this.canHost(code, j, k2, true)) return this.useHost(code, j, k2, true)
+    }
   }
   put(p, a) { a = Math.min(a, p.chips); p.chips -= a; p.bet += a; p.total += a; if (!p.chips) p.allIn = true }
 
@@ -428,7 +450,7 @@ export class Table {
       const q = opp[R(opp.length)]
       p.sense = { j: this.players.indexOf(q), k: R(2) }
     }
-    if (con.filter(p => !p.allIn).length > 1) return this.setTurn(this.after(this.dealer, p => p.inHand && !p.folded && !p.allIn))
+    if (con.filter(p => !p.allIn).length > 1) { this.setTurn(this.after(this.dealer, p => p.inHand && !p.folded && !p.allIn)); return this.chaosRoll() }
     con.forEach(p => p.show = true) // semua all-in: buka kartu, board dibuka bertahap
     this.turn = -1; this.defer('runout', RUNOUT_MS)
   }
@@ -579,6 +601,7 @@ export class Table {
   canUseCard(i, code, j) {
     const p = this.players[i], sk = SKILLS[code]
     if (!sk) return 'Kartu ini tidak bisa dipakai di meja'
+    if (this.style === 'casual') return 'Mode Casual: skill card tidak bisa dipakai di match ini'
     if (this.silenced()) return '🤐 Silence dari host: skill card dikunci di hand ini'
     if (sk.angel) {
       if (this.phase === 'over' || !p) return 'Match sudah selesai'
@@ -950,9 +973,11 @@ export class Table {
   silenced() { return this.betting && this.silence === this.handNo }
   // Hand yang kena efek "hand ini / hand berikutnya": selama hand berjalan = hand ini, di antara hand = hand berikutnya.
   nextNo() { return this.betting ? this.handNo : this.handNo + 1 }
-  canHost(code, j, k2) {
+  canHost(code, j, k2, auto = false) {
     const h = HOST_SKILLS[code]
     if (!h) return 'Skill host tidak dikenal'
+    if (this.style === 'casual') return 'Mode Casual: skill bandar tidak bisa dipakai'
+    if (this.style === 'chaos' && !auto) return 'Mode Chaos: skill bandar keluar otomatis secara acak tiap hand'
     if (this.phase === 'over') return 'Match sudah selesai'
     if (this.lobby || !this.handNo) return 'Skill host baru bisa dipakai setelah hand pertama dibagi'
     if (this.hostUsed === this.handNo) return 'Maksimal 1 skill host per hand, tunggu hand berikutnya'
@@ -998,8 +1023,8 @@ export class Table {
       }
     }
   }
-  useHost(code, j, k2) {
-    const err = this.canHost(code, j, k2)
+  useHost(code, j, k2, auto = false) {
+    const err = this.canHost(code, j, k2, auto)
     if (err) return err
     this.hostUsed = this.handNo
     let extra = ''
@@ -1079,6 +1104,7 @@ export class Table {
       this.luck = { i: j, code: lucks[R(lucks.length)] }
     }
     this.announce(-1, code, Number.isInteger(j) ? j : -1, extra)
+    if (auto) this.ann.auto = true // Mode Chaos: diumumkan dengan cap CHAOS
     if (!this.betting && this.due?.kind === 'next') this.defer('next', Math.max(this.due.at - this.now, 4500)) // beri waktu pengumumannya
   }
   frozen(i) { const p = this.players[i]; return !!p && (p.iced || (this.freeze?.no === this.handNo && this.freeze.uid === p.uid)) }
@@ -1194,7 +1220,7 @@ export class Table {
       nextIn: this.startedAt === null || nextSb === LEVELS[lvl] ? 0 : Math.max(0, this.startedAt + (lvl - this.level0 + 1) * this.levelMs - this.now),
       next: [nextSb, nextSb * 2],
       startIn: this.startedAt === null && this.due ? Math.max(0, this.due.at - this.now) : 0,
-      lobby: !!this.lobby, countdown: this.counting(),
+      lobby: !!this.lobby, countdown: this.counting(), style: this.style || 'normal',
       pot: this.betting ? N.reduce((s, q) => s + q.total + (q.boost || 0), 0) : 0,
       left: this.turn >= 0 && this.due ? Math.max(0, this.due.at - this.now) : 0,
       // showdown: kombinasi tiap pemain untuk disorot bergantian, terlemah dulu, pemenang terakhir

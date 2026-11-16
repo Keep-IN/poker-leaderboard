@@ -450,7 +450,10 @@ begin
     if minutes is null or minutes < 2 or minutes > 60 then
       raise exception 'Blind naik tiap 2 sampai 60 menit';
     end if;
-    cfg := jsonb_build_object('sb', sb, 'start_chips', chips, 'level_minutes', minutes);
+    if coalesce(p_config ->> 'style', 'normal') not in ('normal', 'casual', 'chaos') then
+      raise exception 'Mode permainan tidak dikenal';
+    end if;
+    cfg := jsonb_build_object('sb', sb, 'start_chips', chips, 'level_minutes', minutes, 'style', coalesce(p_config ->> 'style', 'normal'));
   end if;
   if my_role = 'player' and public.points_balance(auth.uid()) < public.match_creation_cost() then
     raise exception 'Poin kamu belum cukup untuk membuat match (butuh % poin)', public.match_creation_cost();
@@ -1516,6 +1519,18 @@ as $$
                      select 1 from public.online_tables t where t.match_id = m.id and coalesce((t.state ->> 'handNo')::int, 0) > 0))));
 $$;
 
+-- Mode permainan match online (online_config.style): normal (maks 3 skill card), casual (tanpa skill card),
+-- chaos (skill card tanpa batas jatah, skill bandar otomatis). Match lama tanpa style = normal.
+create or replace function public.match_style(p_match uuid)
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select online_config ->> 'style' from public.matches where id = p_match), 'normal');
+$$;
+
 create or replace function public.arm_double_down(p_card uuid, p_match uuid)
 returns void
 language plpgsql
@@ -1525,6 +1540,9 @@ as $$
 begin
   if not public.online_not_dealt(p_match) then
     raise exception 'Double Down hanya bisa dipasang sebelum hand pertama dibagi';
+  end if;
+  if public.match_style(p_match) = 'casual' then
+    raise exception 'Mode Casual: skill card tidak bisa dipakai di match ini';
   end if;
   if not exists (select 1 from public.match_players where match_id = p_match and player_id = auth.uid()) then
     raise exception 'Join match ini dulu sebelum memasang Double Down';
@@ -1570,6 +1588,9 @@ begin
   if not public.online_not_dealt(p_match) then
     raise exception 'Passive hanya bisa dipasang sebelum hand pertama dibagi';
   end if;
+  if public.match_style(p_match) = 'casual' then
+    raise exception 'Mode Casual: skill card tidak bisa dipakai di match ini';
+  end if;
   if not exists (select 1 from public.match_players where match_id = p_match and player_id = auth.uid()) then
     raise exception 'Join match ini dulu sebelum memasang passive';
   end if;
@@ -1583,7 +1604,8 @@ begin
   if exists (select 1 from public.player_cards where match_id = p_match and player_id = auth.uid() and card_code = c.card_code and status = 'armed') then
     raise exception 'Kartu ini sudah terpasang di match ini';
   end if;
-  if (select count(*) from public.player_cards where match_id = p_match and player_id = auth.uid() and status in ('used', 'armed')) >= 3 then
+  if public.match_style(p_match) <> 'chaos'
+     and (select count(*) from public.player_cards where match_id = p_match and player_id = auth.uid() and status in ('used', 'armed')) >= 3 then
     raise exception 'Jatah 3 skill card per match sudah habis';
   end if;
   update public.player_cards set status = 'armed', match_id = p_match where id = c.id;
@@ -1621,8 +1643,11 @@ begin
   if not exists (select 1 from public.matches where id = p_match and mode = 'online' and status = 'ongoing') then
     raise exception 'match_not_ongoing';
   end if;
-  -- passive yang dipasang sebelum match (status armed) ikut memakai jatah
-  if (select count(*) from public.player_cards where match_id = p_match and player_id = p_player and status in ('used', 'armed')) >= 3 then
+  if public.match_style(p_match) = 'casual' then
+    raise exception 'Mode Casual: skill card tidak bisa dipakai di match ini';
+  end if;
+  -- passive yang dipasang sebelum match (status armed) ikut memakai jatah; Mode Chaos tanpa batas jatah
+  if public.match_style(p_match) <> 'chaos' and (select count(*) from public.player_cards where match_id = p_match and player_id = p_player and status in ('used', 'armed')) >= 3 then
     raise exception 'Jatah 3 skill card per match sudah habis (termasuk passive yang dipasang)';
   end if;
   update public.player_cards set status = 'used', used_at = now(), match_id = p_match
@@ -1971,6 +1996,7 @@ revoke all on function public.meja_grant_card(uuid, uuid, text) from public, ano
 revoke all on function public.meja_grant_coins(uuid, uuid, int, text) from public, anon, authenticated;
 revoke all on function public.meja_withdraw(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.online_not_dealt(uuid) from public, anon, authenticated;
+revoke all on function public.match_style(uuid) from public, anon, authenticated;
 grant execute on function public.meja_withdraw(uuid, uuid) to service_role;
 grant execute on function public.meja_use_card(uuid, uuid, uuid) to service_role;
 grant execute on function public.meja_refund_card(uuid, uuid, uuid) to service_role;

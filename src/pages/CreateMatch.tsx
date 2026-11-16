@@ -14,6 +14,8 @@ import {
   supabase,
   type MatchMode,
   type OnlineConfig,
+  PLAY_STYLES,
+  type PlayStyle,
 } from '../lib/supabase'
 
 const CHIP_PRESETS = [1000, 1500, 3000, 5000, 10000]
@@ -27,6 +29,7 @@ export default function CreateMatch() {
   const [sb, setSb] = useState(10)
   const [startChips, setStartChips] = useState(1500)
   const [levelMinutes, setLevelMinutes] = useState(10)
+  const [style, setStyle] = useState<PlayStyle>('normal')
   const [timer, setTimer] = useState<TimerChoice>({ kind: 'off' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -70,7 +73,7 @@ export default function CreateMatch() {
 
   const enoughPoints = !isPlayer || (balance ?? 0) >= MATCH_CREATION_COST
   const online = mode === 'online'
-  const config: OnlineConfig = { sb, start_chips: startChips, level_minutes: levelMinutes }
+  const config: OnlineConfig = { sb, start_chips: startChips, level_minutes: levelMinutes, style }
   const chipsOk = startChips >= sb * 20 && startChips <= 1_000_000
 
   if (confirming && balance !== null)
@@ -201,6 +204,26 @@ export default function CreateMatch() {
 
           {online && (
             <>
+              <div>
+                <span className="mb-1.5 block text-sm font-medium text-slate-300">Mode permainan</span>
+                <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-950/60 p-1">
+                  {(Object.keys(PLAY_STYLES) as PlayStyle[]).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setStyle(k)}
+                      className={cx(
+                        'min-h-10 rounded-lg text-sm font-semibold transition',
+                        style === k ? 'bg-brand-400 text-on-accent' : 'text-slate-400 hover:text-slate-200',
+                      )}
+                    >
+                      {PLAY_STYLES[k].icon} {PLAY_STYLES[k].name}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-slate-400">{PLAY_STYLES[style].desc}</p>
+              </div>
+
               <div>
                 <span className="mb-1.5 block text-sm font-medium text-slate-300">Blind awal</span>
                 <div className="flex flex-wrap gap-1.5">

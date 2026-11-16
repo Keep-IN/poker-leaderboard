@@ -547,7 +547,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
 { // fuzz: aksi acak dan timeout, state selalu dimuat ulang dari JSON; chip tetap, urutan tersingkir konsisten, selalu selesai
   for (let round = 0; round < 300; round++) {
     const n = 3 + (round % 6), R = k => Math.random() * k | 0
-    let t = mk(Array.from({ length: n }, () => 200 + R(800)), { level_minutes: 1 + R(3) })
+    let t = mk(Array.from({ length: n }, () => 200 + R(800)), { level_minutes: 1 + R(3), style: ['normal', 'chaos', 'normal', 'casual'][round % 4] })
     if (round % 2) { t.counter = [t.players[R(n)].uid]; t.passives = { chip_stack: [t.players[R(n)].uid], card_sense: [t.players[R(n)].uid], lucky_charm: [t.players[R(n)].uid] } }
     const total = t.players.reduce((s, p) => s + p.chips, 0)
     begin(t)
@@ -857,7 +857,7 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
   drain(t)
   const w = t.players.filter(p => p.won > 0)
-  assert.equal(t.coins.filter(c => c.ref.endsWith(':hand')).length, w.length); assert(w.every(p => p.coin === 2))
+  assert.equal(t.coins.filter(c => c.ref.endsWith(':hand')).length, w.length); assert(w.every(p => p.coin - (p.bigHand || 0) === 2)) // bisa ditambah bonus Big Hand kalau kombinasinya besar
   t.handCoins[w[0].uid] = 49; t.coins = []
   nxt(t); while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check'); drain(t)
   for (const c of t.coins.filter(c => c.uid === w[0].uid && c.ref.endsWith(':hand'))) assert.equal(c.n, 1) // sisa jatah 1
@@ -880,6 +880,26 @@ const reload = (t, now) => { const u = Table.from(JSON.parse(JSON.stringify(t)))
   while (t.betting && t.turn >= 0) ok(t, t.turn, t.ctl(t.turn).call ? 'call' : 'check')
   drain(t)
   assert(!(t.coins || []).some(c => c.ref.endsWith(':big')))
+}
+
+{ // Mode Casual: skill card dan skill bandar ditolak; Mode Chaos: skill bandar manual ditolak, keluar otomatis tiap hand
+  const c = mk([1000, 1000, 1000], { style: 'casual' }); begin(c)
+  assert.equal(c.style, 'casual'); assert.equal(c.view(c.players[0]).style, 'casual')
+  assert.match(c.useCard(0, 'defend_me'), /Casual/)
+  assert.match(c.useHost('jackpot'), /Casual/)
+  assert.equal(mk([1000, 1000, 1000], { style: 'aneh' }).style, 'normal') // nilai tak dikenal = normal
+  const x = mk([5000, 5000, 5000, 5000], { style: 'chaos' }); begin(x)
+  assert.match(x.useHost('jackpot'), /Chaos/)
+  assert.equal(x.useCard(0, 'defend_me'), undefined) // skill card tetap bisa
+  let fired = 0, mad = false
+  for (let h = 0; h < 20 && x.phase !== 'over'; h++) {
+    const no = x.handNo
+    while (x.betting && x.turn >= 0) ok(x, x.turn, x.ctl(x.turn).call ? 'call' : 'check') // semua call/check: selalu sampai flop
+    // tiap hand keluar 1 skill bandar otomatis, kecuali hand All-in Madness (langsung all-in, tanpa giliran)
+    if (!mad) { assert.equal(x.hostUsed, no, 'hand ' + no + ' tanpa skill bandar otomatis'); fired++ }
+    drain(x); mad = !!x.madness; nxt(x)
+  }
+  assert(fired >= 1)
 }
 
 console.log('semua tes lulus')

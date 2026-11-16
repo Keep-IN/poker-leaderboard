@@ -135,7 +135,7 @@ Detailnya:
 - **Pengumuman di tengah meja**: pemakaian kartu Attack dan Wildcard ditampilkan ke semua pemain (siapa memakai kartu apa ke siapa; khusus Reveal Card tanpa nama korban). Kartu Passive, Luck, dan Defend tidak diumumkan, kecuali Card Reroll. Setiap pengumuman di tengah hand **mengulang waktu giliran** pemain yang sedang jalan dari awal.
 - 🎁 **Gift dari dealer** (menu dealer **Kirim Gift** di Beranda, `/gifts`): dealer mengirim koin dan/atau skill card (1–10 per player, semua kartu termasuk wildcard) ke semua player atau player pilihan, dengan pesan opsional. Kartu gift tidak mengurangi stok market. Gift muncul di Beranda player dan masuk ke akun setelah player menekan **Klaim** (atau **Klaim semua**); koin tercatat di riwayat koin sebagai "Gift dari dealer". Dealer melihat riwayat kiriman (berapa yang sudah diklaim) dan bisa membatalkan gift yang belum diklaim.
 - Kartu Defend dan Luck baru terlihat pemain lain saat kartu dibuka di akhir hand. Kalau kartu gagal dipakai (misalnya target keburu fold), kartunya kembali ke inventory.
-- Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match (termasuk passive yang dipasang sebelum match).
+- Batas pemakaian: 1 kartu per hand, maksimal 3 kartu per match (termasuk passive yang dipasang sebelum match). Mode Chaos tanpa batas per match; Mode Casual tidak bisa memakai skill card.
 
 ### 👑 Podium all time
 - Tiga besar leaderboard all time mendapat **bingkai avatar logam** (emas, perak, perunggu) dengan kilau berputar dan **medali peringkat**. #1 juga mendapat 👑 dan bintang berkelip. Bingkai tampil di semua tempat avatar muncul.
@@ -161,6 +161,11 @@ Detailnya:
 ### 🌐 Match Online
 - Saat membuat match, host memilih **Offline** atau **Online**.
 - Untuk match online, host menentukan **maksimal player**, **blind awal** (10/20, 25/50, 50/100, …), **chip awal** tiap player, dan **blind naik tiap berapa menit**.
+- **Mode permainan** (dipilih saat membuat match online, tampil sebagai badge di halaman match dan catatan di lobi meja):
+  - 🃏 **Normal**: aturan biasa. Skill card maks 3 per match (termasuk passive), bandar pakai skill sendiri maks 1 per hand.
+  - ☕ **Casual**: poker murni. Pemain tidak bisa memakai/memasang skill card apa pun (termasuk passive dan Double Down), dan bandar tidak bisa memakai skill bandar.
+  - 🌀 **Chaos**: skill card **tanpa batas jatah per match** (batas 1 kartu per hand dan aturan kartu lainnya tetap). Bandar tidak memilih skill sendiri: **1 skill bandar acak keluar otomatis tiap hand** (diundi keluar saat preflop atau flop, target juga acak) dan diumumkan dengan cap 🌀 CHAOS.
+  - Match lama dan match offline dianggap Normal.
 - Setelah host menekan Mulai, pemain menekan **Masuk meja poker** di halaman match dan bermain Texas Hold'em langsung di website. Yang bukan pemain bisa **menonton** (kartu tertutup tidak terlihat).
 - **Lobi Ready**: setelah host menekan Mulai, meja belum langsung membagi kartu. Tiap pemain menekan **Ready** (bisa dibatalkan) atau **Out** (keluar dari match). Begitu **semua pemain Ready**, muncul hitung mundur **3-2-1** lalu hand pertama dibagi. Selama lobi, Double Down bisa dipasang lewat 🎒. Host bisa **mengeluarkan** pemain yang belum Ready (misalnya tidak membuka meja) supaya match tidak tertahan. Out dan dikeluarkan butuh minimal tersisa 2 pemain.
 - **Mode turnamen**: tidak ada beli chip lagi. Chip habis = tersingkir. Yang terakhir punya chip jadi juara.
