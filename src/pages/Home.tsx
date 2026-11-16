@@ -325,8 +325,12 @@ interface DealerMatchRow {
   players: { count: number }[]
 }
 
+type DealerTab = 'match' | 'misi' | 'skill'
+
 function DealerHome({ profile }: { profile: Profile }) {
   const [rows, setRows] = useState<DealerMatchRow[] | null>(null)
+  const [tab, setTab] = useState<DealerTab>(() => (localStorage.getItem('dealerTab') as DealerTab) || 'match')
+  const [allHistory, setAllHistory] = useState(false)
 
   useEffect(() => {
     supabase
@@ -342,38 +346,32 @@ function DealerHome({ profile }: { profile: Profile }) {
   const hosted = rows.filter((m) => m.status === 'finished').length
   const active = rows.filter((m) => m.status === 'open' || m.status === 'ongoing')
   const history = rows.filter((m) => m.status === 'finished' || m.status === 'cancelled')
+  const players = rows.filter((m) => m.status === 'finished').reduce((s, m) => s + (m.players[0]?.count ?? 0), 0)
+  const pick = (t: DealerTab) => { setTab(t); localStorage.setItem('dealerTab', t) }
 
   return (
     <div className="space-y-5">
       <Greeting profile={profile} subtitle="Panel dealer" />
 
-      <div className="space-y-5 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-      <Card className="relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-6 -right-4 text-[120px] leading-none text-ink/[0.03]">♦</div>
-        <p className="text-sm text-slate-400">Match yang sudah di-host</p>
-        <p className="mt-1 text-5xl font-extrabold text-brand-400">{hosted}</p>
-      </Card>
-
-      <Link
-        to="/dealer/new"
-        className="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-brand-400 text-base font-bold text-on-accent shadow-lg shadow-brand-500/20 transition active:scale-[0.98]"
-      >
-        <span className="text-xl">＋</span> Buat Match Baru
-      </Link>
+      {/* ringkasan */}
+      <div className="grid grid-cols-3 gap-2">
+        <DealerStat icon="🎲" label="Match di-host" value={hosted} accent />
+        <DealerStat icon="🟢" label="Match aktif" value={active.length} />
+        <DealerStat icon="👥" label="Total pemain" value={players} />
       </div>
 
-      <Link
-        to="/gifts"
-        className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-fuchsia-400/50 bg-fuchsia-500/10 text-sm font-bold text-fuchsia-200 transition hover:bg-fuchsia-500/20 active:scale-[0.98] md:w-fit md:px-8"
-      >
-        🎁 Kirim Gift ke Player
-      </Link>
+      {/* aksi cepat */}
+      <div className="grid grid-cols-3 gap-2 md:grid-cols-5">
+        <Link to="/dealer/new" className="col-span-3 flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-brand-400 text-base font-bold text-on-accent shadow-lg shadow-brand-500/20 transition active:scale-[0.98] md:col-span-1 md:min-h-20 md:flex-col md:gap-1">
+          <span className="text-xl">＋</span> Buat Match
+        </Link>
+        <QuickAction to="/gifts" icon="🎁" label="Kirim Gift" />
+        <QuickAction to="/missions/new" icon="🎯" label="Buat Misi" />
+        <QuickAction to="/market" icon="🛒" label="Market & Gacha" />
+        <QuickAction to="/matches" icon="🃏" label="Semua Match" className="hidden md:flex" />
+      </div>
 
-      <HostSkillList />
-      <DealerDuelSections me={profile.id} />
-      <DealerMissions />
-      <DealerBounties />
-
+      {/* yang perlu tindakan sekarang */}
       {active.length > 0 && (
         <section>
           <SectionTitle>Match aktif</SectionTitle>
@@ -392,31 +390,76 @@ function DealerHome({ profile }: { profile: Profile }) {
           </div>
         </section>
       )}
+      <DealerDuelSections me={profile.id} />
 
-      <section>
-        <SectionTitle>Riwayat hosting</SectionTitle>
-        {history.length === 0 ? (
+      {/* sisanya dipisah per tab supaya halaman tidak panjang */}
+      <div className="sticky top-14 z-10 -mx-1 flex gap-1 rounded-2xl bg-surface-900/90 p-1 backdrop-blur md:top-16">
+        {([['match', '📜 Riwayat'], ['misi', '🎯 Misi & Bounty'], ['skill', '🎩 Skill Bandar']] as const).map(([k, label]) => (
+          <button key={k} type="button" onClick={() => pick(k)}
+            className={cx('min-h-10 flex-1 whitespace-nowrap rounded-xl px-1 text-xs font-bold transition sm:text-sm', tab === k ? 'bg-brand-400 text-on-accent' : 'text-slate-300 hover:bg-ink/5')}>
+            <span className="sm:hidden">{label.split(' ').slice(0, 2).join(' ')}</span>
+            <span className="hidden sm:inline">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {tab === 'match' && (
+        history.length === 0 ? (
           <Card>
             <EmptyState icon="🎲" title="Belum ada match selesai" />
           </Card>
         ) : (
-          <Card className="divide-y divide-ink/5 p-0">
-            {history.map((m) => (
-              <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-ink/5">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{m.title}</p>
-                  <p className="truncate text-xs text-slate-400">
-                    {formatDate(m.finished_at ?? m.created_at)}
-                    {m.winner ? ` · 🏆 ${m.winner.name}` : m.status === 'cancelled' ? ' · Dibatalkan' : ''}
-                  </p>
-                </div>
-                <Chevron />
-              </Link>
-            ))}
-          </Card>
-        )}
-      </section>
+          <div className="space-y-2">
+            <Card className="divide-y divide-ink/5 p-0">
+              {(allHistory ? history : history.slice(0, 6)).map((m) => (
+                <Link key={m.id} to={`/matches/${m.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-ink/5">
+                  <span className="text-lg">{m.status === 'cancelled' ? '✖️' : '🏆'}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{m.title}</p>
+                    <p className="truncate text-xs text-slate-400">
+                      {formatDate(m.finished_at ?? m.created_at)} · {m.players[0]?.count ?? 0} player
+                      {m.winner ? ` · ${m.winner.name}` : m.status === 'cancelled' ? ' · Dibatalkan' : ''}
+                    </p>
+                  </div>
+                  <Chevron />
+                </Link>
+              ))}
+            </Card>
+            {history.length > 6 && (
+              <button type="button" onClick={() => setAllHistory(!allHistory)} className="min-h-10 w-full rounded-xl bg-ink/5 text-sm font-semibold text-slate-300 hover:bg-ink/10">
+                {allHistory ? 'Tampilkan lebih sedikit' : `Lihat semua (${history.length})`}
+              </button>
+            )}
+          </div>
+        )
+      )}
+      {tab === 'misi' && (
+        <div className="space-y-5">
+          <DealerMissions />
+          <DealerBounties />
+        </div>
+      )}
+      {tab === 'skill' && <HostSkillList />}
     </div>
+  )
+}
+
+function DealerStat({ icon, label, value, accent }: { icon: string; label: string; value: number; accent?: boolean }) {
+  return (
+    <Card className="relative overflow-hidden p-3">
+      <span className="pointer-events-none absolute -top-1 -right-1 text-3xl opacity-15">{icon}</span>
+      <p className={cx('text-3xl font-extrabold leading-none', accent && 'text-brand-400')}>{value}</p>
+      <p className="mt-1 text-xs leading-tight text-slate-400">{label}</p>
+    </Card>
+  )
+}
+
+function QuickAction({ to, icon, label, className }: { to: string; icon: string; label: string; className?: string }) {
+  return (
+    <Link to={to} className={cx('flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border border-ink/8 bg-surface-800/80 px-1 text-center text-xs font-semibold text-slate-200 transition hover:bg-surface-700/80 active:scale-[0.97]', className)}>
+      <span className="text-2xl">{icon}</span>
+      <span className="leading-tight">{label}</span>
+    </Link>
   )
 }
 

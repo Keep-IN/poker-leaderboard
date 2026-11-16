@@ -143,11 +143,10 @@ Detailnya:
 - Gelar tampil sebagai pita logam di profil: Raja Meja, Tangan Dingin, Penantang.
 
 ### 🎩 Beranda Dealer
-- Jumlah **match yang sudah di-host**.
-- Tombol **Buat Match Baru**.
-- Daftar **misi** yang sedang berjalan (jumlah player yang sudah selesai dan sisa waktunya), tombol **Buat misi**, dan tombol untuk membatalkan misi.
-- Daftar match aktif dan riwayat hosting beserta pemenangnya.
-- Daftar **🎩 Skill Bandar**: skill card khusus host yang bisa dipakai di meja online (lihat Match Online).
+- **Ringkasan**: match yang sudah di-host, match aktif, dan total pemain yang pernah ikut.
+- **Aksi cepat**: Buat Match, Kirim Gift, Buat Misi, Market & Gacha (dan Semua Match di desktop).
+- **Match aktif** dan **duel yang menunggu persetujuan** selalu tampil di atas karena perlu tindakan.
+- Sisanya dipisah ke tab supaya halaman tidak panjang (tab terakhir diingat): **📜 Riwayat** (6 match terakhir + Lihat semua), **🎯 Misi & Bounty**, dan **🎩 Skill Bandar** (grid ringkas dengan filter Saat hand / Kapan saja / Khusus; ketuk untuk melihat efek).
 
 ### 🃏 Match
 - Daftar **match yang sedang aktif** dan **match yang baru selesai**, bisa dilihat semua user.

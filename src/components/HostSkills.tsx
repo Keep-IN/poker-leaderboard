@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card, SectionTitle } from './ui'
+import { Card, cx } from './ui'
 
 /** Skill card khusus host (sama dengan HOST_SKILLS di api/_lib/poker.js). Dipakai lewat tombol 🎩 di meja online. */
 export const HOST_SKILLS = [
@@ -38,32 +38,50 @@ export const HOST_SKILLS = [
   { code: 'revenge_vote', icon: '🗳️', name: 'Revenge Vote', when: 'Ada yang tersingkir', desc: 'Pemain tersingkir voting 1 pemain untuk kehilangan 10% chip.' },
 ]
 
+const WHEN_FILTERS = [
+  { key: 'all', label: 'Semua' },
+  { key: 'hand', label: 'Saat hand' },
+  { key: 'any', label: 'Kapan saja' },
+  { key: 'other', label: 'Khusus' },
+] as const
+const whenGroup = (w: string) => (w === 'Saat hand berjalan' ? 'hand' : w === 'Kapan saja' ? 'any' : 'other')
+
 export function HostSkillList() {
-  const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState<(typeof WHEN_FILTERS)[number]['key']>('all')
+  const [open, setOpen] = useState('')
+  const list = HOST_SKILLS.filter((s) => filter === 'all' || whenGroup(s.when) === filter)
   return (
-    <section>
-      <SectionTitle>🎩 Skill Bandar</SectionTitle>
-      <Card className="space-y-3">
-        <p className="text-sm text-slate-400">
-          Gratis &amp; tanpa batas untuk host match online, maksimal 1 per hand, dan selalu diumumkan di meja. Buka meja, lalu ketuk tombol 🎩.
+    <section className="space-y-3">
+      <Card className="flex items-center gap-3 border-violet-400/30 bg-violet-500/10 p-3">
+        <span className="text-3xl">🎩</span>
+        <p className="text-sm text-slate-300">
+          <b className="text-violet-200">{HOST_SKILLS.length} skill</b> gratis & tanpa batas untuk host match online, maks 1 per hand, selalu diumumkan. Pakai lewat tombol 🎩 di meja.
         </p>
-        <div className={open ? 'grid gap-2 md:grid-cols-2' : 'grid gap-2 md:grid-cols-2 [&>*:nth-child(n+5)]:hidden'}>
-          {HOST_SKILLS.map((s) => (
-            <div key={s.code} className="flex gap-3 rounded-xl border border-violet-400/25 bg-violet-500/10 px-3 py-2.5">
-              <span className="text-2xl leading-none">{s.icon}</span>
-              <div className="min-w-0">
-                <p className="font-semibold">
-                  {s.name} <span className="text-[11px] font-normal text-violet-300">· {s.when}</span>
-                </p>
-                <p className="text-xs text-slate-400">{s.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <button type="button" onClick={() => setOpen(!open)} className="min-h-10 w-full rounded-xl bg-ink/5 text-sm font-semibold text-slate-300 hover:bg-ink/10">
-          {open ? 'Tutup' : `Lihat semua (${HOST_SKILLS.length})`}
-        </button>
       </Card>
+      <div className="flex flex-wrap gap-1.5">
+        {WHEN_FILTERS.map((f) => (
+          <button key={f.key} type="button" onClick={() => setFilter(f.key)}
+            className={cx('min-h-9 rounded-full px-3 text-xs font-bold transition', filter === f.key ? 'bg-violet-400 text-[#1a0838]' : 'bg-ink/5 text-slate-300 hover:bg-ink/10')}>
+            {f.label} <span className="opacity-60">{f.key === 'all' ? HOST_SKILLS.length : HOST_SKILLS.filter((s) => whenGroup(s.when) === f.key).length}</span>
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+        {list.map((s) => (
+          <button key={s.code} type="button" onClick={() => setOpen(open === s.code ? '' : s.code)}
+            className={cx('rounded-xl border px-3 py-2.5 text-left transition', open === s.code ? 'col-span-2 border-violet-400/60 bg-violet-500/15 md:col-span-3' : 'border-violet-400/20 bg-violet-500/5 hover:bg-violet-500/10')}>
+            <span className="flex items-center gap-2">
+              <span className="text-xl leading-none">{s.icon}</span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">{s.name}</span>
+                <span className="block truncate text-[11px] text-violet-300">{s.when}</span>
+              </span>
+            </span>
+            {open === s.code && <span className="mt-2 block text-xs text-slate-300">{s.desc}</span>}
+          </button>
+        ))}
+      </div>
+      <p className="text-center text-xs text-slate-500">Ketuk skill untuk melihat efeknya.</p>
     </section>
   )
 }
